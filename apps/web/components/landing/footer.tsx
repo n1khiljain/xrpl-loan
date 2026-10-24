@@ -68,7 +68,7 @@ export function LandingFooter() {
               <span className="text-base">
                 <ClientLockup tone="on-dark" />
               </span>
-              <p className="text-on-ink/60 text-xs leading-relaxed lg:text-[13px]">Built by Blockchain at Berkeley in collaboration with Frax. frxUSD is issued by Frax.</p>
+              <p className="text-on-ink/60 text-xs leading-relaxed lg:text-[13px]">Built by Blockchain at Berkeley on the XRP Ledger. Runs on XRPL test networks only; no real money moves.</p>
             </div>
           </div>
           <div className="flex flex-col gap-3 p-4 sm:w-[30%] sm:gap-4 sm:p-6 lg:gap-5 lg:p-8 xl:p-12">

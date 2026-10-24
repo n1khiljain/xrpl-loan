@@ -1,5 +1,5 @@
 /**
- * The browser's anon key can't read or write any table (FR-B1, SYSTEM_DESIGN 5.1). This goes through the real API
+ * The browser's anon key can't read or write any table. This goes through the real API
  * gateway and PostgREST on the local stack, the same path a browser would take. `supabase/tests/database` checks
  * the same thing inside Postgres.
  */
@@ -11,10 +11,8 @@ const EXPECTED_TABLES = [
   "admin_actions",
   "claim_documents",
   "claims",
-  "fraxnet_connections",
-  "fraxnet_oauth_states",
-  "gas_drips",
   "guarantor_invites",
+  "ledger_txs",
   "notifications",
   "once_keys",
   "org_officers",
@@ -22,6 +20,7 @@ const EXPECTED_TABLES = [
   "profiles",
   "staff",
   "sync_state",
+  "wallets",
 ];
 
 /** Every table PostgREST exposes, and one real column of each, from its OpenAPI document (service role). */
@@ -46,9 +45,9 @@ Deno.test({
 
     // a row in every table the browser might go looking for, so an empty result can't pass for a denial
     const service = createClient(stack.url, stack.serviceKey, { auth: { persistSession: false } });
-    const probe = `0x${"ab".repeat(20)}`;
+    const probe = "rPEPPER7kfTD9w2To4CQk6UCfuHM9c6GDY";
     await service.from("staff").upsert({ wallet_address: probe, role: "admin" });
-    await service.from("sync_state").upsert({ key: "anon-probe", last_block: 1 });
+    await service.from("sync_state").upsert({ key: "anon-probe", last_ledger: 1 });
 
     const keys = [["anon", stack.anonKey], ...(stack.publishableKey ? [["publishable", stack.publishableKey]] : [])];
     try {

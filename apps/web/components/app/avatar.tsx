@@ -8,7 +8,7 @@ export function initials(name: string | null | undefined): string {
 }
 
 /**
- * Someone's initials in a plain circle (U-75). `onInk` is the white circle for the dark sidebar; otherwise it's dark
+ * Someone's initials in a plain circle. `onInk` is the white circle for the dark sidebar; otherwise it's dark
  * on light. The letters swap in when the name changes.
  */
 export function Avatar({ name, onInk = false, className }: { name: string | null | undefined; onInk?: boolean; className?: string }) {

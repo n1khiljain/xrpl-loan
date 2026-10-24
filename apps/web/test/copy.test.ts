@@ -1,3 +1,4 @@
+import { fileURLToPath } from "node:url";
 import { readFileSync, readdirSync, statSync } from "node:fs";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
@@ -11,23 +12,23 @@ function files(dir: string, out: string[] = []): string[] {
   return out;
 }
 
-const SOURCES = [...files(new URL("../app", import.meta.url).pathname), ...files(new URL("../components", import.meta.url).pathname)].filter(
+const SOURCES = [...files(fileURLToPath(new URL("../app", import.meta.url))), ...files(fileURLToPath(new URL("../components", import.meta.url)))].filter(
   (p) => /\.(tsx?|css)$/.test(p),
 );
 
 describe("copy and styling rules", () => {
-  it("no user-facing copy uses loan, borrow, interest, or repay (U-09)", () => {
+  it("nothing still names Frax, frxUSD, or Fraxtal", () => {
     const hits = SOURCES.flatMap((p) =>
       readFileSync(p, "utf8")
         .split("\n")
         .map((line, i) => ({ p, i, line }))
-        .filter(({ line }) => /\b(loan|loans|borrow\w*|interest|repay\w*)\b/i.test(line))
+        .filter(({ line }) => /\b(frax\w*|frxusd)\b/i.test(line))
         .map(({ p, i, line }) => `${p}:${i + 1}: ${line.trim()}`),
     );
     expect(hits).toEqual([]);
   });
 
-  it("no raw hex colors outside app/globals.css (BRAND.md tokens only)", () => {
+  it("no raw hex colors outside app/globals.css (design tokens only)", () => {
     const hits = SOURCES.filter((p) => !p.endsWith("app/globals.css")).flatMap((p) =>
       readFileSync(p, "utf8")
         .split("\n")

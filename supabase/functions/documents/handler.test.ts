@@ -12,7 +12,7 @@ Deno.test("documents rejects requests without a valid Privy token", async () => 
   assertEquals(storage.uploads.length, 0);
 });
 
-Deno.test("create returns a signed upload target; confirm hashes what was uploaded (FR-B3)", async () => {
+Deno.test("create returns a signed upload target; confirm hashes what was uploaded", async () => {
   const w = await draftWorld({ receipts: [] });
   const handler = createDocumentsHandler({ auth: verifier, db: w.db, storage: w.storage });
   const bytes = new TextEncoder().encode("%PDF-1.7 receipt for snacks");
@@ -54,6 +54,6 @@ Deno.test("only the claimant uploads, only allowed types and sizes, and only bef
   w.storage.put(upload.path, new Uint8Array(99));
   assertStatus(await call(handler, "POST", ENDPOINT, { token: w.claimant.token, body: { action: "confirm", documentId: doc.id } }), 409, "size_mismatch");
 
-  await w.db.updateClaim(w.claim.id, { packetHash: `0x${"22".repeat(32)}`, packetJson: {} });
+  await w.db.updateClaim(w.claim.id, { packetHash: "22".repeat(32), packetJson: {} });
   assertStatus(await create(w.claimant.token), 409, "frozen");
 });

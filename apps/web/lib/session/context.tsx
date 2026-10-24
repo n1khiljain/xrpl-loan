@@ -9,16 +9,15 @@ export const SIGNED_OUT: Session = {
   kind: "none",
   status: "loading",
   userId: null,
-  address: null,
   email: null,
   name: null,
-  login: () => {},
   sendEmailCode: noop,
   verifyEmailCode: noop,
   loginWithGoogle: noop,
   loginError: null,
   logout: noop,
   getAccessToken: async () => null,
+  getIdentityToken: async () => null,
   unavailableReason: null,
 };
 

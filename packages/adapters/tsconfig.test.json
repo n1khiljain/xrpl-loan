@@ -1,5 +1,0 @@
-{
-  "extends": "../../tsconfig.base.json",
-  "compilerOptions": { "types": ["node"] },
-  "include": ["index.ts", "shared", "fraxnet", "gas-sponsor", "cash-out", "chain-reader", "test", "vitest.config.ts"]
-}

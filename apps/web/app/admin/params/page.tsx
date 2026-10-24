@@ -1,167 +1,94 @@
 "use client";
 
-import { claimRegistryAbi, receivablesPoolAbi } from "@app/abi";
-import { useQuery } from "@tanstack/react-query";
-import { useState } from "react";
-import { encodeFunctionData } from "viem";
 import { AdminShell } from "@/components/admin/admin-shell";
-import { ErrorNotice } from "@/components/app/notice";
-import { SafeAction } from "@/components/app/safe-action";
-import { Badge } from "@/components/ui/badge";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Skeleton } from "@/components/ui/skeleton";
-import { roleSafe, useHoldsRole } from "@/hooks/use-roles";
-import { publicClient } from "@/lib/chain";
-import { deployedContracts } from "@/lib/config";
-import { parseUsd, usd, weiToInput } from "@/lib/format";
-import { cn } from "@/lib/utils";
+import { StatusText } from "@/components/admin/status-text";
+import { InfoNotice } from "@/components/app/notice";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { ASSET, accountUrl, config, ledgerReady } from "@/lib/config";
+import { shortAddress, usd } from "@/lib/format";
 
-type Field = { key: string; label: string; hint: string; kind: "usd" | "bps" | "days" };
-const FIELDS: Field[] = [
-  { key: "advanceRateBps", label: "Advance rate (bps)", hint: "Share of face value the pool pays", kind: "bps" },
-  { key: "feeBps", label: "Fee (bps a year)", hint: "Yearly rate on unpaid principal, accrued every second; free during the pilot", kind: "bps" },
-  { key: "perClaimCap", label: "Per-reimbursement cap", hint: "Largest single one", kind: "usd" },
-  { key: "perOrgCap", label: "Per-org cap", hint: "Outstanding across one org", kind: "usd" },
-  { key: "overdueWindow", label: "Overdue window (days)", hint: "From payout to due date", kind: "days" },
-  { key: "approvalExpiry", label: "Approval expiry (days)", hint: "Time to press Get paid", kind: "days" },
-  { key: "writeOffGrace", label: "Write-off grace (days)", hint: "After the officer is asked to cover", kind: "days" },
+type Row = { label: string; value: string; hint: string };
+
+const days = (seconds: number) => `${Math.round(seconds / 86_400)} days`;
+
+const LIMITS: Row[] = [
+  { label: "Advance rate", value: `${config.params.advanceRateBps / 100}%`, hint: "Share of face value that can be paid out" },
+  { label: "Fee", value: `${config.params.feeBps / 100}% a year`, hint: "Yearly rate on unpaid principal" },
+  { label: "Per-reimbursement cap", value: usd(config.params.perClaimCap), hint: "Largest single one" },
+  { label: "Per-org cap", value: usd(config.params.perOrgCap), hint: "Outstanding across one org" },
+  { label: "Vault deposit cap", value: usd(config.params.poolDepositCap), hint: "Most the vault takes in" },
+  { label: "Due window", value: days(config.params.overdueWindowSeconds), hint: "From payout to due date" },
+  { label: "Approval expiry", value: days(config.params.approvalExpirySeconds), hint: "Time to collect after approval" },
+  { label: "Write-off grace", value: days(config.params.writeOffGraceSeconds), hint: "After the officer is asked to cover" },
 ];
 
-type Params = { advanceRateBps: number; feeBps: number; perClaimCap: bigint; perOrgCap: bigint; overdueWindow: number; approvalExpiry: number; writeOffGrace: number };
+/** The ledger accounts and objects `pnpm xrpl:setup` writes into deployments/<network>.json. */
+const ACCOUNTS: Array<{ label: string; address: string | null | undefined }> = [
+  { label: `${ASSET} issuer`, address: config.asset.issuer },
+  { label: "Loan broker", address: config.ledger.broker },
+  { label: "Credential issuer", address: config.ledger.credentialIssuer },
+  { label: "Repayment account", address: config.ledger.repaymentAccount },
+];
+const OBJECTS: Array<{ label: string; id: string | undefined }> = [
+  { label: "Permissioned domain", id: config.ledger.domainId },
+  { label: "Single asset vault", id: config.ledger.vaultId },
+  { label: "Loan broker object", id: config.ledger.loanBrokerId },
+];
 
-function show(p: Params, f: Field): string {
-  const v = p[f.key as keyof Params];
-  if (f.kind === "usd") return usd(v as bigint);
-  if (f.kind === "days") return String(Number(v) / 86_400);
-  return String(v);
-}
-function toInput(p: Params, f: Field): string {
-  const v = p[f.key as keyof Params];
-  return f.kind === "usd" ? weiToInput(v as bigint) : f.kind === "days" ? String(Number(v) / 86_400) : String(v);
-}
-
-function Limits() {
-  const deployed = deployedContracts();
-  const holds = useHoldsRole("admin");
-  const current = useQuery({
-    queryKey: ["params"],
-    enabled: Boolean(deployed),
-    queryFn: async () => {
-      const [p, cap, allowlist] = await Promise.all([
-        publicClient.readContract({ address: deployed!.claimRegistry, abi: claimRegistryAbi, functionName: "params" }),
-        publicClient.readContract({ address: deployed!.pool, abi: receivablesPoolAbi, functionName: "depositCap" }),
-        publicClient.readContract({ address: deployed!.pool, abi: receivablesPoolAbi, functionName: "allowlistEnabled" }),
-      ]);
-      return { params: p as Params, cap, allowlist };
-    },
-  });
-  if (!deployed || current.isPending) return <Skeleton className="h-48 w-full rounded-3xl" />;
-  if (current.isError) return <ErrorNotice>We couldn&apos;t read the current limits.</ErrorNotice>;
-  return <LimitsForm key={JSON.stringify(current.data, (_k, v) => (typeof v === "bigint" ? v.toString() : v))} current={current.data} directSender={holds.data === true} />;
-}
-
-function LimitsForm({ current, directSender }: { current: { params: Params; cap: bigint; allowlist: boolean }; directSender: boolean }) {
-  const deployed = deployedContracts()!;
-  const p = current.params;
-  const [draft, setDraft] = useState<Record<string, string>>(() => Object.fromEntries(FIELDS.map((f) => [f.key, toInput(p, f)])));
-  const [cap, setCap] = useState(() => weiToInput(current.cap));
-
-  const proposed: Params | null = (() => {
-    try {
-      const num = (k: string) => Number(draft[k]);
-      const days = (k: string) => Math.round(Number(draft[k]) * 86_400);
-      const perClaimCap = parseUsd(draft.perClaimCap ?? "");
-      const perOrgCap = parseUsd(draft.perOrgCap ?? "");
-      if (perClaimCap === null || perOrgCap === null) return null;
-      const next = {
-        advanceRateBps: num("advanceRateBps"),
-        feeBps: num("feeBps"),
-        perClaimCap,
-        perOrgCap,
-        overdueWindow: days("overdueWindow"),
-        approvalExpiry: days("approvalExpiry"),
-        writeOffGrace: days("writeOffGrace"),
-      };
-      return Object.values(next).every((v) => (typeof v === "number" ? Number.isFinite(v) && v >= 0 : true)) ? next : null;
-    } catch {
-      return null;
-    }
-  })();
-  const capWei = parseUsd(cap);
-  const txs = proposed
-    ? [{ to: deployed.claimRegistry, value: 0n, label: "Set limits", data: encodeFunctionData({ abi: claimRegistryAbi, functionName: "setParams", args: [proposed] }) }]
-    : [];
-  const changedFields = proposed ? FIELDS.filter((f) => show(proposed, f) !== show(p, f)) : [];
-  const capChanged = capWei !== null && capWei !== current.cap;
-
+/** Product terms and ledger setup, read from deployments/<network>.json. Changing them is a config change and a redeploy. */
+function Params() {
   return (
     <div className="flex flex-col gap-6">
       <Card>
         <CardHeader>
           <CardTitle>Limits</CardTitle>
+          <CardDescription>Set in deployments/{config.network}.json.</CardDescription>
         </CardHeader>
-        <CardContent className="flex flex-col gap-5">
-          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-            {FIELDS.map((f) => {
-              const changed = proposed ? show(proposed, f) !== show(p, f) : false;
-              return (
-                <div key={f.key} className={cn("border-border flex flex-col gap-2.5 rounded-md border p-4", changed && "border-info")}>
-                  <div className="flex items-center justify-between gap-2">
-                    <span className="text-[13px] font-bold">{f.label}</span>
-                    {changed ? <Badge variant="info">Changed</Badge> : null}
-                  </div>
-                  <Label htmlFor={`field-${f.key}`} className="sr-only">
-                    Proposed {f.label}
-                  </Label>
-                  <div className="flex items-center gap-2">
-                    <span className={cn("text-muted-foreground shrink-0 text-[13px]", changed && "line-through")}>{show(p, f)}</span>
-                    <Input
-                      id={`field-${f.key}`}
-                      aria-label={`Proposed ${f.label}`}
-                      className="tabular h-10 min-w-0 font-bold"
-                      value={draft[f.key] ?? ""}
-                      onChange={(e) => setDraft({ ...draft, [f.key]: e.target.value })}
-                    />
-                  </div>
-                  <span className="text-muted-foreground text-xs">{f.hint}</span>
-                </div>
-              );
-            })}
-          </div>
-          <p className="text-muted-foreground text-xs">New limits apply to later approvals and purchases. Reimbursements already paid keep their terms.</p>
-          {changedFields.length ? (
-            <p className="text-info text-sm font-semibold">
-              {changedFields.length} change{changedFields.length === 1 ? "" : "s"} ready · {changedFields.map((f) => f.label).join(" · ")}
-            </p>
-          ) : null}
-          <SafeAction txs={txs} name="Set limits" description="setParams" safeAddress={roleSafe("admin")} directSender={directSender} disabled={!proposed} />
+        <CardContent className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+          {LIMITS.map((row) => (
+            <div key={row.label} className="border-border flex flex-col gap-1.5 rounded-md border p-4">
+              <span className="text-[13px] font-bold">{row.label}</span>
+              <span className="tabular text-lg font-semibold">{row.value}</span>
+              <span className="text-muted-foreground text-xs">{row.hint}</span>
+            </div>
+          ))}
         </CardContent>
       </Card>
       <Card>
         <CardHeader>
-          <CardTitle>Pool deposit cap</CardTitle>
+          <CardTitle className="flex items-center gap-3">
+            XRPL {config.network.replace("xrpl-", "")}
+            <StatusText tone={ledgerReady ? "success" : "warning"}>{ledgerReady ? "Set up" : "Not set up"}</StatusText>
+          </CardTitle>
+          <CardDescription>
+            Loan asset {ASSET}
+            {config.asset.standIn ? ", issued by the app as a stand-in because RLUSD isn't on this network" : ""}.
+          </CardDescription>
         </CardHeader>
-        <CardContent className="flex flex-col gap-3">
-          <div className={cn("border-border flex max-w-xs flex-col gap-2.5 rounded-md border p-4", capChanged && "border-info")}>
-            <div className="flex items-center justify-between gap-2">
-              <span className="text-[13px] font-bold">Total lender deposits</span>
-              {capChanged ? <Badge variant="info">Changed</Badge> : null}
-            </div>
-            <div className="flex items-center gap-2">
-              <span className={cn("text-muted-foreground shrink-0 text-[13px]", capChanged && "line-through")}>{usd(current.cap)}</span>
-              <Input aria-label="Proposed deposit cap" className="tabular h-10 min-w-0 font-bold" value={cap} onChange={(e) => setCap(e.target.value)} />
-            </div>
-          </div>
-          <SafeAction
-            txs={capWei !== null ? [{ to: deployed.pool, value: 0n, label: "Set deposit cap", data: encodeFunctionData({ abi: receivablesPoolAbi, functionName: "setDepositCap", args: [capWei] }) }] : []}
-            name="Set deposit cap"
-            description="setDepositCap"
-            safeAddress={roleSafe("admin")}
-            directSender={directSender}
-            disabled={capWei === null}
-          />
+        <CardContent className="flex flex-col gap-4">
+          {!ledgerReady ? <InfoNotice title="Run the setup script">pnpm xrpl:setup creates the issuer, domain, vault, and loan broker.</InfoNotice> : null}
+          <dl className="divide-divider divide-y text-sm">
+            {ACCOUNTS.map((a) => (
+              <div key={a.label} className="flex items-center justify-between gap-3 py-2.5">
+                <dt className="text-muted-foreground">{a.label}</dt>
+                <dd className="font-mono text-xs">
+                  {a.address ? (
+                    <a href={accountUrl(a.address)} target="_blank" rel="noopener noreferrer" className="underline underline-offset-2">
+                      {shortAddress(a.address)}
+                    </a>
+                  ) : (
+                    "not created"
+                  )}
+                </dd>
+              </div>
+            ))}
+            {OBJECTS.map((o) => (
+              <div key={o.label} className="flex items-center justify-between gap-3 py-2.5">
+                <dt className="text-muted-foreground">{o.label}</dt>
+                <dd className="font-mono text-xs">{o.id ? `${o.id.slice(0, 10)}…` : "not created"}</dd>
+              </div>
+            ))}
+          </dl>
         </CardContent>
       </Card>
     </div>
@@ -169,5 +96,5 @@ function LimitsForm({ current, directSender }: { current: { params: Params; cap:
 }
 
 export default function ParamsPage() {
-  return <AdminShell title="Parameters">{() => <Limits />}</AdminShell>;
+  return <AdminShell title="Parameters">{() => <Params />}</AdminShell>;
 }

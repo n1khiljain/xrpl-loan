@@ -4,20 +4,14 @@
   "private": true,
   "type": "module",
   "exports": {
-    ".": "./index.ts",
-    "./fraxnet": "./fraxnet/index.ts",
-    "./gas-sponsor": "./gas-sponsor/index.ts",
-    "./cash-out": "./cash-out/index.ts",
-    "./chain-reader": "./chain-reader/index.ts"
+    ".": "./index.ts"
   },
   "scripts": {
     "test": "vitest run",
-    "typecheck": "tsc -p tsconfig.json && tsc -p tsconfig.test.json"
+    "typecheck": "tsc -p tsconfig.json"
   },
   "dependencies": {
-    "@app/abi": "workspace:*",
-    "@app/config": "workspace:*",
-    "viem": "^2.56.8"
+    "@app/config": "workspace:*"
   },
   "devDependencies": {
     "@types/node": "^24.13.6",

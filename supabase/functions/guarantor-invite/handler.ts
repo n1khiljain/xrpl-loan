@@ -1,29 +1,24 @@
-import type { NetworkConfig } from "@app/config";
 import { z } from "zod";
 import { type TokenVerifier, requireCaller } from "../_shared/auth.ts";
-import type { RegistryReads } from "../_shared/chain.ts";
 import { loadClaim, requireClaimant, uuid } from "../_shared/claims.ts";
 import type { Db } from "../_shared/db/types.ts";
 import { renderEmail, usd } from "../_shared/emails.ts";
 import { type Handler, HttpError, badRequest, conflict, forbidden, json, methodNotAllowed, notFound, readJson } from "../_shared/http.ts";
 import type { Mailer } from "../_shared/mail.ts";
 import { sha256Hex } from "../_shared/storage.ts";
-import { typedDataFor } from "../packet/handler.ts";
 
 export type InviteDeps = {
   auth: TokenVerifier;
   db: Db;
-  config: NetworkConfig;
-  registry: RegistryReads;
   mailer: Mailer;
   appBaseUrl: string;
   now?: () => Date;
 };
 
-/** Invite links expire after 7 days (FR-B5). */
+/** Invite links expire after 7 days. */
 export const INVITE_TTL_MS = 7 * 24 * 60 * 60 * 1000;
 
-/** At most this many invites (and emails) per claim in any 24 hours (security campaign E-3d). UNCERTAIN: U-88 */
+/** At most this many invites (and emails) per claim in any 24 hours. */
 export const MAX_INVITES_PER_DAY = 3;
 const DAY_MS = 24 * 60 * 60 * 1000;
 
@@ -39,9 +34,9 @@ export function newInviteToken(): string {
 }
 
 /**
- * POST: the claimant creates a 7-day invite link for their guarantor and we email it (FR-B5). Only the token's
+ * POST: the claimant creates a 7-day invite link for their guarantor and we email it. Only the token's
  * hash is stored, and a claim gets at most `MAX_INVITES_PER_DAY` a day. GET `?invite=`: the guarantor opens it and
- * gets the claim summary and the typed data to sign; an invite that was already used to sign answers 410.
+ * gets the claim summary to sign off on; an invite that was already used to sign answers 410.
  */
 export function createInviteHandler(deps: InviteDeps): Handler {
   const now = deps.now ?? (() => new Date());
@@ -52,7 +47,7 @@ export function createInviteHandler(deps: InviteDeps): Handler {
     const claim = await loadClaim(db, claimId);
     requireClaimant(caller, claim);
     if (!claim.packetHash || !claim.guarantorWallet) throw conflict("freeze the packet first", "not_frozen");
-    if (claim.statusCache !== "Draft") throw conflict("this claim was already submitted", "not_draft");
+    if (claim.status !== "Draft") throw conflict("this claim was already submitted", "not_draft");
     if (!(await db.isActiveOfficer(claim.orgId, claim.guarantorWallet))) {
       throw conflict("the guarantor is no longer an active officer of the org", "not_officer");
     }
@@ -102,7 +97,7 @@ export function createInviteHandler(deps: InviteDeps): Handler {
       db.getProfile(claim.recipientWallet),
       db.listDocuments(claim.id),
     ]);
-    const signed = claim.guarantySignature !== null;
+    const signed = claim.guarantySignedAt !== null;
     return json({
       claim: {
         id: claim.id,
@@ -116,11 +111,11 @@ export function createInviteHandler(deps: InviteDeps): Handler {
         description: claim.description,
         documentCount: documents.length,
         packetHash: claim.packetHash,
-        status: claim.statusCache,
+        status: claim.status,
       },
       expiresAt: invite.expiresAt,
       signed,
-      typedData: signed || claim.statusCache !== "Draft" ? null : await typedDataFor(deps, claim, now()),
+      signable: !signed && claim.status === "Draft" && claim.packetHash !== null,
     });
   }
 

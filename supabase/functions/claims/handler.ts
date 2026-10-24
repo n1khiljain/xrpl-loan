@@ -2,29 +2,29 @@ import type { NetworkConfig } from "@app/config";
 import { z } from "zod";
 import { type Caller, type TokenVerifier, requireCaller, requireStaff } from "../_shared/auth.ts";
 import {
-  address,
   canViewClaim,
   claimView,
   documentView,
   isEditable,
   loadClaim,
   requireClaimant,
+  requireKycApproved,
+  unitsString,
   uuid,
-  weiString,
+  xrplAddress,
 } from "../_shared/claims.ts";
 import { type Claim, type ClaimPatch, type Db, UniqueViolation, type Wallet } from "../_shared/db/types.ts";
 import { type Handler, badRequest, conflict, json, methodNotAllowed, notFound, readJson } from "../_shared/http.ts";
-import { requireKycApproved } from "../_shared/kyc.ts";
 
 export type ClaimsDeps = { auth: TokenVerifier; db: Db; config: NetworkConfig };
 
 const Fields = {
   recipientType: z.enum(["member", "org_treasurer"]),
-  faceValue: weiString,
-  requestedAmount: weiString,
+  faceValue: unitsString,
+  requestedAmount: unitsString,
   callinkPrNumber: z.string().trim().min(1).max(64),
   description: z.string().trim().max(2000).nullable(),
-  guarantorWallet: address.nullable(),
+  guarantorWallet: xrplAddress.nullable(),
 };
 
 const CreateBody = z.strictObject({
@@ -49,7 +49,7 @@ const PatchBody = z.strictObject({
 
 /**
  * Drafts and lists claims. GET `?id=` returns one claim with its documents; GET alone lists what the caller sells,
- * guarantees, or oversees as an officer; staff can pass `?scope=all` or `?scope=reported` (FR-B11). POST creates a
+ * guarantees, or oversees as an officer; staff can pass `?scope=all` or `?scope=reported`. POST creates a
  * draft and PATCH edits one until its packet is frozen.
  */
 export function createClaimsHandler(deps: ClaimsDeps): Handler {
@@ -61,7 +61,7 @@ export function createClaimsHandler(deps: ClaimsDeps): Handler {
     if (BigInt(c.requestedAmount) > perClaimCap) throw badRequest("requestedAmount is over the per-claim cap", "over_cap");
     if (c.guarantorWallet) {
       if (c.guarantorWallet === caller.profile.wallet) {
-        throw badRequest("the guarantor must be someone other than the claimant (U-34)", "self_guaranty");
+        throw badRequest("the guarantor must be someone other than the claimant", "self_guaranty");
       }
       if (!(await db.isActiveOfficer(c.orgId, c.guarantorWallet))) {
         throw badRequest("the guarantor must be an active officer of the org", "not_officer");
@@ -95,7 +95,7 @@ export function createClaimsHandler(deps: ClaimsDeps): Handler {
 
   async function create(req: Request, caller: Caller) {
     const body = await readJson(req, CreateBody);
-    requireKycApproved(caller.profile, "member");
+    requireKycApproved(caller, "member");
     const org = await db.getOrg(body.orgId);
     if (!org) throw notFound("no such org");
     if (!org.active) throw conflict("that org isn't active", "org_inactive");

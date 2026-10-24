@@ -12,10 +12,9 @@ const STEP_MS = 2600;
 // the app's own claim card, walked through the states a member sees (labels and colors match state-chip.tsx)
 const STAGES: { state: string; label: string; tone: ClaimCardTone; moment?: CardMoment; caption: string }[] = [
   { state: "IN REVIEW", label: "In review", tone: "frost", caption: "Your officer signed off. Blockchain at Berkeley checks the receipts." },
-  { state: "APPROVED", label: "Approved", tone: "sky", moment: "approved", caption: "Approved. Frax is ready to pay you." },
-  // UNCERTAIN: U-73
-  { state: "PAID", label: "Paid", tone: "deep", moment: "paid", caption: "Frax pays you in under 24 hours." },
-  { state: "CLOSED OUT", label: "Closed out", tone: "gold", moment: "closed", caption: "ASUC pays you, you send it to Frax, and you're done." },
+  { state: "APPROVED", label: "Approved", tone: "sky", moment: "approved", caption: "Approved. The vault is ready to pay you." },
+  { state: "PAID", label: "Paid", tone: "deep", moment: "paid", caption: "The vault pays you within a day." },
+  { state: "CLOSED OUT", label: "Closed out", tone: "gold", moment: "closed", caption: "ASUC pays you, you send it back to the vault, and you're done." },
 ];
 
 /** One reimbursement, start to finish. Advances on its own while on screen; the steps are also buttons. */
@@ -35,7 +34,6 @@ export function CardJourney() {
 
   return (
     <div ref={ref} className="flex w-full max-w-4xl flex-col items-center gap-10 px-4 lg:gap-14">
-      {/* UNCERTAIN: U-73 */}
       <h2 className="display-type text-center text-3xl sm:text-4xl lg:text-5xl xl:text-6xl">From receipt to paid, in a day</h2>
 
       {/* grows in on a soft spring the first time it scrolls into view, like the dashboard shot on the first landing */}

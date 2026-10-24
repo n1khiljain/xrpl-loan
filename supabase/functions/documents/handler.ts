@@ -23,7 +23,7 @@ const Body = z.discriminatedUnion("action", [
 ]);
 
 /**
- * Receipt uploads (FR-B3). `create` records the file and returns a one-time signed upload target in the private
+ * Receipt and invoice uploads. `create` records the file and returns a one-time signed upload target in the private
  * bucket. `confirm` reads the uploaded bytes back and stores their SHA-256, which goes into the packet.
  */
 export function createDocumentsHandler(deps: DocumentsDeps): Handler {

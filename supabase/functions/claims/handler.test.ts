@@ -1,10 +1,10 @@
 import { assertEquals } from "@std/assert";
 import { assertStatus, draftWorld } from "../_shared/fixtures.ts";
-import { MemoryDb, assertRejectsBadTokens, call, localConfig, makeUser, seedOrg, verifier } from "../_shared/testing.ts";
+import { MemoryDb, assertRejectsBadTokens, call, makeUser, testConfig, seedOrg, verifier } from "../_shared/testing.ts";
 import { createClaimsHandler } from "./handler.ts";
 
 const ENDPOINT = "http://localhost/claims";
-const USD = 10n ** 18n;
+const USD = 10n ** 6n;
 
 function draftBody(overrides: Record<string, unknown> = {}) {
   return {
@@ -18,7 +18,7 @@ function draftBody(overrides: Record<string, unknown> = {}) {
 
 Deno.test("claims rejects requests without a valid Privy token", async () => {
   const db = new MemoryDb();
-  await assertRejectsBadTokens(createClaimsHandler({ auth: verifier, db, config: localConfig() }), ENDPOINT, ["GET", "POST", "PATCH"]);
+  await assertRejectsBadTokens(createClaimsHandler({ auth: verifier, db, config: testConfig() }), ENDPOINT, ["GET", "POST", "PATCH"]);
   assertEquals(db.claims.size, 0);
 });
 
@@ -27,9 +27,9 @@ Deno.test("POST creates a draft for the caller; the same CalLink request can't b
   const claimant = await makeUser(db, { kyc: "approved" });
   const officer = await makeUser(db);
   seedOrg(db, 1, "Blockchain at Berkeley", [officer.wallet]);
-  const handler = createClaimsHandler({ auth: verifier, db, config: localConfig() });
+  const handler = createClaimsHandler({ auth: verifier, db, config: testConfig() });
 
-  const created = await call(handler, "POST", ENDPOINT, { token: claimant.token, body: draftBody({ guarantorWallet: officer.account.address }) });
+  const created = await call(handler, "POST", ENDPOINT, { token: claimant.token, body: draftBody({ guarantorWallet: officer.wallet }) });
   assertStatus(created, 201);
   const claim = created.body.claim as { recipientWallet: string; status: string; guarantorWallet: string };
   assertEquals([claim.recipientWallet, claim.status, claim.guarantorWallet], [claimant.wallet, "Draft", officer.wallet]);
@@ -38,11 +38,11 @@ Deno.test("POST creates a draft for the caller; the same CalLink request can't b
   assertStatus(dupe, 409, "duplicate_callink");
 });
 
-Deno.test("POST needs the member verified on FraxNet first, whatever else is wrong (U-24, U-77)", async () => {
+Deno.test("POST needs the member verified first, whatever else is wrong", async () => {
   const db = new MemoryDb();
   const officer = await makeUser(db);
   seedOrg(db, 1, "Blockchain at Berkeley", [officer.wallet]);
-  const handler = createClaimsHandler({ auth: verifier, db, config: localConfig() });
+  const handler = createClaimsHandler({ auth: verifier, db, config: testConfig() });
   for (const kyc of [undefined, "pending", "rejected"] as const) {
     const member = await makeUser(db, kyc ? { kyc } : {});
     const res = await call(handler, "POST", ENDPOINT, { token: member.token, body: draftBody({ guarantorWallet: officer.wallet }) });
@@ -57,7 +57,7 @@ Deno.test("POST enforces amounts, the per-claim cap, org state, and guarantor ru
   const stranger = await makeUser(db);
   seedOrg(db, 1, "Blockchain at Berkeley", [claimant.wallet]);
   db.orgs.set(2, { id: 2, name: "Dormant Club", active: false });
-  const handler = createClaimsHandler({ auth: verifier, db, config: localConfig() });
+  const handler = createClaimsHandler({ auth: verifier, db, config: testConfig() });
   const post = (body: Record<string, unknown>) => call(handler, "POST", ENDPOINT, { token: claimant.token, body: draftBody(body) });
 
   assertStatus(await post({ requestedAmount: (301n * USD).toString() }), 400, "over_face_value");
@@ -90,10 +90,10 @@ Deno.test("GET shows a claim to its claimant, guarantor, org officers, and staff
   assertEquals(((await call(handler, "GET", ENDPOINT, { token: w.outsider.token })).body.claims as unknown[]).length, 0);
 });
 
-Deno.test("scope=all and scope=reported are staff-only (FR-B11)", async () => {
+Deno.test("scope=all and scope=reported are staff-only", async () => {
   const w = await draftWorld();
   const attester = await makeUser(w.db, { staff: "attester" });
-  await w.db.updateClaim(w.claim.id, { asucOutcome: "short_paid", asucOutcomeNote: "ASUC paid $300" });
+  await w.db.updateClaim(w.claim.id, { asucOutcome: "short_paid", asucOutcomeNote: "the payer sent $300" });
   const handler = createClaimsHandler({ auth: verifier, db: w.db, config: w.config });
   assertStatus(await call(handler, "GET", `${ENDPOINT}?scope=reported`, { token: w.claimant.token }), 403);
   const reported = await call(handler, "GET", `${ENDPOINT}?scope=reported`, { token: attester.token });
@@ -114,6 +114,6 @@ Deno.test("PATCH edits a draft for its claimant until the packet is frozen", asy
     "over_face_value",
   );
 
-  await w.db.updateClaim(w.claim.id, { packetHash: `0x${"11".repeat(32)}`, packetJson: {} });
+  await w.db.updateClaim(w.claim.id, { packetHash: "11".repeat(32), packetJson: {} });
   assertStatus(await call(handler, "PATCH", ENDPOINT, { token: w.claimant.token, body: { id: w.claim.id, description: "late" } }), 409, "frozen");
 });

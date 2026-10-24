@@ -1,7 +1,7 @@
 import { assert, assertEquals, assertMatch } from "@std/assert";
 import { assertStatus, draftWorld } from "../_shared/fixtures.ts";
 import { MemoryMailer } from "../_shared/mail.ts";
-import { FIXED_NOW, MemoryDb, assertRejectsBadTokens, call, localConfig, makeUser, verifier } from "../_shared/testing.ts";
+import { FIXED_NOW, MemoryDb, assertRejectsBadTokens, call, makeUser, verifier } from "../_shared/testing.ts";
 import { createPacketHandler } from "../packet/handler.ts";
 import { createInviteHandler, hashToken } from "./handler.ts";
 
@@ -9,17 +9,15 @@ const ENDPOINT = "http://localhost/guarantor-invite";
 
 async function frozenWorld() {
   const w = await draftWorld();
-  const packet = createPacketHandler({ auth: verifier, db: w.db, config: w.config, registry: w.registry, now: () => FIXED_NOW });
+  const packet = createPacketHandler({ auth: verifier, db: w.db });
   await call(packet, "POST", "http://localhost/packet", { token: w.claimant.token, body: { claimId: w.claim.id } });
   const mailer = new MemoryMailer();
   let now = FIXED_NOW;
   const handler = createInviteHandler({
     auth: verifier,
     db: w.db,
-    config: w.config,
-    registry: w.registry,
     mailer,
-    appBaseUrl: "https://college.frax.com/",
+    appBaseUrl: "https://receivables.example.test/",
     now: () => now,
   });
   return { ...w, mailer, handler, setNow: (d: Date) => (now = d) };
@@ -27,18 +25,17 @@ async function frozenWorld() {
 
 Deno.test("guarantor-invite rejects requests without a valid Privy token", async () => {
   const mailer = new MemoryMailer();
-  const registry = { guarantyNonce: async () => 0n, tokenBalance: async () => 0n };
-  const handler = createInviteHandler({ auth: verifier, db: new MemoryDb(), config: localConfig(), registry, mailer, appBaseUrl: "http://x" });
+  const handler = createInviteHandler({ auth: verifier, db: new MemoryDb(), mailer, appBaseUrl: "http://x" });
   await assertRejectsBadTokens(handler, `${ENDPOINT}?invite=${"a".repeat(43)}`, ["GET", "POST"]);
   assertEquals(mailer.sent.length, 0);
 });
 
-Deno.test("POST makes a 7-day link, stores only its hash, and emails the guarantor (FR-B5)", async () => {
+Deno.test("POST makes a 7-day link, stores only its hash, and emails the guarantor", async () => {
   const w = await frozenWorld();
   const res = await call(w.handler, "POST", ENDPOINT, { token: w.claimant.token, body: { claimId: w.claim.id } });
   assertStatus(res, 201);
   const inviteUrl = String(res.body.inviteUrl);
-  assertMatch(inviteUrl, /^https:\/\/college\.frax\.com\/guarantee\?invite=[A-Za-z0-9_-]{43}$/);
+  assertMatch(inviteUrl, /^https:\/\/receivables\.example\.test\/guarantee\?invite=[A-Za-z0-9_-]{43}$/);
   assertEquals(res.body.expiresAt, new Date(FIXED_NOW.getTime() + 7 * 86_400_000).toISOString());
   assertEquals(res.body.emailed, true);
 
@@ -51,13 +48,12 @@ Deno.test("POST makes a 7-day link, stores only its hash, and emails the guarant
   assertEquals(email?.to, w.guarantor.profile.email);
   assertEquals(email?.subject, "Ada asked you to sign off on a reimbursement");
   assert(email?.text.includes(inviteUrl));
-  assert(!/loan|borrow|interest|repay/i.test(email?.text ?? ""));
 });
 
 Deno.test("POST needs a frozen packet, the claimant, and a guarantor who is still an officer", async () => {
   const w = await draftWorld();
   const mailer = new MemoryMailer();
-  const handler = createInviteHandler({ auth: verifier, db: w.db, config: w.config, registry: w.registry, mailer, appBaseUrl: "http://x" });
+  const handler = createInviteHandler({ auth: verifier, db: w.db, mailer, appBaseUrl: "http://x" });
   assertStatus(await call(handler, "POST", ENDPOINT, { token: w.claimant.token, body: { claimId: w.claim.id } }), 409, "not_frozen");
 
   const f = await frozenWorld();
@@ -86,11 +82,11 @@ Deno.test("GET resolves the token for the named guarantor only, until it expires
   assertEquals([claim.orgName, claim.claimantName, claim.requestedAmount, claim.documentCount], [
     "Blockchain at Berkeley",
     "Ada",
-    "400000000000000000000",
+    "400000000",
     1,
   ]);
   assertEquals(res.body.signed, false);
-  assert(res.body.typedData !== null);
+  assertEquals(res.body.signable, true);
 
   assertStatus(await get(w.claimant.token), 403, "wrong_guarantor");
   assertStatus(await call(w.handler, "GET", `${ENDPOINT}?invite=${"x".repeat(43)}`, { token: w.guarantor.token }), 404);

@@ -1,6 +1,5 @@
 "use client";
 
-import { claimRegistryAbi } from "@app/abi";
 import type { ClaimView } from "@app/adapters";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Check, ChevronRight, Copy } from "lucide-react";
@@ -8,7 +7,6 @@ import { motion } from "motion/react";
 import Link from "next/link";
 import { type ReactNode, useState } from "react";
 import { CtaLabel } from "@/components/app/cta";
-import { Disclosure } from "@/components/app/disclosure";
 import { ErrorNotice, InfoNotice } from "@/components/app/notice";
 import { cardNumber } from "@/components/brand/claim-card";
 import { CountUp, EASE } from "@/components/motion";
@@ -19,19 +17,16 @@ import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Textarea } from "@/components/ui/textarea";
 import { useCall } from "@/hooks/use-api";
 import { useNowSeconds } from "@/hooks/use-now";
-import { contractCall, useSendCalls } from "@/hooks/use-tx";
-import { publicClient } from "@/lib/chain";
-import { config, deployedContracts, onTestnet } from "@/lib/config";
+import { ASSET, ledgerReady } from "@/lib/config";
 import { friendlyError } from "@/lib/errors";
-import { dateFromSeconds, daysFrom, usd } from "@/lib/format";
+import { dateFromSeconds, daysFrom, dollars, usd } from "@/lib/format";
 import { cn } from "@/lib/utils";
 import type { InviteCreated, OffchainClaim } from "@/lib/types";
-import { CashOut } from "./cash-out";
 import { SettlePanel } from "./settle-panel";
 
 /**
  * Where a reimbursement stands, as a plain part of the page: one sentence that leads, a quieter line under it, then the
- * action. No box and no repeated big amount, since the card beside it already shows the number (U-75). Shared between
+ * action. No box and no repeated big amount, since the card beside it already shows the number. Shared between
  * the claimant and guarantor views.
  */
 export function StatePanel({ lead, description, children }: { lead: ReactNode; description?: ReactNode; children?: ReactNode }) {
@@ -82,62 +77,24 @@ function ResendInvite({ claim }: { claim: OffchainClaim }) {
   );
 }
 
-function SubmitClaim({ claim }: { claim: OffchainClaim }) {
-  const deployed = deployedContracts();
-  const tx = useSendCalls();
-  const now = useNowSeconds();
-  const nonce = useQuery({
-    queryKey: ["guaranty-nonce", claim.guarantorWallet],
-    enabled: Boolean(deployed && claim.guarantorWallet),
-    queryFn: () =>
-      publicClient.readContract({ address: deployed!.claimRegistry, abi: claimRegistryAbi, functionName: "nonces", args: [claim.guarantorWallet!] }),
+/** A claim step for the claimant (submit, cancel), sent to `claim-actions`. */
+function useClaimAction(claim: OffchainClaim) {
+  const call = useCall();
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (action: "submit" | "cancel") => call("claim-actions", { method: "POST", body: { action, claimId: claim.id } }),
+    onSuccess: () => queryClient.invalidateQueries(),
   });
-  const stale = nonce.data !== undefined && claim.guarantyNonce !== null && nonce.data.toString() !== claim.guarantyNonce;
-  const expired = claim.guarantyDeadline !== null && claim.guarantyDeadline < now;
+}
 
-  if (stale || expired) {
-    return (
-      <div className="space-y-3">
-        <InfoNotice title="Your officer needs to sign off again">
-          {expired ? "Their signature expired." : "They signed off on another reimbursement since yours."} Send them the link again.
-        </InfoNotice>
-        <ResendInvite claim={claim} />
-      </div>
-    );
-  }
-
-  async function submit() {
-    if (!deployed || !claim.packetHash || !claim.guarantorWallet || !claim.guarantySignature || !claim.guarantyDeadline) return;
-    await tx.send(
-      [
-        contractCall({
-          address: deployed.claimRegistry,
-          abi: claimRegistryAbi,
-          functionName: "submitClaim",
-          args: [
-            {
-              orgId: BigInt(claim.orgId),
-              recipientType: claim.recipientType === "member" ? 0 : 1,
-              guarantor: claim.guarantorWallet,
-              faceValue: BigInt(claim.faceValue),
-              requestedAmount: BigInt(claim.requestedAmount),
-              packetHash: claim.packetHash,
-            },
-            BigInt(claim.guarantyDeadline),
-            claim.guarantySignature,
-          ],
-        }),
-      ],
-      ["Sending it for review"],
-    );
-  }
-
+function SubmitClaim({ claim }: { claim: OffchainClaim }) {
+  const action = useClaimAction(claim);
   return (
     <div className="space-y-3">
-      <Button size="lg" onClick={() => void submit()} disabled={tx.status === "sending"} data-testid="submit-claim">
-        {tx.status === "sending" ? "Sending..." : "Submit for review"}
+      <Button size="lg" onClick={() => action.mutate("submit")} disabled={action.isPending} data-testid="submit-claim">
+        {action.isPending ? "Sending..." : "Submit for review"}
       </Button>
-      {tx.error ? <ErrorNotice>{tx.error}</ErrorNotice> : null}
+      {action.isError ? <ErrorNotice>{friendlyError(action.error)}</ErrorNotice> : null}
     </div>
   );
 }
@@ -149,7 +106,8 @@ function ReportOutcome({ claim, onchain }: { claim: OffchainClaim; onchain: Clai
   const [outcome, setOutcome] = useState<"rejected" | "short_paid">("rejected");
   const [note, setNote] = useState("");
   const report = useMutation({
-    mutationFn: () => call("report-outcome", { method: "POST", body: { claimId: claim.id, outcome, note: note.trim() || undefined } }),
+    mutationFn: () =>
+      call("claim-actions", { method: "POST", body: { action: "report-outcome", claimId: claim.id, outcome, note: note.trim() || undefined } }),
     onSuccess: async () => {
       setOpen(false);
       await queryClient.invalidateQueries({ queryKey: ["claim", claim.id] });
@@ -178,10 +136,10 @@ function ReportOutcome({ claim, onchain }: { claim: OffchainClaim; onchain: Clai
       <DialogContent>
         <DialogHeader>
           <p className="text-muted-foreground text-xs font-medium">
-            No. {cardNumber(onchain.id)} · {usd(onchain.amountRemaining)} to send
+            No. {cardNumber(onchain.id)} · {usd(onchain.amountRemaining)} left
           </p>
           <DialogTitle>What did ASUC do?</DialogTitle>
-          <DialogDescription>We&apos;ll let a reviewer know. Send Frax whatever ASUC did pay you.</DialogDescription>
+          <DialogDescription>We&apos;ll let a reviewer know. Send the vault whatever ASUC did pay you.</DialogDescription>
         </DialogHeader>
         <RadioGroup value={outcome} onValueChange={(v) => setOutcome(v as "rejected" | "short_paid")} className="grid gap-3 sm:grid-cols-2">
           <div className={cn("rounded-lg border p-4", outcome === "rejected" ? "border-foreground bg-surface-muted" : "border-border")}>
@@ -200,7 +158,7 @@ function ReportOutcome({ claim, onchain }: { claim: OffchainClaim; onchain: Clai
                 ASUC paid less than I asked
               </Label>
             </div>
-            <p className="text-muted-foreground mt-1.5 text-xs leading-relaxed">You send Frax what you got. Your officer covers the rest.</p>
+            <p className="text-muted-foreground mt-1.5 text-xs leading-relaxed">You send the vault what you got. Your officer covers the rest.</p>
           </div>
         </RadioGroup>
         <div className="space-y-2">
@@ -215,32 +173,6 @@ function ReportOutcome({ claim, onchain }: { claim: OffchainClaim; onchain: Clai
         </DialogFooter>
       </DialogContent>
     </Dialog>
-  );
-}
-
-function SimulatePayout({ claim }: { claim: OffchainClaim }) {
-  const call = useCall();
-  const queryClient = useQueryClient();
-  const payout = useMutation({
-    mutationFn: () => call<{ minted: string }>("simulate-payout", { method: "POST", body: { claimId: claim.id } }),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["balance"] }),
-  });
-  if (!onTestnet || !config.features.simulateAsucPayout) return null;
-  return (
-    <div className="space-y-2">
-      {/* a quiet test tool, not a warning: a dot says it's testnet only (U-75) */}
-      <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-        <span className="text-muted-foreground flex items-center gap-2 text-[13px]">
-          <span aria-hidden className="bg-warning size-1.5 rounded-full" />
-          Testnet only
-        </span>
-        <Button variant="outline" size="sm" onClick={() => payout.mutate()} disabled={payout.isPending} data-testid="simulate-payout" className="w-full sm:w-auto">
-          {payout.isPending ? "Simulating..." : "Simulate ASUC paying you"}
-        </Button>
-      </div>
-      {payout.data ? <p className="text-muted-foreground text-sm">Testnet: ASUC payout simulated. {usd(payout.data.minted)} added to your wallet.</p> : null}
-      {payout.isError ? <ErrorNotice>{friendlyError(payout.error)}</ErrorNotice> : null}
-    </div>
   );
 }
 
@@ -264,9 +196,9 @@ function ProgressBar({ paid, due }: { paid: bigint; due: bigint }) {
 }
 
 const USD = new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" });
-const dollars = (n: number) => USD.format(n);
+const formatDollars = (n: number) => USD.format(n);
 
-/** Right after `purchaseClaim` succeeds in this session: a check pops in and the amount counts up, then Continue. */
+/** Right after funding succeeds in this session: a check pops in and the amount counts up, then Continue. */
 function PaidCelebration({ onchain, onContinue }: { onchain: ClaimView; onContinue: () => void }) {
   return (
     <section className="flex flex-col gap-4">
@@ -279,10 +211,10 @@ function PaidCelebration({ onchain, onContinue }: { onchain: ClaimView; onContin
         <Check className="size-5" strokeWidth={2.8} />
       </motion.span>
       <h2 className="display-type text-3xl sm:text-4xl">
-        <CountUp value={Number(onchain.amountRemaining / 10n ** 16n) / 100} format={dollars} /> is in your wallet
+        <CountUp value={dollars(onchain.amountRemaining)} format={formatDollars} /> is in your wallet
       </h2>
       <p className="text-muted-foreground max-w-lg text-[15px] leading-relaxed">
-        When ASUC pays you, come back and send {usd(onchain.amountRemaining)} to Frax by {dateFromSeconds(onchain.dueAt)}.
+        When ASUC pays you, send {usd(onchain.amountRemaining)} back to the vault by {dateFromSeconds(onchain.dueAt)}.
       </p>
       <div>
         <Button size="lg" className="pr-2" onClick={onContinue}>
@@ -295,10 +227,9 @@ function PaidCelebration({ onchain, onContinue }: { onchain: ClaimView; onContin
 
 /** The one action that fits the claim's state, for the person who sold it (SYSTEM_DESIGN 6.2). */
 export function ClaimantActions({ claim, onchain }: { claim: OffchainClaim; onchain: ClaimView | null }) {
-  const deployed = deployedContracts();
-  const tx = useSendCalls();
+  const action = useClaimAction(claim);
   const now = useNowSeconds();
-  const state = onchain && onchain.state !== "None" ? onchain.state : claim.status;
+  const state = claim.status;
   const [justFunded, setJustFunded] = useState(false);
 
   const requested = usd(BigInt(claim.requestedAmount));
@@ -327,7 +258,7 @@ export function ClaimantActions({ claim, onchain }: { claim: OffchainClaim; onch
       </StatePanel>
     );
   }
-  if (!onchain || !deployed) return <p className="text-muted-foreground text-sm">Loading the latest status...</p>;
+  if (!onchain) return <p className="text-muted-foreground text-sm">Loading the latest status...</p>;
 
   if (state === "Submitted") {
     return (
@@ -339,16 +270,14 @@ export function ClaimantActions({ claim, onchain }: { claim: OffchainClaim; onch
           <Button
             variant="outline"
             size="sm"
-            disabled={tx.status === "sending"}
-            onClick={() =>
-              void tx.send([contractCall({ address: deployed.claimRegistry, abi: claimRegistryAbi, functionName: "cancelClaim", args: [onchain.id] })], ["Cancelling"])
-            }
+            disabled={action.isPending}
+            onClick={() => action.mutate("cancel")}
             data-testid="cancel-claim"
           >
             Cancel this request
           </Button>
         </div>
-        {tx.error ? <ErrorNotice>{tx.error}</ErrorNotice> : null}
+        {action.isError ? <ErrorNotice>{friendlyError(action.error)}</ErrorNotice> : null}
       </StatePanel>
     );
   }
@@ -359,21 +288,20 @@ export function ClaimantActions({ claim, onchain }: { claim: OffchainClaim; onch
         lead={`You're approved for ${usd(onchain.approvedAmount)}.`}
         description={`Collect it by ${dateFromSeconds(onchain.approvalExpiresAt)}. ${days} ${days === 1 ? "day" : "days"} left.`}
       >
+        {/* funding is an XLS-66 loan from the vault; it switches on once the ledger setup has run */}
+        <div className="flex flex-col gap-3">
+          <Button size="lg" className="pr-2 self-start" disabled data-testid="get-paid">
+            <CtaLabel>{`Get paid ${usd(onchain.approvedAmount)} in ${ASSET}`}</CtaLabel>
+          </Button>
+          <InfoNotice title={ledgerReady ? "Funding is coming soon" : "The lending vault isn't set up yet"}>
+            Payouts come from the XRPL lending vault. You&apos;ll be able to collect here once it&apos;s live.
+          </InfoNotice>
+        </div>
         <div>
-          <Button
-            size="lg"
-            className="pr-2"
-            disabled={tx.status === "sending"}
-            onClick={async () => {
-              const ok = await tx.send([contractCall({ address: deployed.claimRegistry, abi: claimRegistryAbi, functionName: "purchaseClaim", args: [onchain.id] })], ["Getting paid"]);
-              if (ok) setJustFunded(true);
-            }}
-            data-testid="get-paid"
-          >
-            <CtaLabel>{tx.status === "sending" ? "Paying you..." : `Get paid ${usd(onchain.approvedAmount)}`}</CtaLabel>
+          <Button variant="outline" size="sm" disabled={action.isPending} onClick={() => action.mutate("cancel")} data-testid="cancel-claim">
+            Cancel this request
           </Button>
         </div>
-        {tx.error ? <ErrorNotice>{tx.error}</ErrorNotice> : null}
       </StatePanel>
     );
   }
@@ -384,18 +312,14 @@ export function ClaimantActions({ claim, onchain }: { claim: OffchainClaim; onch
         {justFunded ? (
           <PaidCelebration onchain={onchain} onContinue={() => setJustFunded(false)} />
         ) : (
-          <StatePanel lead={`Send ${usd(onchain.amountRemaining)} to Frax when ASUC pays you.`} description={`By ${dateFromSeconds(onchain.dueAt)}.`}>
+          <StatePanel lead={`Send ${usd(onchain.amountRemaining)} back to the vault when ASUC pays you.`} description={`By ${dateFromSeconds(onchain.dueAt)}.`}>
             <ProgressBar paid={onchain.amountPaid} due={onchain.amountDue} />
           </StatePanel>
         )}
-        <PageSection title="Send to Frax">
-          <SimulatePayout claim={claim} />
+        <PageSection title="Send it back">
           <SettlePanel onchain={onchain} />
         </PageSection>
         <div className="border-divider divide-divider flex flex-col divide-y border-t [&>*]:py-4">
-          <Disclosure label="Cash out to your bank" hint="Move what's in your wallet to your bank through FraxNet" testId="open-cash-out">
-            <CashOut />
-          </Disclosure>
           <ReportOutcome claim={claim} onchain={onchain} />
         </div>
       </div>
@@ -408,14 +332,14 @@ export function ClaimantActions({ claim, onchain }: { claim: OffchainClaim; onch
           lead={state === "GuarantorCalled" ? "Your officer was asked to cover what's left." : "This was written off."}
           description={`You can still send the ${usd(onchain.amountRemaining)} yourself.`}
         />
-        <PageSection title="Send to Frax">
+        <PageSection title="Send it back">
           <SettlePanel onchain={onchain} />
         </PageSection>
       </div>
     );
   }
   if (state === "Settled" || state === "Recovered") {
-    return <StatePanel lead="All closed out. Thank you." description={`${usd(onchain.amountDue)} was sent to Frax, so nothing's left.`} />;
+    return <StatePanel lead="All closed out. Thank you." description={`${usd(onchain.amountDue)} went back to the vault, so nothing's left.`} />;
   }
   return (
     <StatePanel

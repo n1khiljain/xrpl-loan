@@ -2,7 +2,7 @@
 // docs/RUNBOOK.md "Hosted preview" has the build command and the NEXT_PUBLIC_* values it needs.
 {
   "$schema": "node_modules/wrangler/config-schema.json",
-  "name": "fraxnet-college",
+  "name": "xrpl-receivables",
   "compatibility_date": "2026-09-01",
   "assets": {
     "directory": "./apps/web/out",

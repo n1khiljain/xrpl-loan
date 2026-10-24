@@ -16,16 +16,15 @@ import { CARD_TONE, STATE_LABEL, StateChip, type DisplayState } from "@/componen
 import { Topbar } from "@/components/app/topbar";
 import { ClaimCard, cardNumber } from "@/components/brand/claim-card";
 import { CountUp, EASE } from "@/components/motion";
-import { CashOut } from "@/components/claim/cash-out";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useCall, useOrgs } from "@/hooks/use-api";
-import { findOnchain } from "@/hooks/use-claim";
+import { ledgerOf } from "@/hooks/use-claim";
 import { useNowSeconds } from "@/hooks/use-now";
 import { displayState } from "@/lib/claim-record";
 import { friendlyError } from "@/lib/errors";
-import { dateFromSeconds, daysFrom, usd } from "@/lib/format";
+import { dateFromSeconds, daysFrom, dollars, usd } from "@/lib/format";
 import type { DirectoryOrg, MeResponse, OffchainClaim } from "@/lib/types";
 import { cn } from "@/lib/utils";
 
@@ -44,14 +43,12 @@ function useClaimRows(me: MeResponse) {
     queryKey: ["claims", "mine"],
     queryFn: async () => {
       const { claims } = await call<{ claims: OffchainClaim[] }>("claims");
-      const rows = await Promise.all(
-        claims.map(async (claim): Promise<Row> => {
-          const onchain = await findOnchain(claim).catch(() => null);
-          const state = displayState(claim, onchain);
-          const role: Role = claim.recipientWallet === wallet ? "claimant" : claim.guarantorWallet === wallet ? "guarantor" : "org";
-          return { claim, onchain, state, role };
-        }),
-      );
+      const rows = claims.map((claim): Row => {
+        const onchain = ledgerOf(claim);
+        const state = displayState(claim, onchain);
+        const role: Role = claim.recipientWallet === wallet ? "claimant" : claim.guarantorWallet === wallet ? "guarantor" : "org";
+        return { claim, onchain, state, role };
+      });
       return rows.sort((a, b) => new Date(b.claim.updatedAt).getTime() - new Date(a.claim.updatedAt).getTime());
     },
   });
@@ -82,15 +79,14 @@ function dateOnly(iso: string): string {
 }
 
 function idFor(row: Row): string {
-  if (row.onchain && row.onchain.state !== "None") return `#${row.onchain.id}`;
-  if (row.claim.onchainClaimId !== null) return `#${row.claim.onchainClaimId}`;
+  if (row.claim.status !== "Draft") return `#${row.claim.number}`;
   return "Draft";
 }
 
-/** The dollar figure that matters most for a row's current state, from the onchain claim when there is one. */
+/** The dollar figure that matters most for a row's current state. */
 function amountFor(row: Row): bigint {
   const { claim, onchain, state } = row;
-  if (onchain && onchain.state !== "None") {
+  if (onchain) {
     if (state === "Approved") return onchain.approvedAmount;
     if (state === "Funded" || state === "GuarantorCalled") return onchain.amountRemaining;
     if (state === "Settled" || state === "Recovered" || state === "WrittenOff") return onchain.amountDue;
@@ -125,11 +121,11 @@ function actionFor(row: Row): string {
     if (state === "Draft") return "Finish";
     if (state === "Submitted") return "View";
     if (state === "Approved") return "Get paid";
-    if (state === "Funded" || state === "GuarantorCalled") return "Send to Frax";
+    if (state === "Funded" || state === "GuarantorCalled") return "Send it back";
     return "";
   }
   if (role === "guarantor") {
-    if (state === "GuarantorCalled" || state === "WrittenOff") return "Send to Frax";
+    if (state === "GuarantorCalled" || state === "WrittenOff") return "Send it back";
     if (state === "Settled" || state === "Recovered" || state === "Rejected" || state === "Cancelled") return "";
     return "View";
   }
@@ -163,7 +159,7 @@ function ClaimRow({ row, now, index }: { row: Row; now: number; index: number })
             <span className="text-muted-foreground truncate text-xs">{mobileStatusLine(row, next)}</span>
           </span>
           <span className="flex flex-col items-end gap-0.5">
-            <Money wei={amount} size="sm" className="font-semibold" />
+            <Money units={amount} size="sm" className="font-semibold" />
             {action ? <span className="text-foreground text-xs font-semibold">{action}</span> : null}
           </span>
         </div>
@@ -175,7 +171,7 @@ function ClaimRow({ row, now, index }: { row: Row; now: number; index: number })
             <span className="text-muted-foreground truncate text-xs">{sub}</span>
           </span>
           <StateChip state={state} />
-          <Money wei={amount} size="sm" className="text-right font-semibold" />
+          <Money units={amount} size="sm" className="text-right font-semibold" />
           <span className="text-muted-foreground pl-4 text-[13px]">{next}</span>
           {action ? (
             <span className="text-foreground flex items-center gap-1 justify-self-end text-[13px] font-semibold whitespace-nowrap">
@@ -259,7 +255,7 @@ function TabFigure({ label, value, active, onSelect }: { label: string; value: b
 type Figure = "due" | "ready" | "settled";
 
 const DOLLARS = new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" });
-const dollars = (n: number) => DOLLARS.format(n);
+const formatDollars = (n: number) => DOLLARS.format(n);
 
 const claimCount = (n: number) => `${n} ${n === 1 ? "reimbursement" : "reimbursements"}`;
 
@@ -306,13 +302,13 @@ function HomeView({ rows, orgName }: { rows: Row[]; orgName: string | null }) {
       <div className="flex min-w-0 flex-1 flex-col gap-5">
         <GradientPanel tone="panel" className="flex flex-col gap-5 p-6 lg:h-[300px]">
           <div className="flex gap-6 border-b border-on-ink/15">
-            <TabFigure label="To send Frax" value={due} active={figure === "due"} onSelect={() => setFigure("due")} />
+            <TabFigure label="To send back" value={due} active={figure === "due"} onSelect={() => setFigure("due")} />
             <TabFigure label="Ready to collect" value={ready} active={figure === "ready"} onSelect={() => setFigure("ready")} />
             <TabFigure label="Closed out this year" value={settledThisYear} active={figure === "settled"} onSelect={() => setFigure("settled")} />
           </div>
           <div className="flex flex-col gap-1.5" aria-live="polite">
             <span className="money-type text-5xl sm:text-[64px]">
-              <CountUp value={Number(shown.value / 10n ** 16n) / 100} format={dollars} duration={0.6} />
+              <CountUp value={dollars(shown.value)} format={formatDollars} duration={0.6} />
             </span>
             <p className="text-on-ink/80 text-sm">{shown.caption}</p>
           </div>
@@ -320,12 +316,9 @@ function HomeView({ rows, orgName }: { rows: Row[]; orgName: string | null }) {
           <div className="mt-auto flex flex-wrap gap-2">
             {settleHref ? (
               <Button asChild variant="light" size="sm">
-                <Link href={settleHref}>Send to Frax</Link>
+                <Link href={settleHref}>Send it back</Link>
               </Button>
             ) : null}
-            <Button asChild variant={settleHref ? "glass" : "light"} size="sm">
-              <Link href="/claims/?view=cash-out">Cash out</Link>
-            </Button>
           </div>
         </GradientPanel>
         {guarantyRow ? <GuarantyCard row={guarantyRow} className="lg:hidden" /> : null}
@@ -337,7 +330,7 @@ function HomeView({ rows, orgName }: { rows: Row[]; orgName: string | null }) {
             <section className="flex flex-col items-center gap-3.5">
               <h2 className="text-muted-foreground w-full text-sm font-medium">Latest reimbursement</h2>
               <ClaimCard
-                claimId={cardNumber(cardRow.onchain && cardRow.onchain.state !== "None" ? cardRow.onchain.id : cardRow.claim.onchainClaimId)}
+                claimId={cardNumber(cardRow.claim.status === "Draft" ? null : cardRow.claim.number)}
                 amount={usd(amountFor(cardRow))}
                 state={STATE_LABEL[cardRow.state]}
                 org={orgName ?? "Your org"}
@@ -352,34 +345,13 @@ function HomeView({ rows, orgName }: { rows: Row[]; orgName: string | null }) {
   );
 }
 
-function cashOutReminder(rows: Row[]): string | null {
-  const funded = rows.filter((r) => r.role === "claimant" && r.state === "Funded" && r.onchain && r.onchain.state !== "None");
-  if (funded.length === 0) return null;
-  const total = funded.reduce((sum, r) => sum + amountFor(r), 0n);
-  if (funded.length === 1) {
-    const only = funded[0];
-    return only ? `When ASUC pays you for ${idFor(only)}, you still send ${usd(total)} to Frax.` : null;
-  }
-  return `When ASUC pays you, you still send ${usd(total)} total to Frax.`;
-}
-
-function CashOutView({ rows }: { rows: Row[] }) {
-  return (
-    <Card className="max-w-2xl">
-      <CardContent>
-        <CashOut reminder={cashOutReminder(rows)} />
-      </CardContent>
-    </Card>
-  );
-}
-
 function ClaimsView({ me }: { me: MeResponse }) {
   const view = useSearchParams().get("view");
   const rows = useClaimRows(me);
   const orgs = useOrgs();
   const firstName = (me.profile?.displayName ?? "").trim().split(/\s+/)[0] || "there";
   const orgName = resolveOrgName(rows.data ?? [], orgs.data);
-  const title = view === "claims" ? "My reimbursements" : view === "guaranties" ? "Sign-offs" : view === "cash-out" ? "Cash out" : `Hi, ${firstName}`;
+  const title = view === "claims" ? "My reimbursements" : view === "guaranties" ? "Sign-offs" : `Hi, ${firstName}`;
   const crumb = view ? undefined : crumbFor(me, orgName);
 
   return (
@@ -389,8 +361,7 @@ function ClaimsView({ me }: { me: MeResponse }) {
         <Skeleton className="h-96 w-full rounded-3xl" />
       ) : rows.isError ? (
         <ErrorNotice>{friendlyError(rows.error)}</ErrorNotice>
-      ) : view === "cash-out" ? (
-        <CashOutView rows={rows.data} />
+
       ) : view === "guaranties" ? (
         <ClaimsSection rows={rows.data.filter((r) => r.role === "guarantor")} emptyText="No sign-offs yet." />
       ) : view === "claims" ? (

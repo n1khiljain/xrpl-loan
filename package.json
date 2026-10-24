@@ -1,5 +1,5 @@
 {
-  "name": "fraxnet-college",
+  "name": "xrpl-receivables",
   "private": true,
   "packageManager": "pnpm@10.30.3",
   "engines": {
@@ -9,14 +9,9 @@
     "lint": "pnpm -r --if-present lint",
     "typecheck": "pnpm -r --if-present typecheck",
     "test": "pnpm -r --if-present test",
-    "e2e": "pnpm --filter web e2e",
-    "contracts:build": "cd contracts && forge build",
-    "contracts:test": "cd contracts && forge test",
-    "contracts:coverage": "cd contracts && forge coverage --report summary",
-    "ts:test": "pnpm --filter @app/config test && pnpm --filter @app/abi test && pnpm --filter @app/adapters test",
+    "ts:test": "pnpm --filter @app/config test && pnpm --filter @app/adapters test",
     "db:test": "supabase test db",
     "functions:test": "cd supabase/functions && deno test --allow-all",
-    "uncertainties": "node scripts/uncertainties.mjs --write",
     "demo": "deno run --allow-all --config supabase/functions/deno.json scripts/local-demo.ts",
     "local": "bash scripts/local-up.sh"
   }

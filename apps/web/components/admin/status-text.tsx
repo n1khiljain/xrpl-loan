@@ -10,7 +10,7 @@ const TONE = {
 
 export type StatusTone = keyof typeof TONE;
 
-/** A status as colored text, not a pill (U-75). */
+/** A status as colored text, not a pill. */
 export function StatusText({ tone, children, className, ...props }: { tone: StatusTone; children: ReactNode; className?: string; "data-testid"?: string }) {
   return (
     <span className={cn("shrink-0 text-xs font-semibold whitespace-nowrap", TONE[tone], className)} {...props}>

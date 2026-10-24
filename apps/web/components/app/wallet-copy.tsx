@@ -1,36 +1,37 @@
 "use client";
 
-import { Check, Copy } from "lucide-react";
+import { Check, Copy, ExternalLink } from "lucide-react";
 import { useState } from "react";
-import { getAddress } from "viem";
 import { Button } from "@/components/ui/button";
+import { accountUrl } from "@/lib/config";
 
-/**
- * The wallet this app made for the member (Privy), to paste where FraxNet asks for one. Connecting adds it for them
- * when FraxNet allows it, so this is the fallback (U-63, U-78).
- */
+/** The XRP Ledger wallet this app holds for the person, with a copy button and an explorer link. */
 export function WalletCopy({ wallet, className }: { wallet: string; className?: string }) {
   const [copied, setCopied] = useState(false);
-  // checksummed, the way wallets and FraxNet show it; profiles store it lowercase
-  const address = getAddress(wallet);
   return (
     <div className={className}>
-      <p className="text-muted-foreground pb-2 text-sm">If FraxNet asks you to add a wallet address, use this one. It&apos;s the wallet this app made for you.</p>
+      <p className="text-muted-foreground pb-2 text-sm">Your XRP Ledger wallet. The app holds its keys and signs for you.</p>
       <div className="bg-surface-muted flex flex-col gap-3 rounded-xl p-3 sm:flex-row sm:items-center sm:justify-between">
         <code data-testid="wallet-address" className="font-mono min-w-0 flex-1 text-sm break-all">
-          {address}
+          {wallet}
         </code>
-        <Button
-          variant="secondary"
-          size="sm"
-          className="self-start sm:self-auto"
-          onClick={() => {
-            void navigator.clipboard?.writeText(address);
-            setCopied(true);
-          }}
-        >
-          {copied ? <Check className="size-4" /> : <Copy className="size-4" />} {copied ? "Copied" : "Copy"}
-        </Button>
+        <div className="flex gap-2 self-start sm:self-auto">
+          <Button
+            variant="secondary"
+            size="sm"
+            onClick={() => {
+              void navigator.clipboard?.writeText(wallet);
+              setCopied(true);
+            }}
+          >
+            {copied ? <Check className="size-4" /> : <Copy className="size-4" />} {copied ? "Copied" : "Copy"}
+          </Button>
+          <Button asChild variant="ghost" size="sm">
+            <a href={accountUrl(wallet)} target="_blank" rel="noopener noreferrer">
+              Explorer <ExternalLink className="size-4" />
+            </a>
+          </Button>
+        </div>
       </div>
     </div>
   );

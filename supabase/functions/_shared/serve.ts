@@ -1,25 +1,15 @@
 import type { NetworkConfig } from "@app/config";
-import {
-  type ChainReader,
-  type FraxNetClient,
-  type GasSponsor,
-  createChainReader,
-  createFraxNetClient,
-  createGasSponsor,
-  publicClientFor,
-} from "@app/adapters";
 import { createClient } from "@supabase/supabase-js";
-import type { Hex } from "viem";
 import { type TokenVerifier, createPrivyVerifier } from "./auth.ts";
-import { type Payout, type RegistryReads, type SignatureCheck, chainSignatureCheck, payoutFor, registryReads } from "./chain.ts";
 import type { Database } from "./db/database.types.ts";
 import { type ServiceClient, SupabaseDb } from "./db/supabase.ts";
 import type { Db } from "./db/types.ts";
 import { type Env, MissingEnvError, denoEnv, networkConfig, requireEnv } from "./env.ts";
 import { type Handler, json, withErrors } from "./http.ts";
+import { type Ledger, xrplLedger } from "./ledger.ts";
 import { type Mailer, createLogMailer, createResendMailer } from "./mail.ts";
 import { type ReceiptStorage, supabaseStorage } from "./storage.ts";
-import { profileLiquidationStore } from "./kyc.ts";
+import { type Custody, createCustody, importWalletKey } from "./wallets.ts";
 
 /** Builds production dependencies from environment variables, each only when a function asks for it. */
 export class Context {
@@ -58,42 +48,12 @@ export class Context {
     });
   }
 
-  fraxnet(): FraxNetClient {
-    return createFraxNetClient(this.config, {
-      clientId: this.env.get("FRAXNET_CLIENT_ID"),
-      clientSecret: this.env.get("FRAXNET_CLIENT_SECRET"),
-      store: profileLiquidationStore(this.db()),
-    });
+  custody(): Custody {
+    return createCustody({ db: this.db(), key: importWalletKey(requireEnv(this.env, "WALLET_ENCRYPTION_KEY")) });
   }
 
-  gasSponsor(): GasSponsor {
-    return createGasSponsor(this.config, {
-      dripPrivateKey: this.env.get("DRIP_PRIVATE_KEY"),
-      amountWei: this.env.get("DRIP_AMOUNT_WEI"),
-      thresholdWei: this.env.get("DRIP_THRESHOLD_WEI"),
-      publicClient: publicClientFor(this.config),
-    });
-  }
-
-  dripAmountWei(): bigint {
-    const value = this.env.get("DRIP_AMOUNT_WEI");
-    return value && /^[0-9]+$/.test(value) ? BigInt(value) : 0n;
-  }
-
-  chain(): ChainReader {
-    return createChainReader(this.config, { publicClient: publicClientFor(this.config) });
-  }
-
-  registry(): RegistryReads {
-    return registryReads(this.config);
-  }
-
-  signatureCheck(): SignatureCheck {
-    return chainSignatureCheck(publicClientFor(this.config));
-  }
-
-  payout(): Payout {
-    return payoutFor(this.config, requireEnv(this.env, "PAYOUT_PRIVATE_KEY") as Hex);
+  ledger(): Ledger {
+    return xrplLedger(this.config, this.db());
   }
 
   mailer(): Mailer {

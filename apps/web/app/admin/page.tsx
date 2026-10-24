@@ -1,55 +1,60 @@
 "use client";
 
-import { claimRegistryAbi } from "@app/abi";
-import type { ClaimView, OrgExposure } from "@app/adapters";
+import { type ClaimView, claimViewFromJson } from "@app/adapters";
 import { useQuery } from "@tanstack/react-query";
 import { useState } from "react";
-import { encodeFunctionData, stringToHex } from "viem";
 import { AdminShell } from "@/components/admin/admin-shell";
 import { ReceiptLink } from "@/components/admin/receipt-link";
+import { StaffAction } from "@/components/admin/staff-action";
+import { StatusText, kycTone } from "@/components/admin/status-text";
 import { ErrorNotice, InfoNotice } from "@/components/app/notice";
 import { GradientPanel } from "@/components/app/gradient-panel";
 import { Money } from "@/components/app/money";
-import { SafeAction } from "@/components/app/safe-action";
 import { StateChip } from "@/components/app/state-chip";
-import { StatusText, kycTone } from "@/components/admin/status-text";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
-import { useCall } from "@/hooks/use-api";
+import { useCall, useOrgs } from "@/hooks/use-api";
 import { useNowSeconds } from "@/hooks/use-now";
-import { roleSafe, useHoldsRole } from "@/hooks/use-roles";
-import { chainReader } from "@/lib/chain";
-import { deployedContracts } from "@/lib/config";
-import { parseUsd, shortAddress, usd, weiToInput } from "@/lib/format";
 import { REJECT_REASONS } from "@/lib/admin";
+import { config } from "@/lib/config";
+import { parseUsd, shortAddress, unitsToInput, usd } from "@/lib/format";
 import type { ClaimWithDocuments, OffchainClaim, PersonView } from "@/lib/types";
 import { cn } from "@/lib/utils";
 
-type QueueItem = { onchain: ClaimView; offchain: OffchainClaim | null };
+type QueueItem = { ledger: ClaimView; claim: OffchainClaim };
+type Exposure = { orgId: number; name: string; outstanding: bigint; cap: bigint };
+
+const OUTSTANDING = new Set(["Funded", "GuarantorCalled", "WrittenOff"]);
 
 function useQueue() {
   const call = useCall();
+  const orgs = useOrgs();
   return useQuery({
-    queryKey: ["admin-queue"],
+    queryKey: ["admin-queue", orgs.data?.length],
+    enabled: orgs.isSuccess,
     queryFn: async () => {
-      const reader = chainReader();
-      if (!reader) return null;
-      const [submitted, { claims }, exposure, stats] = await Promise.all([
-        reader.listClaims({ states: ["Submitted"] }),
-        call<{ claims: OffchainClaim[] }>("claims", { query: { scope: "all" } }),
-        reader.getOrgExposure(),
-        reader.getPoolStats(),
-      ]);
-      const byHash = new Map(claims.filter((c) => c.packetHash).map((c) => [c.packetHash!.toLowerCase(), c]));
-      const items: QueueItem[] = submitted.map((onchain) => ({ onchain, offchain: byHash.get(onchain.packetHash.toLowerCase()) ?? null }));
-      const wallets = [...new Set(items.flatMap((i) => [i.onchain.recipient, i.onchain.guarantor]))];
+      const { claims } = await call<{ claims: OffchainClaim[] }>("claims", { query: { scope: "all" } });
+      const items: QueueItem[] = claims
+        .filter((c) => c.status === "Submitted" && c.ledger)
+        .map((claim) => ({ claim, ledger: claimViewFromJson(claim.ledger!) }))
+        .sort((a, b) => a.ledger.submittedAt - b.ledger.submittedAt);
+      const cap = BigInt(config.params.perOrgCap);
+      const exposure: Exposure[] = (orgs.data ?? []).map((o) => ({
+        orgId: o.id,
+        name: o.name,
+        cap,
+        outstanding: claims
+          .filter((c) => c.orgId === o.id && OUTSTANDING.has(c.status) && c.ledger)
+          .reduce((sum, c) => sum + BigInt(c.ledger!.amountRemaining), 0n),
+      }));
+      const wallets = [...new Set(items.flatMap((i) => [i.claim.recipientWallet, i.claim.guarantorWallet].filter(Boolean)))] as string[];
       const people = wallets.length
         ? (await call<{ people: PersonView[] }>("directory", { query: { view: "people", wallets: wallets.join(",") } })).people
         : [];
-      return { items, exposure, idleCash: stats.idleCash, people: new Map(people.map((p) => [p.wallet.toLowerCase(), p])) };
+      return { items, exposure, people: new Map(people.map((p) => [p.wallet, p])) };
     },
     refetchInterval: 10_000,
   });
@@ -81,62 +86,46 @@ function Kyc({ person, role }: { person: PersonView | undefined; role: string })
 function ReviewCard({
   item,
   exposure,
-  idleCash,
   people,
   highlighted,
 }: {
   item: QueueItem;
-  exposure: OrgExposure | undefined;
-  idleCash: bigint;
+  exposure: Exposure | undefined;
   people: Map<string, PersonView>;
   highlighted: boolean;
 }) {
-  const deployed = deployedContracts();
-  const holds = useHoldsRole("underwriter");
   const call = useCall();
-  const { onchain, offchain } = item;
-  const [amount, setAmount] = useState(weiToInput(onchain.requestedAmount));
+  const { ledger, claim } = item;
+  const [amount, setAmount] = useState(unitsToInput(ledger.requestedAmount));
   const [reason, setReason] = useState<string>("MISSING_RECEIPTS");
   const docs = useQuery({
-    queryKey: ["claim", offchain?.id],
-    enabled: Boolean(offchain),
-    queryFn: () => call<ClaimWithDocuments>("claims", { query: { id: offchain!.id } }),
+    queryKey: ["claim", claim.id],
+    queryFn: () => call<ClaimWithDocuments>("claims", { query: { id: claim.id } }),
   });
-  if (!deployed) return null;
-  const approveWei = parseUsd(amount);
-  const approveTx = approveWei
-    ? [{ to: deployed.claimRegistry, value: 0n, label: "Approve claim", data: encodeFunctionData({ abi: claimRegistryAbi, functionName: "approveClaim", args: [onchain.id, approveWei] }) }]
-    : [];
-  const rejectTx = [
-    {
-      to: deployed.claimRegistry,
-      value: 0n,
-      label: "Reject",
-      data: encodeFunctionData({ abi: claimRegistryAbi, functionName: "rejectClaim", args: [onchain.id, stringToHex(reason, { size: 32 })] }),
-    },
-  ];
-  const overCap = exposure && approveWei ? exposure.outstanding + approveWei > exposure.cap : false;
-  const claimant = people.get(onchain.recipient.toLowerCase());
-  const guarantor = people.get(onchain.guarantor.toLowerCase());
+  const approveUnits = parseUsd(amount);
+  const overCap = exposure && approveUnits ? exposure.outstanding + approveUnits > exposure.cap : false;
+  const claimant = people.get(claim.recipientWallet);
+  const guarantor = claim.guarantorWallet ? people.get(claim.guarantorWallet) : undefined;
   const documents = docs.data?.documents ?? [];
-  // the member and the officer both need FraxNet verification before Frax buys the claim (U-24, U-77)
+  // the member and the officer both need verification before the claim is funded
   const kycReady = claimant?.kycStatus === "approved" && guarantor?.kycStatus === "approved";
+  const number = ledger.id.toString();
 
   return (
     <Card
-      id={`review-${onchain.id}`}
-      data-testid={`review-${onchain.id}`}
+      id={`review-${number}`}
+      data-testid={`review-${number}`}
       className={cn("scroll-mt-24 gap-0 overflow-hidden p-0 transition-shadow", highlighted && "ring-2 ring-foreground/50 ring-offset-2 ring-offset-background")}
     >
       <GradientPanel tone="panel" className="flex flex-col gap-2 rounded-none p-5 sm:p-6">
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div className="flex min-w-0 flex-col gap-1.5">
             <span className="text-on-ink/70 truncate text-[13px]">
-              Reimbursement {onchain.id.toString()} · {exposure?.name ?? `Org ${onchain.orgId}`}
+              Reimbursement {number} · {exposure?.name ?? `Org ${claim.orgId}`}
               {claimant?.displayName ? ` · ${claimant.displayName}` : ""}
             </span>
-            <Money wei={onchain.requestedAmount} size="lg" />
-            {offchain?.description ? <p className="text-on-ink/80 max-w-md text-sm leading-snug">{offchain.description}</p> : null}
+            <Money units={ledger.requestedAmount} size="lg" />
+            {claim.description ? <p className="text-on-ink/80 max-w-md text-sm leading-snug">{claim.description}</p> : null}
           </div>
           <StateChip state="Submitted" className="text-on-ink shrink-0" />
         </div>
@@ -153,57 +142,49 @@ function ReviewCard({
           <div className="bg-surface-muted flex flex-col gap-2.5 rounded-md p-4 text-sm">
             <div className="flex items-center justify-between gap-3">
               <span className="text-muted-foreground">CalLink request</span>
-              <span className="font-semibold">{offchain?.callinkPrNumber ?? "not found offchain"}</span>
+              <span className="font-semibold">{claim.callinkPrNumber}</span>
             </div>
             <div className="flex items-center justify-between gap-3">
               <span className="text-muted-foreground">Face value</span>
-              <span className="tabular font-semibold">{usd(onchain.faceValue)}</span>
+              <span className="tabular font-semibold">{usd(ledger.faceValue)}</span>
             </div>
             <div className="flex items-center justify-between gap-3">
               <span className="text-muted-foreground">Member wallet</span>
-              <span className="font-mono text-xs">{shortAddress(onchain.recipient)}</span>
+              <span className="font-mono text-xs">{shortAddress(claim.recipientWallet)}</span>
             </div>
             <div className="flex items-center justify-between gap-3">
               <span className="text-muted-foreground">Packet</span>
-              <span className="font-mono text-xs">{onchain.packetHash.slice(0, 10)}…</span>
+              <span className="font-mono text-xs">{ledger.packetHash.slice(0, 10)}…</span>
             </div>
           </div>
           <div className="border-border divide-divider flex flex-col divide-y rounded-md border px-4">
             <Kyc person={claimant} role="Member" />
             <Kyc person={guarantor} role="Officer" />
-            {offchain ? (
-              <div className="flex items-center justify-between gap-3 py-2.5 text-sm">
-                <span className="text-muted-foreground">Officer sign-off</span>
-                <StatusText tone={offchain.guarantySigned ? "success" : "warning"}>{offchain.guarantySigned ? "Signed" : "Not signed"}</StatusText>
-              </div>
-            ) : null}
+            <div className="flex items-center justify-between gap-3 py-2.5 text-sm">
+              <span className="text-muted-foreground">Officer sign-off</span>
+              <StatusText tone={claim.guarantySigned ? "success" : "warning"}>{claim.guarantySigned ? "Signed" : "Not signed"}</StatusText>
+            </div>
             <div className="flex items-center justify-between gap-3 py-2.5 text-sm">
               <span className="text-muted-foreground">Org exposure</span>
               <span className="tabular font-semibold">
                 {usd(exposure?.outstanding)} of {usd(exposure?.cap)}
               </span>
             </div>
-            <div className="flex items-center justify-between gap-3 py-2.5 text-sm">
-              <span className="text-muted-foreground">Pool idle cash</span>
-              <span className="tabular font-semibold">{usd(idleCash)}</span>
-            </div>
           </div>
         </div>
         {!kycReady ? (
-          <InfoNotice title="Waiting on FraxNet verification">The member and the officer both need to be verified before this can be approved.</InfoNotice>
+          <InfoNotice title="Waiting on verification">The member and the officer both need to be verified before this can be approved.</InfoNotice>
         ) : null}
-        {overCap ? <InfoNotice title="This would go over the org's cap">Getting paid will fail until others are closed out.</InfoNotice> : null}
+        {overCap ? <InfoNotice title="This would go over the org's cap">Funding will fail until others are closed out.</InfoNotice> : null}
         <div className="grid gap-5 lg:grid-cols-2">
           <div className="space-y-2.5">
-            <Label htmlFor={`amount-${onchain.id}`}>Approve for ($)</Label>
-            <Input id={`amount-${onchain.id}`} inputMode="decimal" className="tabular" value={amount} onChange={(e) => setAmount(e.target.value)} />
-            <SafeAction
-              txs={approveTx}
-              name={`Approve reimbursement ${onchain.id}`}
-              description={`approveClaim(${onchain.id}, ${usd(approveWei)})`}
-              safeAddress={roleSafe("underwriter")}
-              directSender={holds.data === true}
-              disabled={!approveWei || !kycReady}
+            <Label htmlFor={`amount-${number}`}>Approve for ($)</Label>
+            <Input id={`amount-${number}`} inputMode="decimal" className="tabular" value={amount} onChange={(e) => setAmount(e.target.value)} />
+            <StaffAction
+              label={`Approve ${approveUnits ? usd(approveUnits) : ""}`}
+              body={approveUnits ? { action: "approve", claimId: claim.id, amount: approveUnits.toString() } : null}
+              disabled={!kycReady}
+              testId={`approve-${number}`}
             />
           </div>
           <div className="space-y-2.5">
@@ -220,13 +201,7 @@ function ReviewCard({
                 ))}
               </SelectContent>
             </Select>
-            <SafeAction
-              txs={rejectTx}
-              name={`Reject reimbursement ${onchain.id}`}
-              description={`rejectClaim(${onchain.id}, ${reason})`}
-              safeAddress={roleSafe("underwriter")}
-              directSender={holds.data === true}
-            />
+            <StaffAction label="Reject" variant="outline" body={{ action: "reject", claimId: claim.id, reason }} testId={`reject-${number}`} />
           </div>
         </div>
       </CardContent>
@@ -236,8 +211,7 @@ function ReviewCard({
 
 /**
  * Every submitted claim renders as a full review card in a scrollable column, with a compact list above (desktop:
- * to the side) for jumping between them. That keeps exactly one `review-{id}` element per claim in the DOM at all
- * times, regardless of which one a signer is looking at, which is what the e2e suite and multi-signer review need.
+ * to the side) for jumping between them.
  */
 function Queue() {
   const queue = useQueue();
@@ -246,19 +220,19 @@ function Queue() {
 
   if (queue.isPending) return <Skeleton className="h-48 w-full rounded-3xl" />;
   if (queue.isError) return <ErrorNotice>We couldn&apos;t load the queue. Try again in a minute.</ErrorNotice>;
-  if (!queue.data || queue.data.items.length === 0) return <InfoNotice title="Nothing to review" />;
+  if (queue.data.items.length === 0) return <InfoNotice title="Nothing to review" />;
 
-  const { items, exposure, idleCash, people } = queue.data;
-  const activeId = selected ?? items[0]?.onchain.id.toString() ?? null;
+  const { items, exposure, people } = queue.data;
+  const activeId = selected ?? items[0]?.ledger.id.toString() ?? null;
 
   return (
     <div className="flex flex-col gap-5 lg:flex-row lg:items-start">
       <nav aria-label="Waiting for review" className="bg-card shadow-card flex shrink-0 flex-col gap-1 rounded-3xl p-3 lg:sticky lg:top-6 lg:w-80">
         <span className="eyebrow text-muted-foreground px-2.5 pt-1.5 pb-2">Submitted {items.length}</span>
-        {items.map(({ onchain, offchain }) => {
-          const id = onchain.id.toString();
+        {items.map(({ ledger, claim }) => {
+          const id = ledger.id.toString();
           const on = id === activeId;
-          const org = exposure.find((e) => e.orgId === onchain.orgId)?.name ?? `Org ${onchain.orgId}`;
+          const org = exposure.find((e) => e.orgId === claim.orgId)?.name ?? `Org ${claim.orgId}`;
           return (
             <a
               key={id}
@@ -270,11 +244,10 @@ function Queue() {
               <span className="flex min-w-0 flex-1 flex-col gap-0.5">
                 <span className="truncate font-bold">{org}</span>
                 <span className="text-muted-foreground truncate text-xs">
-                  {timeAgo(onchain.submittedAt, now)}
-                  {offchain?.callinkPrNumber ? ` · ${offchain.callinkPrNumber}` : ""}
+                  {timeAgo(ledger.submittedAt, now)} · {claim.callinkPrNumber}
                 </span>
               </span>
-              <span className="tabular shrink-0 text-sm font-bold">{usd(onchain.requestedAmount)}</span>
+              <span className="tabular shrink-0 text-sm font-bold">{usd(ledger.requestedAmount)}</span>
             </a>
           );
         })}
@@ -282,12 +255,11 @@ function Queue() {
       <div className="flex min-w-0 flex-1 flex-col gap-4">
         {items.map((item) => (
           <ReviewCard
-            key={item.onchain.id.toString()}
+            key={item.claim.id}
             item={item}
-            exposure={exposure.find((e) => e.orgId === item.onchain.orgId)}
-            idleCash={idleCash}
+            exposure={exposure.find((e) => e.orgId === item.claim.orgId)}
             people={people}
-            highlighted={item.onchain.id.toString() === activeId}
+            highlighted={item.ledger.id.toString() === activeId}
           />
         ))}
       </div>

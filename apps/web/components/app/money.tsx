@@ -8,7 +8,7 @@ const SIZES = {
   xl: "text-5xl sm:text-[64px]",
 } as const;
 
-/** Dollar amounts: tabular figures, and the largest text on claim and dashboard screens (BRAND.md). */
-export function Money({ wei, size = "md", className }: { wei: bigint | string | null | undefined; size?: keyof typeof SIZES; className?: string }) {
-  return <span className={cn("money-type", SIZES[size], className)}>{usd(wei)}</span>;
+/** Dollar amounts: tabular figures, and the largest text on claim and dashboard screens. */
+export function Money({ units, size = "md", className }: { units: bigint | string | null | undefined; size?: keyof typeof SIZES; className?: string }) {
+  return <span className={cn("money-type", SIZES[size], className)}>{usd(units)}</span>;
 }

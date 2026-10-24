@@ -3,21 +3,25 @@
  * so the auth tests exercise the same code path as a real Privy token.
  */
 import { assertEquals } from "@std/assert";
-import { type ClaimView, toClaimView } from "@app/adapters";
 import { type NetworkConfig, loadNetworkConfig } from "@app/config";
 import { SignJWT, exportSPKI, generateKeyPair } from "jose";
-import type { Hex, LocalAccount } from "viem";
-import { generatePrivateKey, privateKeyToAccount } from "viem/accounts";
-import { type TokenVerifier, bindingMessage, createPrivyVerifier } from "./auth.ts";
+import { Wallet as XrplWallet } from "xrpl";
+import { type TokenVerifier, createPrivyVerifier } from "./auth.ts";
 import { MemoryDb } from "./db/memory.ts";
 import type { KycStatus, Profile, StaffRole, Wallet } from "./db/types.ts";
 import { type Handler, withErrors } from "./http.ts";
+import { FakeLedger } from "./ledger.ts";
+import { type Custody, createCustody, encryptSeed, importWalletKey } from "./wallets.ts";
 
 export const APP_ID = "test-privy-app";
 const keys = await generateKeyPair("ES256", { extractable: true });
 const otherKeys = await generateKeyPair("ES256", { extractable: true });
 export const VERIFICATION_KEY = await exportSPKI(keys.publicKey);
 export const verifier: TokenVerifier = createPrivyVerifier({ appId: APP_ID, verificationKey: VERIFICATION_KEY });
+
+/** A fixed test-only wallet key: 32 zero bytes. */
+export const WALLET_KEY = btoa(String.fromCharCode(...new Uint8Array(32)));
+const walletKey = importWalletKey(WALLET_KEY);
 
 export async function privyToken(
   userId: string,
@@ -31,6 +35,18 @@ export async function privyToken(
     .setIssuedAt()
     .setExpirationTime(opts.expiresIn ?? "1h")
     .sign(opts.otherKey ? otherKeys.privateKey : keys.privateKey);
+}
+
+/** A Privy identity token whose linked accounts include `emails`. */
+export async function identityToken(userId: string, emails: string[]): Promise<string> {
+  return await new SignJWT({ linked_accounts: JSON.stringify(emails.map((address) => ({ type: "email", address }))) })
+    .setProtectedHeader({ alg: "ES256", typ: "JWT" })
+    .setIssuer("privy.io")
+    .setAudience(APP_ID)
+    .setSubject(userId)
+    .setIssuedAt()
+    .setExpirationTime("1h")
+    .sign(keys.privateKey);
 }
 
 /** Every way a request can fail Privy verification. */
@@ -63,36 +79,39 @@ export async function assertRejectsBadTokens(handler: Handler, url: string, meth
   }
 }
 
-export type TestUser = { account: LocalAccount; wallet: Wallet; userId: string; token: string; profile: Profile };
+/** Custody over `db` with the fixed test key. */
+export function testCustody(db: MemoryDb): Custody {
+  return createCustody({ db, key: walletKey });
+}
+
+export type TestUser = { xrpl: XrplWallet; wallet: Wallet; userId: string; token: string; profile: Profile };
 
 let userCount = 0;
 
-/** A user with a fresh key, a Privy token, and a profile in `db`. */
+/** A user with a fresh custodial wallet, a Privy token, and a profile in `db`. */
 export async function makeUser(
   db: MemoryDb,
   opts: { email?: string | null; name?: string; staff?: StaffRole; profile?: boolean; kyc?: KycStatus } = {},
 ): Promise<TestUser> {
-  const account = privateKeyToAccount(generatePrivateKey());
-  const wallet = account.address.toLowerCase() as Wallet;
+  const xrpl = XrplWallet.generate();
+  const wallet = xrpl.classicAddress as Wallet;
   const userId = `did:privy:user${++userCount}`;
-  const profile =
-    opts.profile === false
-      ? (null as unknown as Profile)
-      : await db.insertProfile({
-          wallet,
-          privyUserId: userId,
-          email: opts.email === undefined ? `user${userCount}@example.test` : opts.email,
-          displayName: opts.name ?? `User ${userCount}`,
-        });
+  let profile = null as unknown as Profile;
+  if (opts.profile !== false) {
+    await db.insertWallet({ address: wallet, encryptedSeed: await encryptSeed(await walletKey, wallet, xrpl.seed as string) });
+    profile = await db.insertProfile({
+      wallet,
+      privyUserId: userId,
+      email: opts.email === undefined ? `user${userCount}@example.test` : opts.email,
+      emailVerified: true,
+      displayName: opts.name ?? `User ${userCount}`,
+    });
+    if (opts.kyc) {
+      profile = await db.updateProfile(wallet, { kycStatus: opts.kyc, kycSource: "manual", kycUpdatedBy: wallet, kycUpdatedAt: FIXED_NOW.toISOString() });
+    }
+  }
   if (opts.staff) db.staff.set(wallet, opts.staff);
-  const verified = opts.kyc && profile ? await db.updateProfile(wallet, { kycStatus: opts.kyc, kycSource: "manual", kycUpdatedAt: FIXED_NOW.toISOString() }) : profile;
-  return { account, wallet, userId, token: await privyToken(userId), profile: verified };
-}
-
-export async function bindingSignature(user: { account: LocalAccount; userId: string }, issuedAt: string): Promise<Hex> {
-  return await user.account.signMessage({
-    message: bindingMessage({ privyUserId: user.userId, wallet: user.account.address, issuedAt }),
-  });
+  return { xrpl, wallet, userId, token: await privyToken(userId), profile };
 }
 
 /** Calls a handler the way Supabase would, wrapped in the same error handling. */
@@ -115,9 +134,9 @@ export async function call(
   return { status: res.status, body: text ? JSON.parse(text) : {} };
 }
 
-/** `deployments/local.json`, which has deployed addresses. */
-export function localConfig(overrides: Partial<NetworkConfig> = {}): NetworkConfig {
-  return { ...loadNetworkConfig("local"), ...overrides };
+/** `deployments/xrpl-devnet.json`. */
+export function testConfig(overrides: Partial<NetworkConfig> = {}): NetworkConfig {
+  return { ...loadNetworkConfig("xrpl-devnet"), ...overrides };
 }
 
 export function seedOrg(db: MemoryDb, id: number, name: string, officers: Wallet[] = []) {
@@ -125,39 +144,6 @@ export function seedOrg(db: MemoryDb, id: number, name: string, officers: Wallet
   for (const wallet of officers) db.officers.set(`${id}:${wallet}`, { orgId: id, wallet, title: "Treasurer", active: true });
 }
 
-/** A claim as the chain would return it, for fake ChainReaders. */
-export function onchainClaim(overrides: Partial<ClaimView> = {}): ClaimView {
-  return {
-    ...toClaimView({
-      id: 1n,
-      recipient: "0x0000000000000000000000000000000000000001",
-      orgId: 1n,
-      recipientType: 0,
-      state: 3,
-      callReason: 0,
-      principalWrittenOff: false,
-      guarantor: "0x0000000000000000000000000000000000000002",
-      feeBps: 0,
-      submittedAt: 1_790_000_000,
-      approvalExpiresAt: 1_791_209_600,
-      faceValue: 500n * 10n ** 18n,
-      requestedAmount: 400n * 10n ** 18n,
-      approvedAmount: 400n * 10n ** 18n,
-      purchasePrice: 400n * 10n ** 18n,
-      amountDue: 400n * 10n ** 18n,
-      amountPaid: 0n,
-      writtenOffPrincipal: 0n,
-      purchasedAt: 1_790_100_000,
-      dueAt: 1_805_652_000,
-      guarantorCalledAt: 0,
-      writeOffEligibleAt: 0,
-      feeAccruedAt: 1_790_100_000,
-      packetHash: `0x${"ab".repeat(32)}`,
-    }),
-    ...overrides,
-  };
-}
-
 export const FIXED_NOW = new Date("2026-10-11T17:00:00.000Z");
 
-export { MemoryDb };
+export { FakeLedger, MemoryDb };

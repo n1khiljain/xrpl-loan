@@ -28,7 +28,7 @@ import { useCall, useOrgs } from "@/hooks/use-api";
 import { uploadToSignedUrl } from "@/lib/api";
 import { params } from "@/lib/config";
 import { friendlyError } from "@/lib/errors";
-import { amountDue, parseUsd, usd, weiToInput } from "@/lib/format";
+import { amountDue, parseUsd, unitsToInput, usd } from "@/lib/format";
 import type { ClaimWithDocuments, DocumentView, InviteCreated, MeResponse, PacketResponse } from "@/lib/types";
 
 /** Once a draft is saved, it waits in this list with "Finish". */
@@ -96,8 +96,8 @@ function WizardForm({ me, initial }: { me: MeResponse; initial: ClaimWithDocumen
 
   const [pickedOrgId, setOrgId] = useState<number | null>(seed?.orgId ?? null);
   const [recipientType, setRecipientType] = useState<"member" | "org_treasurer">(seed?.recipientType ?? "member");
-  const [face, setFace] = useState(() => (seed ? weiToInput(BigInt(seed.faceValue)) : ""));
-  const [requested, setRequested] = useState(() => (seed ? weiToInput(BigInt(seed.requestedAmount)) : ""));
+  const [face, setFace] = useState(() => (seed ? unitsToInput(BigInt(seed.faceValue)) : ""));
+  const [requested, setRequested] = useState(() => (seed ? unitsToInput(BigInt(seed.requestedAmount)) : ""));
   const [callink, setCallink] = useState(seed?.callinkPrNumber ?? "");
   const [description, setDescription] = useState(seed?.description ?? "");
   const [guarantor, setGuarantor] = useState<string | null>(seed?.guarantorWallet ?? null);
@@ -111,8 +111,8 @@ function WizardForm({ me, initial }: { me: MeResponse; initial: ClaimWithDocumen
     queryFn: () => call<ClaimWithDocuments>("claims", { query: { id: claimId as string } }),
   });
 
-  const faceWei = parseUsd(face);
-  const requestedWei = parseUsd(requested) ?? 0n;
+  const faceUnits = parseUsd(face);
+  const requestedUnits = parseUsd(requested) ?? 0n;
   const orgList = orgs.data ?? [];
   // with one org there's nothing to choose, so it's picked for you
   const orgId = pickedOrgId ?? (orgList.length === 1 ? (orgList[0]?.id ?? null) : null);
@@ -136,12 +136,12 @@ function WizardForm({ me, initial }: { me: MeResponse; initial: ClaimWithDocumen
   const saveDetails = () =>
     run(async () => {
       if (!orgId) throw new Error("Pick an org.");
-      if (!faceWei || !requestedWei || faceWei === 0n || requestedWei === 0n) throw new Error("Enter both amounts in dollars.");
-      if (requestedWei > maxRequest(faceWei)) throw new Error(`You can ask for up to ${usd(maxRequest(faceWei))}.`);
+      if (!faceUnits || !requestedUnits || faceUnits === 0n || requestedUnits === 0n) throw new Error("Enter both amounts in dollars.");
+      if (requestedUnits > maxRequest(faceUnits)) throw new Error(`You can ask for up to ${usd(maxRequest(faceUnits))}.`);
       const fields = {
         recipientType,
-        faceValue: faceWei.toString(),
-        requestedAmount: requestedWei.toString(),
+        faceValue: faceUnits.toString(),
+        requestedAmount: requestedUnits.toString(),
         callinkPrNumber: callink.trim(),
         description: description.trim() || null,
       };
@@ -189,17 +189,17 @@ function WizardForm({ me, initial }: { me: MeResponse; initial: ClaimWithDocumen
       router.push(`/claim/?id=${claimId}`);
     });
 
-  const due = requestedWei ? amountDue(requestedWei, params.feeBps, params.overdueWindowSeconds) : 0n;
-  const fee = due - requestedWei;
+  const due = requestedUnits ? amountDue(requestedUnits, params.feeBps, params.overdueWindowSeconds) : 0n;
+  const fee = due - requestedUnits;
   const overdueDays = Math.round(params.overdueWindowSeconds / 86_400);
   const guarantorName = officers.find((o) => o.wallet === guarantor)?.displayName ?? "your officer";
   const previewOrgName = org?.name ?? "Your org";
   const previewState = (STEPS[step] ?? STEPS[0]).toUpperCase();
 
   const reviewMoney: Array<[string, string]> = [
-    ["Amount on the request", usd(faceWei)],
+    ["Amount on the request", usd(faceUnits)],
     ["Fee, at most, if sent by the due date", usd(fee)],
-    ["You send Frax, at most", usd(due)],
+    ["You send back, at most", usd(due)],
     ["Send by", `${overdueDays} days after you're paid`],
   ];
   const reviewDetails: Array<[string, string]> = [
@@ -223,10 +223,10 @@ function WizardForm({ me, initial }: { me: MeResponse; initial: ClaimWithDocumen
                 <>
                   <div className="space-y-1">
                     <h2 className="display-type text-2xl">What did you pay for?</h2>
-                    <p className="text-muted-foreground text-sm">Get it now instead of waiting on ASUC. When ASUC pays you, you send it to Frax.</p>
+                    <p className="text-muted-foreground text-sm">Get it now instead of waiting on ASUC. When ASUC pays you, you send it back to the vault.</p>
                   </div>
 
-                  {/* one org is picked for you; the pills only show when there's a real choice (U-75) */}
+                  {/* one org is picked for you; the pills only show when there's a real choice */}
                   {orgs.isPending ? <Skeleton className="h-5 w-56" /> : null}
                   {orgList.length === 1 && org ? (
                     <p className="flex items-center gap-2.5 text-sm" data-testid="org-picked">
@@ -268,7 +268,7 @@ function WizardForm({ me, initial }: { me: MeResponse; initial: ClaimWithDocumen
                       onChange={(v) => {
                         setFace(v);
                         const f = parseUsd(v);
-                        if (f) setRequested(weiToInput(maxRequest(f)));
+                        if (f) setRequested(unitsToInput(maxRequest(f)));
                       }}
                       placeholder="240.00"
                     />
@@ -279,18 +279,18 @@ function WizardForm({ me, initial }: { me: MeResponse; initial: ClaimWithDocumen
                           How much you want now ($)
                         </Label>
                         <Input id="requested" inputMode="decimal" value={requested} onChange={(e) => setRequested(e.target.value)} className="sm:max-w-[240px]" />
-                        <p className="text-muted-foreground text-xs">Up to {faceWei ? usd(maxRequest(faceWei)) : usd(params.perClaimCap)}</p>
+                        <p className="text-muted-foreground text-xs">Up to {faceUnits ? usd(maxRequest(faceUnits)) : usd(params.perClaimCap)}</p>
                       </div>
                     ) : (
                       <p className="text-muted-foreground text-sm" data-testid="get-now">
-                        {faceWei ? (
+                        {faceUnits ? (
                           <>
-                            You get <span className="text-foreground font-semibold">{usd(requestedWei)}</span> now.{" "}
+                            You get <span className="text-foreground font-semibold">{usd(requestedUnits)}</span> now.{" "}
                           </>
                         ) : (
                           `Up to ${usd(params.perClaimCap)} per reimbursement. `
                         )}
-                        {faceWei ? (
+                        {faceUnits ? (
                           <button type="button" className="text-foreground font-medium underline underline-offset-4" onClick={() => setTakeLess(true)}>
                             Take less
                           </button>
@@ -331,7 +331,7 @@ function WizardForm({ me, initial }: { me: MeResponse; initial: ClaimWithDocumen
                     </div>
                   ) : null}
 
-                  {/* stacked on phones, primary on top, so a long label or wider font never pushes past 375px (FR-F10) */}
+                  {/* stacked on phones, primary on top, so a long label or wider font never pushes past 375px  */}
                   <div className="flex flex-col-reverse gap-3 sm:flex-row sm:items-center sm:justify-between">
                     <Button asChild variant="secondary" size="lg" className="w-full sm:w-auto">
                       <Link href="/claims/">Cancel</Link>
@@ -371,9 +371,9 @@ function WizardForm({ me, initial }: { me: MeResponse; initial: ClaimWithDocumen
                   </ul>
                   <div className="bg-surface-muted flex items-center gap-2.5 rounded-lg px-4 py-3 text-[13px]">
                     <ShieldCheck className="size-[18px] shrink-0" />
-                    Receipts stay private. Only a fingerprint of them goes onchain.
+                    Receipts stay private. Only a fingerprint of them is kept with your request.
                   </div>
-                  {/* stacked on phones, primary on top, so a long label or wider font never pushes past 375px (FR-F10) */}
+                  {/* stacked on phones, primary on top, so a long label or wider font never pushes past 375px  */}
                   <div className="flex flex-col-reverse gap-3 sm:flex-row sm:items-center sm:justify-between">
                     <Button variant="secondary" size="lg" className="w-full sm:w-auto" onClick={() => setStep(0)} disabled={busy}>
                       Back
@@ -412,7 +412,7 @@ function WizardForm({ me, initial }: { me: MeResponse; initial: ClaimWithDocumen
                       </Label>
                     ))}
                   </RadioGroup>
-                  {/* stacked on phones, primary on top, so a long label or wider font never pushes past 375px (FR-F10) */}
+                  {/* stacked on phones, primary on top, so a long label or wider font never pushes past 375px  */}
                   <div className="flex flex-col-reverse gap-3 sm:flex-row sm:items-center sm:justify-between">
                     <Button variant="secondary" size="lg" className="w-full sm:w-auto" onClick={() => setStep(1)} disabled={busy}>
                       Back
@@ -431,13 +431,13 @@ function WizardForm({ me, initial }: { me: MeResponse; initial: ClaimWithDocumen
                     <p className="text-muted-foreground text-sm">Double check the numbers, then send it to {guarantorName} to sign off.</p>
                   </div>
                   <div className="flex justify-center lg:hidden">
-                    <ClaimCard claimId="DRAFT" amount={usd(requestedWei)} state={previewState} org={previewOrgName} tone="frost" scale={0.62} />
+                    <ClaimCard claimId="DRAFT" amount={usd(requestedUnits)} state={previewState} org={previewOrgName} tone="frost" scale={0.62} />
                   </div>
-                  {/* the money first, with what you get now large; then what it's for (U-75) */}
+                  {/* the money first, with what you get now large; then what it's for */}
                   <div className="border-border flex flex-col rounded-xl border text-sm" data-testid="review-summary">
                     <div className="flex items-end justify-between gap-4 p-5">
                       <span className="text-muted-foreground">You get now</span>
-                      <span className="money-type text-3xl font-semibold">{usd(requestedWei)}</span>
+                      <span className="money-type text-3xl font-semibold">{usd(requestedUnits)}</span>
                     </div>
                     {[reviewMoney, reviewDetails].map((rows, i) => (
                       <div key={i} className="border-divider grid grid-cols-[1fr_auto] gap-x-8 gap-y-2.5 border-t p-5">
@@ -451,9 +451,9 @@ function WizardForm({ me, initial }: { me: MeResponse; initial: ClaimWithDocumen
                     ))}
                   </div>
                   <p className="text-sm">
-                    You&apos;ll get {usd(requestedWei)} now. When ASUC pays you, send {usd(due)} to Frax. {guarantorName} gets an email to sign off first, then you send it for review.
+                    You&apos;ll get {usd(requestedUnits)} now. When ASUC pays you, send {usd(due)} back to the vault. {guarantorName} gets an email to sign off first, then you send it for review.
                   </p>
-                  {/* stacked on phones, primary on top, so a long label or wider font never pushes past 375px (FR-F10) */}
+                  {/* stacked on phones, primary on top, so a long label or wider font never pushes past 375px  */}
                   <div className="flex flex-col-reverse gap-3 sm:flex-row sm:items-center sm:justify-between">
                     <Button variant="secondary" size="lg" className="w-full sm:w-auto" onClick={() => setStep(2)} disabled={busy}>
                       Back
@@ -469,7 +469,7 @@ function WizardForm({ me, initial }: { me: MeResponse; initial: ClaimWithDocumen
             {error ? <ErrorNotice>{error}</ErrorNotice> : null}
           </CardContent>
         </Card>
-        <WizardAside org={previewOrgName} requestedWei={requestedWei} state={previewState} />
+        <WizardAside org={previewOrgName} requestedUnits={requestedUnits} state={previewState} />
       </div>
     </div>
   );
@@ -486,7 +486,7 @@ export default function NewClaimPage() {
         ) : (
           <>
             <Topbar title="Get reimbursed now" action={null} back={BACK} />
-            <VerifyFirst status={me.profile?.kycStatus ?? "not_started"} role="member" wallet={me.profile?.wallet} />
+            <VerifyFirst status={me.profile?.kycStatus ?? "not_started"} role="member" />
           </>
         )
       }

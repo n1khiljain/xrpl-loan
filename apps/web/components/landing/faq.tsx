@@ -7,9 +7,9 @@ import { useState } from "react";
 const FAQ = [
   {
     q: "Is this a sale or a debt?",
-    a: "It's a sale. Frax buys your pending reimbursement and pays you now. When ASUC pays you, you send that payment to Frax.",
+    a: "It's an advance against your pending reimbursement, made as a loan from a lending vault on the XRP Ledger. When ASUC pays you, you send that payment back to the vault.",
   },
-  { q: "What does it cost?", a: "Nothing during the pilot. The fee is 0%, and Frax covers network costs." },
+  { q: "What does it cost?", a: "Nothing during the pilot. The fee is 0%, and the app covers XRP Ledger network costs." },
   { q: "What if ASUC rejects it?", a: "Report it in the app. The officer who signed off covers what ASUC didn't pay." },
   { q: "Who holds my documents?", a: "Only you, your club's officers, and Blockchain at Berkeley's reviewers can see your receipts. The receipts themselves never go on the blockchain." },
 ] as const;

@@ -6,13 +6,11 @@ import { usePathname } from "next/navigation";
 import type { ReactNode } from "react";
 import { ClientLockup } from "@/components/brand/logos-context";
 import { Button } from "@/components/ui/button";
-import { useSafeContext } from "./safe-action";
 import { areaFor } from "./app-shell";
 import { cn } from "@/lib/utils";
 
 function AreaAction() {
   const area = areaFor(usePathname() ?? "/");
-  const safe = useSafeContext();
   if (area === "member") {
     return (
       <Button asChild>
@@ -29,15 +27,7 @@ function AreaAction() {
       </Button>
     );
   }
-  return safe.data ? (
-    <span className="bg-success-soft text-success flex h-11 items-center gap-2 rounded-full px-4 text-[13px] font-bold">
-      <span className="bg-success size-2 rounded-full" /> Connected to Frax Safe
-    </span>
-  ) : (
-    <span className="bg-surface-muted text-muted-foreground flex h-11 items-center gap-2 rounded-full px-4 text-[13px] font-bold">
-      <span className="bg-muted-foreground size-2 rounded-full" /> Outside the Safe
-    </span>
-  );
+  return null;
 }
 
 /**

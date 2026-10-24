@@ -6,7 +6,6 @@ import { motion } from "motion/react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { Suspense } from "react";
-import { useSignTypedData } from "wagmi";
 import { AccountGate } from "@/components/app/account-gate";
 import { VerifyFirst } from "@/components/app/verify-first";
 import { GradientPanel } from "@/components/app/gradient-panel";
@@ -19,11 +18,9 @@ import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useCall } from "@/hooks/use-api";
 import { ApiError } from "@/lib/api";
-import { config, deployedContracts } from "@/lib/config";
+import { ASSET } from "@/lib/config";
 import { friendlyError } from "@/lib/errors";
 import { dateTime, shortAddress, usd } from "@/lib/format";
-import { GUARANTY_TTL_SECONDS, guarantyTypedData } from "@/lib/guaranty";
-import { useSession } from "@/lib/session/context";
 import type { InviteView } from "@/lib/types";
 
 const BACK = { href: "/claims/?view=guaranties", label: "Sign-offs" };
@@ -32,8 +29,6 @@ function Guarantee() {
   const invite = useSearchParams().get("invite");
   const call = useCall();
   const queryClient = useQueryClient();
-  const session = useSession();
-  const { signTypedDataAsync } = useSignTypedData();
   const view = useQuery({
     queryKey: ["invite", invite],
     enabled: Boolean(invite),
@@ -46,23 +41,9 @@ function Guarantee() {
   const sign = useMutation({
     mutationFn: async () => {
       const data = view.data;
-      const nonce = data?.typedData?.message.nonce;
-      const deployed = deployedContracts();
-      if (!data || !nonce || !data.claim.packetHash || !session.address || !deployed) throw new Error("This can't be signed right now.");
-      // built here from config and the claim on screen, never taken from the server (E-3a)
-      const typed = guarantyTypedData({
-        chainId: config.chainId,
-        registry: deployed.claimRegistry,
-        guarantor: session.address,
-        claim: { ...data.claim, packetHash: data.claim.packetHash },
-        nonce: BigInt(nonce),
-        deadline: BigInt(Math.floor(Date.now() / 1000) + GUARANTY_TTL_SECONDS),
-      });
-      const signature = await signTypedDataAsync(typed);
-      await call("guaranty", {
-        method: "POST",
-        body: { claimId: data.claim.id, signature, nonce: typed.message.nonce.toString(), deadline: typed.message.deadline.toString(), invite },
-      });
+      if (!data?.signable || !data.claim.packetHash) throw new Error("This can't be signed off right now.");
+      // the sign-off names the packet hash shown here, so it can't land on a claim that changed since
+      await call("guaranty", { method: "POST", body: { claimId: data.claim.id, packetHash: data.claim.packetHash, invite } });
     },
     // the claim lists behind the sidebar's sign-off count, which drops by one. Not the invite: it's used now.
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ["claims"] }),
@@ -111,7 +92,7 @@ function Guarantee() {
     <div className="space-y-6 lg:space-y-8">
       <Topbar title="Sign-off request" crumb={claim.orgName ?? undefined} back={BACK} />
       <div className="flex flex-col gap-5 lg:flex-row lg:items-stretch lg:gap-6">
-        {/* The ask, and the claim as a card. Once signed, the words and the card swap to say so (U-75). */}
+        {/* The ask, and the claim as a card. Once signed, the words and the card swap to say so. */}
         <GradientPanel
           tone="gold"
           className="-mx-4 flex shrink-0 flex-col gap-6 p-6 sm:-mx-6 sm:p-7 lg:mx-0 lg:w-[380px] lg:p-8"
@@ -126,7 +107,7 @@ function Guarantee() {
             <p className="text-on-ink/80 max-w-sm text-[15px] leading-relaxed">
               {signed
                 ? `${name} can send it for review now. You'll only hear from us if ASUC never pays.`
-                : `Frax pays ${name} now instead of waiting on ASUC. You vouch that ASUC will pay. If ASUC never does, you cover what's left.`}
+                : `The lending vault pays ${name} now instead of waiting on ASUC. You vouch that ASUC will pay. If ASUC never does, you cover what's left.`}
             </p>
           </Swap>
           <div className="flex justify-center pt-2 lg:mt-auto lg:pt-0">
@@ -176,10 +157,10 @@ function Guarantee() {
           <div className="border-border flex flex-col gap-2 rounded-xl border p-4 sm:p-5">
             <span className="text-muted-foreground text-xs font-medium">What you&apos;re agreeing to</span>
             <p className="text-[15px] leading-relaxed font-semibold" data-testid="obligation">
-              If ASUC never pays this, you pay Frax whatever is left.
+              If ASUC never pays this, you pay the vault whatever is left.
             </p>
             <p className="text-muted-foreground text-sm leading-relaxed">
-              Signing costs nothing and isn&apos;t a payment. We&apos;ll email you if you&apos;re ever asked to cover it, and you pay in frxUSD.
+              Signing off costs nothing and isn&apos;t a payment. We&apos;ll email you if you&apos;re ever asked to cover it, and you&apos;d pay in {ASSET}.
             </p>
           </div>
 
@@ -211,14 +192,14 @@ function Guarantee() {
               <>
                 <div className="flex flex-col gap-3 sm:flex-row">
                   {/* flex-1 only in a row: in the phone column a zero flex-basis collapses the button's height */}
-                  <Button size="lg" className="sm:flex-1" onClick={() => sign.mutate()} disabled={sign.isPending || !view.data.typedData} data-testid="sign-guaranty">
+                  <Button size="lg" className="sm:flex-1" onClick={() => sign.mutate()} disabled={sign.isPending || !view.data.signable} data-testid="sign-guaranty">
                     {sign.isPending ? "Signing..." : "Sign off"}
                   </Button>
                   <Button variant="secondary" size="lg" asChild>
                     <Link href="/claims/">Decline</Link>
                   </Button>
                 </div>
-                <span className="text-muted-foreground text-center text-xs">A signature, not a payment. Nothing moves unless ASUC doesn&apos;t pay.</span>
+                <span className="text-muted-foreground text-center text-xs">A sign-off, not a payment. Nothing moves unless ASUC doesn&apos;t pay.</span>
               </>
             )}
             {sign.isError ? <ErrorNotice>{friendlyError(sign.error)}</ErrorNotice> : null}
@@ -236,7 +217,7 @@ export default function GuaranteePage() {
         me.profile?.kycStatus !== "approved" ? (
           <div className="space-y-6">
             <Topbar title="Sign-off request" back={BACK} />
-            <VerifyFirst status={me.profile?.kycStatus ?? "not_started"} role="officer" wallet={me.profile?.wallet} />
+            <VerifyFirst status={me.profile?.kycStatus ?? "not_started"} role="officer" />
           </div>
         ) : (
           <Suspense

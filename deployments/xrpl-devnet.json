@@ -1,0 +1,29 @@
+{
+  "network": "xrpl-devnet",
+  "networkId": 2,
+  "wsUrl": "wss://s.devnet.rippletest.net:51233",
+  "rpcUrl": "https://s.devnet.rippletest.net:51234",
+  "faucetUrl": "https://faucet.devnet.rippletest.net/accounts",
+  "explorer": "https://devnet.xrpl.org",
+  "asset": {
+    "code": "RLUSD",
+    "currency": "524C555344000000000000000000000000000000",
+    "issuer": null,
+    "standIn": true
+  },
+  "params": {
+    "advanceRateBps": 10000,
+    "perClaimCap": "2500000000",
+    "perOrgCap": "10000000000",
+    "poolDepositCap": "50000000000",
+    "feeBps": 0,
+    "overdueWindowSeconds": 15552000,
+    "approvalExpirySeconds": 1209600,
+    "writeOffGraceSeconds": 5184000
+  },
+  "features": {
+    "simulatePayment": true,
+    "testnetBanner": true
+  },
+  "ledger": {}
+}

@@ -3,7 +3,7 @@
 import { type ReactNode, createContext, useContext } from "react";
 import { type LockupTone, type LogoFiles, LockupView } from "./lockup-view";
 
-const NONE: LogoFiles = { bab: null, babOnDark: null, frax: null, fraxOnDark: null };
+const NONE: LogoFiles = { bab: null, babOnDark: null };
 const LogosContext = createContext<LogoFiles>(NONE);
 
 /** The server layout finds the logo files; client components read them from here. */

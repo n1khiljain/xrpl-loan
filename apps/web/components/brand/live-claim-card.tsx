@@ -44,7 +44,7 @@ function Stamp() {
 /**
  * The claim card, alive: it leans toward the pointer with a glare that follows it, and each state plays its moment
  * when it arrives. Swap it with a new key when the state
- * changes so the moment plays again. Under reduced motion it's the still card with its finish (U-75).
+ * changes so the moment plays again. Under reduced motion it's the still card with its finish.
  */
 export function LiveClaimCard({
   moment,

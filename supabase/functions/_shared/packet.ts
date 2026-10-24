@@ -1,5 +1,5 @@
-import { type Hex, keccak256, stringToBytes } from "viem";
 import type { Wallet } from "./db/types.ts";
+import { sha256Hex } from "./storage.ts";
 
 type Json = null | boolean | number | string | Json[] | { [key: string]: Json };
 
@@ -19,14 +19,14 @@ export function canonicalize(value: Json): string {
   return `{${keys.map((key) => `${JSON.stringify(key)}:${canonicalize(value[key] as Json)}`).join(",")}}`;
 }
 
-/** The claim packet (FR-B4). Only its keccak256 goes onchain (U-20). */
+/** The frozen claim packet. Its SHA-256 is the claim's fingerprint; the documents themselves stay private. */
 export type ClaimPacket = {
   orgId: number;
   recipient: Wallet;
-  /** frxUSD wei as a decimal string */
+  /** base units as a decimal string */
   faceValue: string;
   callinkPrNumber: string;
-  /** SHA-256 of each receipt, lowercase hex, sorted */
+  /** SHA-256 of each document, lowercase hex, sorted */
   documentHashes: string[];
   /** When the draft was created, ISO 8601 in UTC */
   createdAt: string;
@@ -34,7 +34,7 @@ export type ClaimPacket = {
 
 export function buildPacket(input: {
   orgId: number;
-  recipient: string;
+  recipient: Wallet;
   faceValue: string | bigint;
   callinkPrNumber: string;
   documentHashes: readonly string[];
@@ -42,7 +42,7 @@ export function buildPacket(input: {
 }): ClaimPacket {
   return {
     orgId: input.orgId,
-    recipient: input.recipient.toLowerCase() as Wallet,
+    recipient: input.recipient,
     faceValue: BigInt(input.faceValue).toString(),
     callinkPrNumber: input.callinkPrNumber.trim(),
     documentHashes: input.documentHashes.map((h) => h.toLowerCase()).sort(),
@@ -50,6 +50,6 @@ export function buildPacket(input: {
   };
 }
 
-export function packetHash(packet: ClaimPacket): Hex {
-  return keccak256(stringToBytes(canonicalize(packet)));
+export function packetHash(packet: ClaimPacket): Promise<string> {
+  return sha256Hex(new TextEncoder().encode(canonicalize(packet)));
 }

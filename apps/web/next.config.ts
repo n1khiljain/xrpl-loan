@@ -7,7 +7,7 @@ const config: NextConfig = {
   images: { unoptimized: true },
   reactStrictMode: true,
   // workspace packages ship TypeScript source
-  transpilePackages: ["@app/config", "@app/abi", "@app/adapters"],
+  transpilePackages: ["@app/config", "@app/adapters"],
 };
 
 export default config;

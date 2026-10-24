@@ -8,17 +8,12 @@
     "build": "next build && rm -f out/local-demo-sessions.json",
     "lint": "eslint .",
     "typecheck": "tsc --noEmit",
-    "test": "vitest run",
-    "e2e": "playwright test",
-    "readme-shots": "playwright test -c playwright.readme.config.ts"
+    "test": "vitest run"
   },
   "dependencies": {
-    "@app/abi": "workspace:*",
     "@app/adapters": "workspace:*",
     "@app/config": "workspace:*",
     "@privy-io/react-auth": "^3.45.0",
-    "@privy-io/wagmi": "^4.0.17",
-    "@safe-global/safe-apps-sdk": "^9.1.0",
     "@tanstack/react-query": "^5.103.2",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
@@ -29,9 +24,7 @@
     "react": "19.3.0",
     "react-dom": "19.3.0",
     "sonner": "^2.0.8",
-    "tailwind-merge": "^3.7.0",
-    "viem": "^2.56.8",
-    "wagmi": "^3.7.7"
+    "tailwind-merge": "^3.7.0"
   },
   "devDependencies": {
     "@playwright/test": "^1.63.0",

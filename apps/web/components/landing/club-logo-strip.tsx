@@ -5,7 +5,7 @@ import { useRef } from "react";
 
 /* eslint-disable @next/next/no-img-element */
 
-// white cut-outs of the marquee's club logos (U-72); width is each file's width at its 96px height
+// white cut-outs of the marquee's club logos; width is each file's width at its 96px height
 const CLUBS: { name: string; slug: string; width: number }[] = [
   { name: "Berkeley Investment Group", slug: "big", width: 94 },
   { name: "Berkeley Consulting", slug: "bc", width: 96 },
@@ -31,7 +31,7 @@ const CLUBS: { name: string; slug: string; width: number }[] = [
 ];
 
 /**
- * frax.com's partner strip, with Berkeley clubs: small white logos drifting along the bottom of the hero, wide gaps,
+ * A partner strip with Berkeley clubs: small white logos drifting along the bottom of the hero, wide gaps,
  * no fade. The list renders twice so the loop has no seam; reduced motion holds it still.
  */
 export function ClubLogoStrip({ speed = 0.4 }: { speed?: number }) {

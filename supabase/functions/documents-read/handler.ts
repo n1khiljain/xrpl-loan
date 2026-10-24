@@ -10,8 +10,8 @@ export type DocumentsReadDeps = { auth: TokenVerifier; db: Db; storage: ReceiptS
 const Body = z.strictObject({ documentId: uuid });
 
 /**
- * A five-minute signed URL for one receipt, for the claimant, the org's active officers, and underwriters only
- * (FR-B3). Anyone else gets a 404, so document IDs can't be probed.
+ * A five-minute signed URL for one receipt, for the claimant, the org's active officers, and underwriters only.
+ * Anyone else gets a 404, so document IDs can't be probed.
  */
 export function createDocumentsReadHandler(deps: DocumentsReadDeps): Handler {
   const { db, storage } = deps;

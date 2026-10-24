@@ -3,27 +3,26 @@ import { CardJourney } from "@/components/landing/card-journey";
 import { GlowStage } from "@/components/landing/glow-stage";
 import { SectionLink } from "@/components/landing/section-link";
 import { usd } from "@/lib/format";
-import { config } from "@/lib/config";
+import { ASSET, config } from "@/lib/config";
 import { cn } from "@/lib/utils";
 
 /* eslint-disable @next/next/no-img-element */
 
-/** One of Frax's official 3D token renders from frax.com/brand, centred like Project One's coin over a soft glow. */
-function CoinVisual({ src }: { src: string }) {
+/** A word set large over a soft glow, where a token render would go. Text only: no third-party logo is drawn. */
+function WordVisual({ word }: { word: string }) {
   return (
-    <div aria-hidden className="absolute inset-0 flex justify-center pt-[10%] lg:pt-[12%]">
+    <div aria-hidden className="absolute inset-0 flex justify-center pt-[12%] lg:pt-[14%]">
       <div className="bg-on-ink/15 absolute top-[8%] size-[45%] rounded-full blur-3xl" />
-      <img src={src} alt="" width={372} height={386} loading="lazy" className="relative h-auto w-[38%] max-w-[260px] self-start drop-shadow-2xl" />
+      <span className="display-type text-on-ink/90 relative self-start text-6xl font-bold lg:text-8xl">{word}</span>
     </div>
   );
 }
 
-// the first two backgrounds are Project One's (the astronaut's NASA insignia is blurred out); the last two are Frax's own
-// token renders (U-72)
+// the first two backgrounds are Project One's (the astronaut's NASA insignia is blurred out)
 const FEATURES: { title: string; detail: string; visual: ReactNode }[] = [
   {
     title: "Get paid today",
-    detail: "Frax pays you in frxUSD as soon as Blockchain at Berkeley approves your request.",
+    detail: `The lending vault pays you in ${ASSET} as soon as Blockchain at Berkeley approves your request.`,
     visual: <img src="/images/landing/bitcoin-coin.webp" alt="" width={1200} height={1170} loading="lazy" className="absolute inset-0 size-full object-cover" />,
   },
   {
@@ -33,13 +32,13 @@ const FEATURES: { title: string; detail: string; visual: ReactNode }[] = [
   },
   {
     title: "No fees during the pilot",
-    detail: "The fee is 0%, and Frax covers network costs, so nothing is taken out of your reimbursement.",
-    visual: <CoinVisual src="/brand/frax-3d.png" />,
+    detail: "The fee is 0%, and the app covers XRP Ledger network costs, so nothing is taken out of your reimbursement.",
+    visual: <WordVisual word="0%" />,
   },
   {
     title: "Open to lenders",
-    detail: `Frax funds the pilot pool with up to ${usd(config.params.poolDepositCap)}. Lenders can see every reimbursement the pool buys and when each one is closed out.`,
-    visual: <CoinVisual src="/brand/frxusd-3d.png" />,
+    detail: `Verified lenders fund a private vault on the XRP Ledger, up to ${usd(config.params.poolDepositCap)}. Every payout and repayment is on the ledger for anyone to check.`,
+    visual: <WordVisual word={ASSET} />,
   },
 ];
 
@@ -64,7 +63,7 @@ export function Features() {
           <h2 className="display-type max-w-[700px] text-2xl sm:text-3xl lg:text-4xl xl:text-5xl">Reimbursements without the wait</h2>
           <div className="flex max-w-[600px] flex-col gap-6 sm:gap-8 lg:gap-10">
             <p className="text-on-ink/60 text-base leading-relaxed sm:text-lg">
-              ASUC reimbursements can take weeks or months. Frax buys your pending reimbursement and pays you today. When ASUC pays you, you send that payment to Frax.
+              ASUC reimbursements can take weeks or months. A lending vault on the XRP Ledger pays you today. When ASUC pays you, you send that payment back to the vault.
             </p>
             <SectionLink
               href="#how"

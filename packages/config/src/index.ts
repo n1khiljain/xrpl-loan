@@ -1,27 +1,11 @@
-import local from "../../../deployments/local.json" with { type: "json" };
-import fraxtalTestnet from "../../../deployments/fraxtal-testnet.json" with { type: "json" };
-import sepolia from "../../../deployments/sepolia.json" with { type: "json" };
-import fraxtal from "../../../deployments/fraxtal.json" with { type: "json" };
-import {
-  type Address,
-  type Deployed,
-  type NetworkConfig,
-  type NetworkName,
-  NETWORKS,
-  networkConfigSchema,
-} from "./schema.ts";
+import xrplDevnet from "../../../deployments/xrpl-devnet.json" with { type: "json" };
+import { type LedgerObjects, type NetworkConfig, type NetworkName, NETWORKS, networkConfigSchema } from "./schema.ts";
 
 export * from "./schema.ts";
 
-/**
- * The four files in `deployments/`, bundled at build time so the static web export and the edge functions can read
- * them without a filesystem.
- */
+/** The files in `deployments/`, bundled at build time so the static web export and the edge functions can read them. */
 export const RAW_CONFIGS: Record<NetworkName, unknown> = {
-  local,
-  "fraxtal-testnet": fraxtalTestnet,
-  sepolia,
-  fraxtal,
+  "xrpl-devnet": xrplDevnet,
 };
 
 /** Thrown when a network config fails validation. `issues` lists every problem with its path. */
@@ -51,10 +35,7 @@ export function isNetworkName(value: string): value is NetworkName {
   return (NETWORKS as readonly string[]).includes(value);
 }
 
-/**
- * Loads and validates `deployments/<network>.json`. The name usually comes from `NETWORK` (contracts, functions)
- * or `NEXT_PUBLIC_NETWORK` (web).
- */
+/** Loads and validates `deployments/<network>.json`. The name comes from `NETWORK` (functions) or `NEXT_PUBLIC_NETWORK` (web). */
 export function loadNetworkConfig(network: string): NetworkConfig {
   if (!isNetworkName(network)) {
     throw new ConfigError(network, [`unknown network; expected one of ${NETWORKS.join(", ")}`]);
@@ -62,28 +43,36 @@ export function loadNetworkConfig(network: string): NetworkConfig {
   return parseNetworkConfig(RAW_CONFIGS[network], network);
 }
 
-export type DeployedContracts = Required<Deployed>;
+export type LedgerSetup = Required<LedgerObjects> & { issuer: NonNullable<NetworkConfig["asset"]["issuer"]> };
 
-/** Thrown when code needs contract addresses that the deploy script has not written yet. */
-export class NotDeployedError extends Error {
+/** Thrown when code needs ledger objects the setup script has not created yet. */
+export class NotSetUpError extends Error {
   constructor(
     readonly network: string,
     readonly missing: string[],
   ) {
-    super(
-      `Contracts are not deployed on ${network} (missing ${missing.join(", ")}). ` +
-        `Run NETWORK=${network} forge script script/Deploy.s.sol from contracts/.`,
-    );
-    this.name = "NotDeployedError";
+    super(`The XRPL setup hasn't run on ${network} (missing ${missing.join(", ")}). Run \`pnpm xrpl:setup\`.`);
+    this.name = "NotSetUpError";
   }
 }
 
-/** Returns every deployed address, or throws `NotDeployedError` naming the ones missing. */
-export function requireDeployed(config: NetworkConfig): DeployedContracts {
-  const keys = ["block", "frxUSD", "orgRegistry", "claimRegistry", "pool", "claimNft"] as const;
-  const missing = keys.filter((key) => config.deployed[key] === undefined);
-  if (missing.length > 0) throw new NotDeployedError(config.network, missing);
-  return config.deployed as DeployedContracts;
+/** Every ledger object the app needs, or throws `NotSetUpError` naming the missing ones. */
+export function requireSetup(config: NetworkConfig): LedgerSetup {
+  const keys = ["broker", "credentialIssuer", "credentialType", "domainId", "vaultId", "loanBrokerId", "repaymentAccount"] as const;
+  const missing: string[] = keys.filter((key) => config.ledger[key] === undefined);
+  if (config.asset.issuer === null) missing.unshift("asset.issuer");
+  if (missing.length > 0) throw new NotSetUpError(config.network, missing);
+  return { ...(config.ledger as Required<LedgerObjects>), issuer: config.asset.issuer! };
+}
+
+/** Whether the setup script has run, without throwing. */
+export function isSetUp(config: NetworkConfig): boolean {
+  try {
+    requireSetup(config);
+    return true;
+  } catch {
+    return false;
+  }
 }
 
 /** Product terms as bigints, for code that compares amounts. */
@@ -97,5 +86,3 @@ export function paramsAsBigInt(config: NetworkConfig) {
     feeBps: BigInt(p.feeBps),
   };
 }
-
-export type { Address };

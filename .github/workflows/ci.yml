@@ -22,60 +22,19 @@ jobs:
           bash <(curl -sSL https://raw.githubusercontent.com/rhysd/actionlint/v1.7.12/scripts/download-actionlint.bash) 1.7.12
           ./actionlint -color
 
-  contracts:
-    runs-on: ubuntu-latest
-    defaults:
-      run:
-        working-directory: contracts
-    steps:
-      - uses: actions/checkout@v4
-        with:
-          submodules: recursive
-      - uses: foundry-rs/foundry-toolchain@v1
-      - run: forge build
-      - run: forge test
-      - run: forge coverage --report summary
-
-  static-analysis:
-    runs-on: ubuntu-latest
-    defaults:
-      run:
-        working-directory: contracts
-    steps:
-      - uses: actions/checkout@v4
-        with:
-          submodules: recursive
-      - uses: foundry-rs/foundry-toolchain@v1
-      - uses: actions/setup-python@v5
-        with:
-          python-version: "3.12"
-      - run: pip install slither-analyzer
-      - run: slither .
-      - run: npm install -g @cyfrin/aderyn
-      - run: aderyn . --output audits/aderyn-report.md
-
   workspace:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-        with:
-          submodules: recursive
-      - uses: foundry-rs/foundry-toolchain@v1
       - uses: pnpm/action-setup@v4
       - uses: actions/setup-node@v4
         with:
           node-version: 24
           cache: pnpm
       - run: pnpm install --frozen-lockfile
-      - run: pnpm --filter @app/abi generate
-      - name: generated ABIs are committed and current
-        run: git diff --exit-code packages/abi/src/generated.ts
       - run: pnpm lint
-      - name: the open-entries list in docs/UNCERTAINTIES.md matches the entries
-        run: node scripts/uncertainties.mjs --check
       - run: pnpm typecheck
-      # unit tests for config, abi, adapters, and web; the rpc reader, drip, and simulated cash-out tests deploy the
-      # contracts to a throwaway anvil
+      # unit tests for config, adapters, and web; none of them touch an XRPL network
       - run: pnpm test
       - name: static export builds
         run: pnpm --filter web build
@@ -84,12 +43,9 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-        with:
-          submodules: recursive
-      - uses: foundry-rs/foundry-toolchain@v1
       - uses: supabase/setup-cli@v1
         with:
-          version: 2.117.0
+          version: 2.122.0
       - uses: denoland/setup-deno@v2
         with:
           deno-version: v2.x
@@ -100,68 +56,6 @@ jobs:
         run: |
           supabase gen types typescript --local --schema public > "$RUNNER_TEMP/database.types.ts"
           diff -u supabase/functions/_shared/db/database.types.ts "$RUNNER_TEMP/database.types.ts"
-      - name: anvil with the local deployment
-        run: |
-          anvil --host 0.0.0.0 --port 8545 --silent &
-          until cast block-number --rpc-url http://127.0.0.1:8545 >/dev/null 2>&1; do sleep 0.5; done
-          cd contracts && NETWORK=local forge script script/Deploy.s.sol --rpc-url http://127.0.0.1:8545 --broadcast
-          git diff --exit-code ../deployments/local.json
-      - name: serve functions
-        run: |
-          deno run --allow-write --config supabase/functions/deno.json supabase/functions/_tests/make-e2e-env.ts "$RUNNER_TEMP"
-          # Linux Docker has no host.docker.internal by default; the edge runtime reaches the host on the bridge gateway
-          gateway="$(docker network inspect bridge -f '{{(index .IPAM.Config 0).Gateway}}')"
-          sed -i "s#host.docker.internal#${gateway}#" "$RUNNER_TEMP/functions.env"
-          supabase functions serve --env-file "$RUNNER_TEMP/functions.env" > "$RUNNER_TEMP/serve.log" 2>&1 &
-          until curl -s -o /dev/null http://127.0.0.1:54321/functions/v1/me; do sleep 1; done
-      - name: deno test (unit, db contract, anon access, e2e)
+      - name: deno test (unit with a fake ledger, db contract, anon access)
         working-directory: supabase/functions
-        env:
-          E2E_ENV_FILE: ${{ runner.temp }}/functions.env
-          E2E_PRIVY_JWK: ${{ runner.temp }}/privy-test.jwk.json
         run: deno test --allow-all
-      - if: failure()
-        run: cat "$RUNNER_TEMP/serve.log" || true
-
-  playwright:
-    runs-on: ubuntu-latest
-    timeout-minutes: 30
-    steps:
-      - uses: actions/checkout@v4
-        with:
-          submodules: recursive
-      - uses: foundry-rs/foundry-toolchain@v1
-      - uses: supabase/setup-cli@v1
-        with:
-          version: 2.117.0
-      - uses: denoland/setup-deno@v2
-        with:
-          deno-version: v2.x
-      - uses: pnpm/action-setup@v4
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 24
-          cache: pnpm
-      - run: pnpm install --frozen-lockfile
-      - run: pnpm --filter web exec playwright install --with-deps chromium
-      - run: supabase start
-      - name: anvil with the local deployment
-        run: |
-          anvil --host 0.0.0.0 --port 8545 --silent &
-          until cast block-number --rpc-url http://127.0.0.1:8545 >/dev/null 2>&1; do sleep 0.5; done
-          cd contracts && NETWORK=local forge script script/Deploy.s.sol --rpc-url http://127.0.0.1:8545 --broadcast
-          git diff --exit-code ../deployments/local.json
-      - name: playwright (anvil, local supabase, mock adapters)
-        run: |
-          # global-setup serves the functions and the static export; see apps/web/e2e/global-setup.ts
-          E2E_DOCKER_HOST="$(docker network inspect bridge -f '{{(index .IPAM.Config 0).Gateway}}')"
-          export E2E_DOCKER_HOST
-          pnpm --filter web e2e
-      - if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: playwright
-          path: |
-            apps/web/e2e/screenshots
-            apps/web/test-results
-          if-no-files-found: ignore

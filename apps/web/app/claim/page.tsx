@@ -18,7 +18,7 @@ import { useOrgs } from "@/hooks/use-api";
 import { useClaimRecord } from "@/hooks/use-claim";
 import { displayState, timeline } from "@/lib/claim-record";
 import { friendlyError } from "@/lib/errors";
-import { usd } from "@/lib/format";
+import { dollars, usd } from "@/lib/format";
 import { cn } from "@/lib/utils";
 import type { MeResponse, OffchainClaim } from "@/lib/types";
 
@@ -37,7 +37,7 @@ const TITLES: Partial<Record<DisplayState, string>> = {
 
 /** The amount this claim's card and hero lead with: what's left once purchased, what was approved, else what was asked for. */
 function headlineAmount(claim: OffchainClaim, onchain: ClaimView | null): bigint {
-  if (!onchain || onchain.state === "None") return BigInt(claim.requestedAmount);
+  if (!onchain) return BigInt(claim.requestedAmount);
   // a closed-out card shows what it was for, not the $0.00 left
   if (onchain.state === "Settled" || onchain.state === "Recovered") return onchain.amountDue;
   if (onchain.purchasedAt > 0) return onchain.amountRemaining;
@@ -52,8 +52,8 @@ function GuarantorPanel({ claim, onchain, state }: { claim: OffchainClaim; oncha
     return (
       <div className="flex flex-col gap-10">
         <StatePanel lead={`Cover the ${usd(onchain.amountRemaining)} that's left.`} description="You signed off, so you cover what's left." />
-        <PageSection title="Send to Frax">
-          <SettlePanel onchain={onchain} label="Pay" />
+        <PageSection title="Send it back">
+          <SettlePanel onchain={onchain} />
         </PageSection>
       </div>
     );
@@ -62,14 +62,14 @@ function GuarantorPanel({ claim, onchain, state }: { claim: OffchainClaim; oncha
     return <StatePanel lead="This is waiting on your sign-off." description="Check your email for the link to sign off on this." />;
   }
   if (state === "Settled" || state === "Recovered") {
-    return <StatePanel lead="Closed out. Nothing for you to cover." description="The reimbursement was sent to Frax in full." />;
+    return <StatePanel lead="Closed out. Nothing for you to cover." description="The reimbursement went back to the vault in full." />;
   }
   return <StatePanel lead="Nothing for you to cover right now." description="We'll email you if that changes." />;
 }
 
 /** The facts of the reimbursement as a plain list, so the page reads top to bottom. */
 function Details({ claim, onchain, receipts }: { claim: OffchainClaim; onchain: ClaimView | null; receipts: number }) {
-  const approved = onchain && onchain.state !== "None" && onchain.approvedAmount > 0n ? onchain.approvedAmount : null;
+  const approved = onchain && onchain.approvedAmount > 0n ? onchain.approvedAmount : null;
   // each number once: the request, then what was approved (or asked for, before approval)
   const rows: Array<[string, string]> = [
     ["What it was for", claim.description ?? "No description"],
@@ -117,7 +117,7 @@ function ClaimDetail({ me }: { me: MeResponse }) {
   const isClaimant = claim.recipientWallet === wallet;
   const isGuarantor = claim.guarantorWallet === wallet;
   const orgName = orgs.data?.find((o) => o.id === claim.orgId)?.name ?? "";
-  const cardId = onchain?.id ?? claim.onchainClaimId ?? null;
+  const cardId = claim.number;
   const calledAsGuarantor = isGuarantor && (state === "GuarantorCalled" || state === "WrittenOff");
   const title = calledAsGuarantor ? "You're asked to cover this" : (TITLES[state] ?? "Reimbursement");
   const fromSignOffs = isGuarantor && !isClaimant;
@@ -128,7 +128,7 @@ function ClaimDetail({ me }: { me: MeResponse }) {
     <>
       <Topbar title={title} crumb={crumb} back={back} />
       {/* one page, read top to bottom: where it stands and what to do, then the details. The card and progress sit to
-          the right on desktop; on a phone the card comes first and progress last (U-75). */}
+          the right on desktop; on a phone the card comes first and progress last. */}
       {/* one white sheet for the whole page, not a box per part */}
       <div className="bg-card grid grid-cols-1 gap-10 rounded-3xl p-5 sm:p-8 lg:grid-cols-[minmax(0,1fr)_300px] lg:gap-x-16 lg:p-10">
         <aside className="flex flex-col items-center gap-10 lg:col-start-2 lg:row-start-1 lg:items-stretch">
@@ -138,7 +138,7 @@ function ClaimDetail({ me }: { me: MeResponse }) {
               <LiveClaimCard
                 claimId={cardNumber(cardId)}
                 amount={usd(headlineAmount(claim, onchain))}
-                amountValue={Number(headlineAmount(claim, onchain) / 10n ** 16n) / 100}
+                amountValue={dollars(headlineAmount(claim, onchain))}
                 state={STATE_LABEL[state]}
                 org={orgName}
                 tone={CARD_TONE[state]}

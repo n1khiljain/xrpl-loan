@@ -1,5 +1,0 @@
-{
-  "filter_paths": "(lib/|test/|script/)",
-  "foundry_compile_all": false,
-  "fail_on": "medium"
-}

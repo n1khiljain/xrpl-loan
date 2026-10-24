@@ -1,4 +1,5 @@
 import type { ReactNode } from "react";
+import { ASSET } from "@/lib/config";
 import { cn } from "@/lib/utils";
 
 export type ClaimCardTone = "frost" | "sky" | "deep" | "gold";
@@ -17,9 +18,9 @@ const TONE: Record<ClaimCardTone, string> = {
 };
 
 /**
- * The claim as a card: a receivable with its number, state, and amount, from the design canvas. The marks are the
- * official B@B and frxUSD files; nothing is drawn in code. `size` scales the whole card (1 = 280x400). The number and
- * state are quiet text in the surrounding font, as on the landing page, not a monospace number and a pill (U-75).
+ * The claim as a card: a receivable with its number, state, and amount, from the design canvas. The mark is the
+ * official B@B file and the asset is named in text; nothing is drawn in code. `size` scales the whole card (1 = 280x400). The number and
+ * state are quiet text in the surrounding font, as on the landing page, not a monospace number and a pill.
  * `amountNode` replaces the printed amount (a count-up), and `children` sit over the card for a state's moment
  * (see LiveClaimCard).
  */
@@ -64,8 +65,7 @@ export function ClaimCard({
       {/* one row, so a long org name truncates instead of running into the label */}
       <span className="absolute right-[1.125em] bottom-[1em] left-[1.125em] flex items-center justify-between gap-[0.75em]">
         <span className="flex min-w-0 items-center gap-[0.5em] text-[0.75em] opacity-90">
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src="/brand/frxusd-mark-on-dark.png" alt="" className="h-[1.5em] w-auto" />
+          <span className="shrink-0 font-semibold">{ASSET}</span>
           <span className="truncate">{org}</span>
         </span>
         <span className="shrink-0 text-[0.8em] font-semibold">Reimbursement</span>

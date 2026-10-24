@@ -4,9 +4,8 @@ import type { TimelineStep } from "@/components/app/timeline";
 import { dateFromSeconds, dateTime, usd } from "./format";
 import type { OffchainClaim } from "./types";
 
-/** The chain is the source of truth once a claim is onchain; the cached status only covers drafts and lag. */
-export function displayState(claim: OffchainClaim, onchain: ClaimView | null): DisplayState {
-  if (onchain && onchain.state !== "None") return onchain.state;
+/** Where the claim stands. The backend keeps one status; the ledger view only adds its numbers. */
+export function displayState(claim: OffchainClaim, _onchain?: ClaimView | null): DisplayState {
   return claim.status;
 }
 
@@ -49,7 +48,7 @@ export function timeline(claim: OffchainClaim, onchain: ClaimView | null): Timel
   }
   if (state === "WrittenOff") steps.push({ label: "Written off", status: "failed" });
   steps.push({
-    label: "Sent to Frax, closed out",
+    label: "Sent back to the vault, closed out",
     detail: state === "Funded" && onchain ? `Due ${dateFromSeconds(onchain.dueAt)}` : undefined,
     status: state === "Settled" || state === "Recovered" ? "done" : state === "Funded" ? "current" : "upcoming",
   });

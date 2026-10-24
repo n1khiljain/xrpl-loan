@@ -3,7 +3,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { ArrowRight } from "lucide-react";
 import { useEffect } from "react";
-import { config } from "@/lib/config";
+import { PUBLIC_ENV } from "@/lib/env";
 import { DEV_SESSION_KEY, type DevSessionSeed } from "@/lib/session/types";
 
 type DemoPerson = { role: string; name: string; seed: DevSessionSeed };
@@ -19,8 +19,8 @@ const ROLE: Record<string, string> = {
 const HOME: Record<string, string> = { claimant: "/claims/", guarantor: "/claims/", lender: "/lend/", staff: "/admin/" };
 
 /**
- * Local builds only: one-click sign-in as the demo people that `pnpm local` sets up, since real sign-in needs a Privy
- * app (U-62). Reads `public/local-demo-sessions.json`, which scripts/local-demo.ts writes and git ignores.
+ * Local demo builds only: one-click sign-in as the demo people that `pnpm demo` sets up, since real sign-in needs a
+ * Privy app. Reads `public/local-demo-sessions.json`, which scripts/local-demo.ts writes and git ignores.
  */
 function signInAs(person: DemoPerson) {
   // the session provider reads this on load (lib/session/providers.tsx)
@@ -31,7 +31,7 @@ function signInAs(person: DemoPerson) {
 export function LocalDemoPicker() {
   const people = useQuery({
     queryKey: ["local-demo-sessions"],
-    enabled: config.network === "local",
+    enabled: PUBLIC_ENV.demoSessions,
     retry: false,
     queryFn: async () => {
       const res = await fetch("/local-demo-sessions.json", { cache: "no-store" });
@@ -48,14 +48,14 @@ export function LocalDemoPicker() {
     if (person) signInAs(person);
   }, [people.data]);
 
-  if (config.network !== "local") return null;
+  if (!PUBLIC_ENV.demoSessions) return null;
 
   return (
     <div className="border-border flex flex-col gap-3 rounded-2xl border p-4" data-testid="local-demo">
       <div className="flex flex-col gap-0.5">
         <p className="text-foreground text-sm font-semibold">Local demo</p>
         <p className="text-muted-foreground text-xs">
-          {people.data ? "Sign in as one of the demo people. Sign out to switch." : "Run `pnpm local` to set up demo people to sign in as."}
+          {people.data ? "Sign in as one of the demo people. Sign out to switch." : "Run `pnpm demo` to set up demo people to sign in as."}
         </p>
       </div>
       {people.data ? (

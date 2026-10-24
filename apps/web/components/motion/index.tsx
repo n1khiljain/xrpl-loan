@@ -4,7 +4,7 @@ import { AnimatePresence, animate, MotionConfig, motion, useInView, useMotionVal
 import { type ReactNode, useEffect, useLayoutEffect, useRef, useState } from "react";
 
 /*
- * The landing page's motion, shared with the app (U-75). Each piece is small and does one thing; use one only where
+ * The landing page's motion, shared with the app. Each piece is small and does one thing; use one only where
  * the movement tells someone what just happened. Reduced motion is honored once, at the root.
  */
 

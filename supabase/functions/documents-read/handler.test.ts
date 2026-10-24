@@ -10,7 +10,7 @@ Deno.test("documents-read rejects requests without a valid Privy token", async (
   await assertRejectsBadTokens(createDocumentsReadHandler({ auth: verifier, db: new MemoryDb(), storage: new MemoryStorage() }), ENDPOINT, ["POST"]);
 });
 
-Deno.test("claimant, org officers, and underwriters get a 5-minute signed ENDPOINT; others get 404 (FR-B3)", async () => {
+Deno.test("claimant, org officers, and underwriters get a 5-minute signed URL; others get 404", async () => {
   const w = await draftWorld();
   const [doc] = await w.db.listDocuments(w.claim.id);
   if (!doc) throw new Error("no receipt");

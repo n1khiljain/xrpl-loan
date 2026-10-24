@@ -1,10 +1,10 @@
-import { formatUnits } from "viem";
+import { unitsToValue } from "@app/adapters";
 import type { NotificationKind } from "./db/types.ts";
 import type { Email } from "./mail.ts";
 
-/** frxUSD wei as dollars and cents, rounded down. */
-export function usd(wei: bigint | string): string {
-  const [whole = "0", fraction = ""] = formatUnits(BigInt(wei), 18).split(".");
+/** Base units as dollars and cents, rounded down. */
+export function usd(units: bigint | string): string {
+  const [whole = "0", fraction = ""] = unitsToValue(BigInt(units)).split(".");
   return `$${Number(whole).toLocaleString("en-US")}.${fraction.padEnd(2, "0").slice(0, 2)}`;
 }
 
@@ -12,7 +12,7 @@ function day(seconds: number | bigint): string {
   return new Date(Number(seconds) * 1000).toLocaleDateString("en-US", { dateStyle: "long", timeZone: "UTC" });
 }
 
-/** Template fields. Amounts are wei as decimal strings and dates are unix seconds, so they can wait in the outbox. */
+/** Template fields. Amounts are base units as decimal strings and dates are unix seconds. */
 export type EmailData =
   | { kind: "guaranty_requested"; claimantName: string; orgName: string; amount: string; link: string; expires: string }
   | { kind: "claim_approved"; amount: string; link: string }
@@ -51,9 +51,9 @@ export function emailDataFrom(kind: NotificationKind, data: Record<string, strin
   }
 }
 
-/** The FR-B9 emails. Plain text, purchase language only (U-09), and no receipt details. */
+/** Plain-text emails, with no receipt details. */
 export function renderEmail(to: string, data: EmailData): Email {
-  const sign = "\n\nB@B x Frax college org financing";
+  const sign = "\n\nBlockchain at Berkeley receivables financing on the XRP Ledger";
   switch (data.kind) {
     case "guaranty_requested":
       return {
@@ -61,7 +61,7 @@ export function renderEmail(to: string, data: EmailData): Email {
         subject: `${data.claimantName} asked you to sign off on a reimbursement`,
         text:
           `${data.claimantName} wants to get their ${data.amount} ASUC reimbursement for ${data.orgName} now, and asked you to sign off as an officer. ` +
-          `If ASUC never pays it, you cover what's left.\n\nReview and sign off: ${data.link}\n\nThis link expires ${data.expires}.${sign}`,
+          `If the payer never pays it, you cover what's left.\n\nReview and sign off: ${data.link}\n\nThis link expires ${data.expires}.${sign}`,
       };
     case "claim_approved":
       return {
@@ -74,21 +74,21 @@ export function renderEmail(to: string, data: EmailData): Email {
         to,
         subject: "You got paid",
         text:
-          `${usd(data.price)} of frxUSD is in your wallet. ` +
-          `When ASUC pays you, send ${usd(data.due)} to Frax by ${day(data.dueAt)}: ${data.link}${sign}`,
+          `${usd(data.price)} of RLUSD is in your wallet. ` +
+          `When you're paid, send ${usd(data.due)} back to the vault by ${day(data.dueAt)}: ${data.link}${sign}`,
       };
     case "due_soon":
       return {
         to,
-        subject: "Send your ASUC payment to Frax within 14 days",
-        text: `Once ASUC pays you, send ${usd(data.remaining)} to Frax by ${day(data.dueAt)}. Do it here: ${data.link}${sign}`,
+        subject: "Your payment to the vault is due within 14 days",
+        text: `Once you're paid, send ${usd(data.remaining)} back to the vault by ${day(data.dueAt)}. Do it here: ${data.link}${sign}`,
       };
     case "guarantor_called":
       return {
         to,
         subject: "You're asked to cover a reimbursement you signed off on",
         text:
-          `ASUC didn't pay a reimbursement you signed off on in full. You cover the ${usd(data.remaining)} that's left. ` +
+          `The payer didn't pay a reimbursement you signed off on in full. You cover the ${usd(data.remaining)} that's left. ` +
           `Pay it here: ${data.link}${sign}`,
       };
   }
