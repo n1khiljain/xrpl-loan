@@ -18,8 +18,8 @@ const TONE: Record<ClaimCardTone, string> = {
 };
 
 /**
- * The claim as a card: a receivable with its number, state, and amount, from the design canvas. The mark is the
- * official B@B file and the asset is named in text; nothing is drawn in code. `size` scales the whole card (1 = 280x400). The number and
+ * The loan as a card: its number, state, and amount. The asset is named in text; nothing is drawn in code.
+ * `size` scales the whole card (1 = 280x400). The number and
  * state are quiet text in the surrounding font, as on the landing page, not a monospace number and a pill.
  * `amountNode` replaces the printed amount (a count-up), and `children` sit over the card for a state's moment
  * (see LiveClaimCard).
@@ -49,7 +49,7 @@ export function ClaimCard({
   return (
     <div
       role="img"
-      aria-label={`Reimbursement ${claimId}, ${amount}, ${state.toLowerCase()}`}
+      aria-label={`Loan ${claimId}, ${amount}, ${state.toLowerCase()}`}
       className={cn("grain text-on-ink shadow-card relative shrink-0 overflow-hidden rounded-[22px] font-sans", TONE[tone], className)}
       style={{ width: 280 * scale, height: 400 * scale, fontSize: 16 * scale }}
     >
@@ -59,8 +59,6 @@ export function ClaimCard({
         {claimId === "DRAFT" ? "Draft" : `No. ${claimId}`}
       </span>
       <span className="text-ink/80 absolute top-[1em] right-[1.125em] text-[0.75em] font-semibold tracking-[0.02em]">{sentenceCase(state)}</span>
-      {/* eslint-disable-next-line @next/next/no-img-element */}
-      <img src="/brand/bab-mark-on-dark.png" alt="" className="absolute top-[8.25em] left-[5.5em] w-[6.5em] opacity-95" />
       <span className="money-type absolute right-[0.64em] bottom-[1.8em] left-[0.64em] text-[1.75em]">{amountNode ?? amount}</span>
       {/* one row, so a long org name truncates instead of running into the label */}
       <span className="absolute right-[1.125em] bottom-[1em] left-[1.125em] flex items-center justify-between gap-[0.75em]">
@@ -68,7 +66,7 @@ export function ClaimCard({
           <span className="shrink-0 font-semibold">{ASSET}</span>
           <span className="truncate">{org}</span>
         </span>
-        <span className="shrink-0 text-[0.8em] font-semibold">Reimbursement</span>
+        <span className="shrink-0 text-[0.8em] font-semibold">Loan</span>
       </span>
       {children}
     </div>

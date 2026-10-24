@@ -61,7 +61,7 @@ function ResendInvite({ claim }: { claim: OffchainClaim }) {
       </Button>
       {invite.data ? (
         <div className="space-y-2">
-          <p className="text-sm">{invite.data.emailed ? "We emailed your officer. " : ""}You can also send them this link:</p>
+          <p className="text-sm">{invite.data.emailed ? "We emailed your approver. " : ""}You can also send them this link:</p>
           <div className="border-border bg-surface-muted flex items-center gap-2 rounded-sm border p-2">
             <code className="min-w-0 flex-1 truncate text-xs" data-testid="invite-link">
               {invite.data.inviteUrl}
@@ -115,7 +115,7 @@ function ReportOutcome({ claim, onchain }: { claim: OffchainClaim; onchain: Clai
   });
   if (claim.asucOutcome !== "none") {
     return (
-      <InfoNotice title={claim.asucOutcome === "rejected" ? "You reported ASUC rejected this" : "You reported ASUC paid less"}>
+      <InfoNotice title={claim.asucOutcome === "rejected" ? "You reported the payer rejected this" : "You reported the payer paid less"}>
         A reviewer will follow up. Your guarantor may be asked to pay what&apos;s left.
       </InfoNotice>
     );
@@ -125,8 +125,8 @@ function ReportOutcome({ claim, onchain }: { claim: OffchainClaim; onchain: Clai
       <DialogTrigger asChild>
         <button type="button" data-testid="report-outcome" className="group flex w-full items-center justify-between gap-3 py-1 text-left">
           <span className="flex min-w-0 flex-col gap-0.5">
-            <span className="text-foreground text-[15px] font-semibold">Report an ASUC problem</span>
-            <span className="text-muted-foreground text-xs">If ASUC rejected it or paid you less</span>
+            <span className="text-foreground text-[15px] font-semibold">Report a payment problem</span>
+            <span className="text-muted-foreground text-xs">If the payer rejected it or paid you less</span>
           </span>
           <span aria-hidden className="text-muted-foreground group-hover:text-foreground flex size-8 shrink-0 items-center justify-center transition-colors">
             <ChevronRight className="size-4" />
@@ -138,27 +138,27 @@ function ReportOutcome({ claim, onchain }: { claim: OffchainClaim; onchain: Clai
           <p className="text-muted-foreground text-xs font-medium">
             No. {cardNumber(onchain.id)} · {usd(onchain.amountRemaining)} left
           </p>
-          <DialogTitle>What did ASUC do?</DialogTitle>
-          <DialogDescription>We&apos;ll let a reviewer know. Send the vault whatever ASUC did pay you.</DialogDescription>
+          <DialogTitle>What did the payer do?</DialogTitle>
+          <DialogDescription>We&apos;ll let a reviewer know. Pay the vault whatever you did receive.</DialogDescription>
         </DialogHeader>
         <RadioGroup value={outcome} onValueChange={(v) => setOutcome(v as "rejected" | "short_paid")} className="grid gap-3 sm:grid-cols-2">
           <div className={cn("rounded-lg border p-4", outcome === "rejected" ? "border-foreground bg-surface-muted" : "border-border")}>
             <div className="flex items-center gap-2">
               <RadioGroupItem value="rejected" id="o-rejected" />
               <Label htmlFor="o-rejected" className="text-sm font-semibold">
-                ASUC rejected it
+                The payer rejected it
               </Label>
             </div>
-            <p className="text-muted-foreground mt-1.5 text-xs leading-relaxed">Nothing to send. Your officer covers it.</p>
+            <p className="text-muted-foreground mt-1.5 text-xs leading-relaxed">Nothing to pay back. Your approver covers it.</p>
           </div>
           <div className={cn("rounded-lg border p-4", outcome === "short_paid" ? "border-foreground bg-surface-muted" : "border-border")}>
             <div className="flex items-center gap-2">
               <RadioGroupItem value="short_paid" id="o-short" />
               <Label htmlFor="o-short" className="text-sm font-semibold">
-                ASUC paid less than I asked
+                The payer paid less than I asked
               </Label>
             </div>
-            <p className="text-muted-foreground mt-1.5 text-xs leading-relaxed">You send the vault what you got. Your officer covers the rest.</p>
+            <p className="text-muted-foreground mt-1.5 text-xs leading-relaxed">You pay the vault what you got. Your approver covers the rest.</p>
           </div>
         </RadioGroup>
         <div className="space-y-2">
@@ -214,7 +214,7 @@ function PaidCelebration({ onchain, onContinue }: { onchain: ClaimView; onContin
         <CountUp value={dollars(onchain.amountRemaining)} format={formatDollars} /> is in your wallet
       </h2>
       <p className="text-muted-foreground max-w-lg text-[15px] leading-relaxed">
-        When ASUC pays you, send {usd(onchain.amountRemaining)} back to the vault by {dateFromSeconds(onchain.dueAt)}.
+        When the payment arrives, pay {usd(onchain.amountRemaining)} back to the vault, with interest, by {dateFromSeconds(onchain.dueAt)}.
       </p>
       <div>
         <Button size="lg" className="pr-2" onClick={onContinue}>
@@ -236,7 +236,7 @@ export function ClaimantActions({ claim, onchain }: { claim: OffchainClaim; onch
   if (state === "Draft") {
     if (!claim.packetHash) {
       return (
-        <StatePanel lead={`Finish your request to get ${requested} now.`} description="Add your receipts and pick an officer to sign off.">
+        <StatePanel lead={`Finish your request to get ${requested} now.`} description="Add your documents and pick an approver to sign off.">
           <div>
             <Button asChild size="lg">
               <Link href={`/claims/new/?id=${claim.id}`}>Finish your request</Link>
@@ -247,13 +247,13 @@ export function ClaimantActions({ claim, onchain }: { claim: OffchainClaim; onch
     }
     if (!claim.guarantySigned) {
       return (
-        <StatePanel lead="Waiting for your officer to sign off." description={`Once they do, you can send it for review and get ${requested}.`}>
+        <StatePanel lead="Waiting for your approver to sign off." description={`Once they do, you can send it for review and get ${requested}.`}>
           <ResendInvite claim={claim} />
         </StatePanel>
       );
     }
     return (
-      <StatePanel lead="Your officer signed off. Send it for review." description={`Reviewers check your receipts and CalLink request before you get ${requested}.`}>
+      <StatePanel lead="Your approver signed off. Send it for review." description={`Reviewers check your documents and payment reference before you get ${requested}.`}>
         <SubmitClaim claim={claim} />
       </StatePanel>
     );
@@ -263,7 +263,7 @@ export function ClaimantActions({ claim, onchain }: { claim: OffchainClaim; onch
   if (state === "Submitted") {
     return (
       <StatePanel
-        lead="B@B underwriters are checking your receipts and CalLink request."
+        lead="Reviewers are checking your documents and payment reference."
         description="Most are reviewed within a day, and we'll email you when it's approved."
       >
         <div>
@@ -291,7 +291,7 @@ export function ClaimantActions({ claim, onchain }: { claim: OffchainClaim; onch
         {/* funding is an XLS-66 loan from the vault; it switches on once the ledger setup has run */}
         <div className="flex flex-col gap-3">
           <Button size="lg" className="pr-2 self-start" disabled data-testid="get-paid">
-            <CtaLabel>{`Get paid ${usd(onchain.approvedAmount)} in ${ASSET}`}</CtaLabel>
+            <CtaLabel>{`Get ${usd(onchain.approvedAmount)} in ${ASSET}`}</CtaLabel>
           </Button>
           <InfoNotice title={ledgerReady ? "Funding is coming soon" : "The lending vault isn't set up yet"}>
             Payouts come from the XRPL lending vault. You&apos;ll be able to collect here once it&apos;s live.
@@ -312,11 +312,11 @@ export function ClaimantActions({ claim, onchain }: { claim: OffchainClaim; onch
         {justFunded ? (
           <PaidCelebration onchain={onchain} onContinue={() => setJustFunded(false)} />
         ) : (
-          <StatePanel lead={`Send ${usd(onchain.amountRemaining)} back to the vault when ASUC pays you.`} description={`By ${dateFromSeconds(onchain.dueAt)}.`}>
+          <StatePanel lead={`Pay ${usd(onchain.amountRemaining)} back to the vault, with interest, when the payment arrives.`} description={`By ${dateFromSeconds(onchain.dueAt)}.`}>
             <ProgressBar paid={onchain.amountPaid} due={onchain.amountDue} />
           </StatePanel>
         )}
-        <PageSection title="Send it back">
+        <PageSection title="Pay it back">
           <SettlePanel onchain={onchain} />
         </PageSection>
         <div className="border-divider divide-divider flex flex-col divide-y border-t [&>*]:py-4">
@@ -329,10 +329,10 @@ export function ClaimantActions({ claim, onchain }: { claim: OffchainClaim; onch
     return (
       <div className="flex flex-col gap-10">
         <StatePanel
-          lead={state === "GuarantorCalled" ? "Your officer was asked to cover what's left." : "This was written off."}
+          lead={state === "GuarantorCalled" ? "Your approver was asked to cover what's left." : "This was written off."}
           description={`You can still send the ${usd(onchain.amountRemaining)} yourself.`}
         />
-        <PageSection title="Send it back">
+        <PageSection title="Pay it back">
           <SettlePanel onchain={onchain} />
         </PageSection>
       </div>

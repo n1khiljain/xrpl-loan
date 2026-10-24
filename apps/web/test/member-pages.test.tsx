@@ -58,9 +58,9 @@ describe("member pages follow the landing's look (U-75)", () => {
   });
 
   it("a page one level down links back to its list", () => {
-    const html = renderToStaticMarkup(<Topbar title="You got paid" crumb="No. 0003" action={null} back={{ href: "/claims/?view=claims", label: "My reimbursements" }} />);
+    const html = renderToStaticMarkup(<Topbar title="You got the loan" crumb="No. 0003" action={null} back={{ href: "/claims/?view=claims", label: "My loans" }} />);
     expect(html).toMatch(/href="\/claims\/?\?view=claims"/);
-    expect(html).toContain("My reimbursements");
+    expect(html).toContain("My loans");
     expect(renderToStaticMarkup(<Topbar title="Home" action={null} />)).not.toContain("back-link");
   });
 });

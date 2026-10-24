@@ -23,11 +23,11 @@ import { cn } from "@/lib/utils";
 import type { MeResponse, OffchainClaim } from "@/lib/types";
 
 const TITLES: Partial<Record<DisplayState, string>> = {
-  Draft: "Your reimbursement",
+  Draft: "Your loan",
   Submitted: "In review",
   Approved: "Approved",
-  Funded: "You got paid",
-  GuarantorCalled: "Officer asked to cover",
+  Funded: "You got the loan",
+  GuarantorCalled: "Approver asked to cover",
   WrittenOff: "Written off",
   Settled: "Closed out",
   Recovered: "Closed out",
@@ -52,7 +52,7 @@ function GuarantorPanel({ claim, onchain, state }: { claim: OffchainClaim; oncha
     return (
       <div className="flex flex-col gap-10">
         <StatePanel lead={`Cover the ${usd(onchain.amountRemaining)} that's left.`} description="You signed off, so you cover what's left." />
-        <PageSection title="Send it back">
+        <PageSection title="Pay it back">
           <SettlePanel onchain={onchain} />
         </PageSection>
       </div>
@@ -62,7 +62,7 @@ function GuarantorPanel({ claim, onchain, state }: { claim: OffchainClaim; oncha
     return <StatePanel lead="This is waiting on your sign-off." description="Check your email for the link to sign off on this." />;
   }
   if (state === "Settled" || state === "Recovered") {
-    return <StatePanel lead="Closed out. Nothing for you to cover." description="The reimbursement went back to the vault in full." />;
+    return <StatePanel lead="Closed out. Nothing for you to cover." description="The loan was paid back to the vault in full." />;
   }
   return <StatePanel lead="Nothing for you to cover right now." description="We'll email you if that changes." />;
 }
@@ -73,11 +73,11 @@ function Details({ claim, onchain, receipts }: { claim: OffchainClaim; onchain: 
   // each number once: the request, then what was approved (or asked for, before approval)
   const rows: Array<[string, string]> = [
     ["What it was for", claim.description ?? "No description"],
-    ["CalLink request", claim.callinkPrNumber],
-    ["Amount on the request", usd(BigInt(claim.faceValue))],
+    ["Payment reference", claim.callinkPrNumber],
+    ["Amount of the payment", usd(BigInt(claim.faceValue))],
     approved !== null ? ["Approved for", usd(approved)] : ["Asked for", usd(BigInt(claim.requestedAmount))],
   ];
-  if (claim.recipientType === "org_treasurer") rows.push(["Who paid", "The org"]);
+  if (claim.recipientType === "org_treasurer") rows.push(["Who paid", "The business"]);
   rows.push(["Receipts", `${receipts} ${receipts === 1 ? "file" : "files"}`]);
   return (
     <PageSection title="Details">
@@ -119,10 +119,10 @@ function ClaimDetail({ me }: { me: MeResponse }) {
   const orgName = orgs.data?.find((o) => o.id === claim.orgId)?.name ?? "";
   const cardId = claim.number;
   const calledAsGuarantor = isGuarantor && (state === "GuarantorCalled" || state === "WrittenOff");
-  const title = calledAsGuarantor ? "You're asked to cover this" : (TITLES[state] ?? "Reimbursement");
+  const title = calledAsGuarantor ? "You're asked to cover this" : (TITLES[state] ?? "Loan");
   const fromSignOffs = isGuarantor && !isClaimant;
   const crumb = `No. ${cardNumber(cardId)}`;
-  const back = fromSignOffs ? { href: "/claims/?view=guaranties", label: "Sign-offs" } : { href: "/claims/?view=claims", label: "My reimbursements" };
+  const back = fromSignOffs ? { href: "/claims/?view=guaranties", label: "Sign-offs" } : { href: "/claims/?view=claims", label: "My loans" };
 
   return (
     <>
@@ -156,7 +156,7 @@ function ClaimDetail({ me }: { me: MeResponse }) {
             ) : isGuarantor ? (
               <GuarantorPanel claim={claim} onchain={onchain} state={state} />
             ) : (
-              <StatePanel lead={`${STATE_LABEL[state]}.`} description="You can see this as an officer of the org." />
+              <StatePanel lead={`${STATE_LABEL[state]}.`} description="You can see this as an approver at the business." />
             )}
           </div>
           <Details claim={claim} onchain={onchain} receipts={documents.length} />
@@ -170,7 +170,7 @@ function ClaimDetail({ me }: { me: MeResponse }) {
 
 export default function ClaimPage() {
   return (
-    <AccountGate reason="Sign in to see this reimbursement.">
+    <AccountGate reason="Sign in to see this loan.">
       {(me) => (
         <Suspense fallback={<Skeleton className="h-64 w-full" />}>
           <ClaimDetail me={me} />

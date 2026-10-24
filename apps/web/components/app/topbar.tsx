@@ -15,7 +15,7 @@ function AreaAction() {
     return (
       <Button asChild>
         <Link href="/claims/new/">
-          <Plus strokeWidth={2.2} /> Get reimbursed now
+          <Plus strokeWidth={2.2} /> Expedite a payment
         </Link>
       </Button>
     );

@@ -7,7 +7,7 @@ import type { MeResponse } from "@/lib/types";
 /** Staff pages; the sidebar and tab bar already carry the admin nav. */
 export function AdminShell({ title, children }: { title: string; children: (me: MeResponse) => ReactNode }) {
   return (
-    <AccountGate reason="Staff sign in to review reimbursements.">
+    <AccountGate reason="Staff sign in to review loans.">
       {(me) => (
         <>
           <Topbar title={title} crumb="Admin" />

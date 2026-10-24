@@ -39,7 +39,7 @@ Deno.test("the claimant submits a signed-off draft, and an underwriter approves 
   const ledger = (approved.body.claim as { ledger: Record<string, unknown> }).ledger;
   assertEquals([ledger.state, ledger.approvedAmount], ["Approved", "350000000"]);
   assertEquals(ledger.approvalExpiresAt, FIXED_NOW.getTime() / 1000 + w.config.params.approvalExpirySeconds);
-  assertEquals(w.mailer.sent.map((m) => m.subject), ["Your reimbursement was approved"]);
+  assertEquals(w.mailer.sent.map((m) => m.subject), ["Your loan was approved"]);
   assertEquals(w.db.adminActions.at(-1)?.action, "approve");
 });
 

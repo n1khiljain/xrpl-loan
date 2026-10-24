@@ -37,7 +37,7 @@ function useExceptions() {
           out.push({
             onchain,
             offchain: c,
-            why: c.asucOutcome === "rejected" ? "Member reported ASUC rejected it" : "Member reported ASUC paid less",
+            why: c.asucOutcome === "rejected" ? "Borrower reported the payer rejected it" : "Borrower reported the payer paid less",
             suggested: c.asucOutcome === "rejected" ? "asuc_rejected" : "partial_shortfall",
           });
         } else if (onchain.dueAt > 0 && now >= onchain.dueAt) {
@@ -51,8 +51,8 @@ function useExceptions() {
 }
 /** A quick-scan reason chip, derived from the same fields `why` is built from. */
 function tagFor(item: Exception): { label: string; variant: "danger" | "warning" } {
-  if (item.onchain.state === "GuarantorCalled") return { label: "Officer asked to cover", variant: "danger" };
-  if (item.offchain?.asucOutcome === "rejected") return { label: "ASUC rejected", variant: "danger" };
+  if (item.onchain.state === "GuarantorCalled") return { label: "Approver asked to cover", variant: "danger" };
+  if (item.offchain?.asucOutcome === "rejected") return { label: "Payer rejected", variant: "danger" };
   if (item.offchain?.asucOutcome === "short_paid") return { label: "Paid less", variant: "warning" };
   return { label: "Overdue", variant: "danger" };
 }
@@ -73,7 +73,7 @@ function ExceptionCard({ item }: { item: Exception }) {
               <Badge variant={tag.variant}>{tag.label}</Badge>
               <StateChip state={onchain.state as "Funded" | "GuarantorCalled"} />
             </span>
-            <span className="font-mono text-xs text-muted-foreground">{shortAddress(onchain.recipient)} · officer {shortAddress(onchain.guarantor)}</span>
+            <span className="font-mono text-xs text-muted-foreground">{shortAddress(onchain.recipient)} · approver {shortAddress(onchain.guarantor)}</span>
           </div>
           <Money units={onchain.amountRemaining} size="sm" className="tabular shrink-0" />
         </div>
@@ -95,7 +95,7 @@ function ExceptionCard({ item }: { item: Exception }) {
             </Select>
           ) : null}
           <StaffAction
-            label={called ? "Write off" : "Ask officer to cover"}
+            label={called ? "Write off" : "Ask approver to cover"}
             body={called ? { action: "write-off", claimId: item.offchain.id } : { action: "call-guarantor", claimId: item.offchain.id, reason }}
             disabled={called && now < onchain.writeOffEligibleAt}
           />
@@ -113,7 +113,7 @@ function Exceptions() {
   return (
     <div className="flex flex-col gap-5">
       <div className="bg-info-soft text-info rounded-md px-4 py-3 text-[13px] font-semibold">
-        ASUC rejected or paid less: call the guarantor any time. Overdue: only after the claim passes its due date. Write off: once the guarantor&apos;s grace period ends.
+        The payer rejected it or paid less: call the approver any time. Overdue: only after the loan passes its due date. Write off: once the approver&apos;s grace period ends.
       </div>
       <div className="flex flex-col gap-4">
         {list.data.map((item) => (

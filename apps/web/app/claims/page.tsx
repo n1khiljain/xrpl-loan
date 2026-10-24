@@ -63,15 +63,15 @@ function resolveOrgName(rows: Row[], orgs: DirectoryOrg[] | undefined): string |
 
 function crumbFor(me: MeResponse, orgName: string | null): string {
   if (me.officerOrgs.length > 0) return me.officerOrgs.map((o) => o.name).join(", ");
-  return orgName ?? "Member";
+  return orgName ?? "Borrower";
 }
 
 function roleLabel(role: Role): string {
-  return role === "claimant" ? "Yours" : role === "guarantor" ? "You signed off" : "Your org";
+  return role === "claimant" ? "Yours" : role === "guarantor" ? "You signed off" : "Your business";
 }
 
 function payerLabel(claim: OffchainClaim): string {
-  return claim.recipientType === "org_treasurer" ? "Org paid" : "You paid";
+  return claim.recipientType === "org_treasurer" ? "The business paid" : "You paid";
 }
 
 function dateOnly(iso: string): string {
@@ -98,7 +98,7 @@ function nextStepFor(row: Row, nowSeconds: number): string {
   const { claim, onchain, state } = row;
   if (state === "Draft") {
     if (!claim.packetHash) return "Add receipts to continue";
-    if (!claim.guarantySigned) return "Waiting for officer sign-off";
+    if (!claim.guarantySigned) return "Waiting for approver sign-off";
     return "Ready to submit";
   }
   if (state === "Submitted") return "Reviewed within a day";
@@ -106,7 +106,7 @@ function nextStepFor(row: Row, nowSeconds: number): string {
     const days = daysFrom(onchain.approvalExpiresAt, nowSeconds * 1000);
     return `Expires in ${days} ${days === 1 ? "day" : "days"}`;
   }
-  if (state === "Funded" && onchain) return `Send by ${dateFromSeconds(onchain.dueAt)}`;
+  if (state === "Funded" && onchain) return `Pay back by ${dateFromSeconds(onchain.dueAt)}`;
   if (state === "GuarantorCalled") return "Payment needed";
   if (state === "Settled") return `Closed out ${dateOnly(claim.updatedAt)}`;
   if (state === "Recovered") return `Closed out ${dateOnly(claim.updatedAt)}`;
@@ -120,12 +120,12 @@ function actionFor(row: Row): string {
   if (role === "claimant") {
     if (state === "Draft") return "Finish";
     if (state === "Submitted") return "View";
-    if (state === "Approved") return "Get paid";
-    if (state === "Funded" || state === "GuarantorCalled") return "Send it back";
+    if (state === "Approved") return "Get the loan";
+    if (state === "Funded" || state === "GuarantorCalled") return "Pay it back";
     return "";
   }
   if (role === "guarantor") {
-    if (state === "GuarantorCalled" || state === "WrittenOff") return "Send it back";
+    if (state === "GuarantorCalled" || state === "WrittenOff") return "Pay it back";
     if (state === "Settled" || state === "Recovered" || state === "Rejected" || state === "Cancelled") return "";
     return "View";
   }
@@ -143,7 +143,7 @@ function mobileStatusLine(row: Row, next: string): string {
 function ClaimRow({ row, now, index }: { row: Row; now: number; index: number }) {
   const { claim, state, role } = row;
   const id = idFor(row);
-  const title = claim.description ?? `Purchase request ${claim.callinkPrNumber}`;
+  const title = claim.description ?? `Payment ${claim.callinkPrNumber}`;
   const sub = `${roleLabel(role)}${role === "claimant" ? ` · ${payerLabel(claim)}` : ""} · ${dateOnly(claim.createdAt)}`;
   const amount = amountFor(row);
   const next = nextStepFor(row, now);
@@ -192,7 +192,7 @@ function EmptyClaims({ text }: { text: string }) {
       <CardContent className="space-y-4 py-10 text-center">
         <p className="text-muted-foreground text-sm">{text}</p>
         <Button asChild>
-          <Link href="/claims/new/">Get reimbursed now</Link>
+          <Link href="/claims/new/">Expedite a payment</Link>
         </Button>
       </CardContent>
     </Card>
@@ -214,12 +214,12 @@ function ClaimsSection({ rows, emptyText }: { rows: Row[]; emptyText: string }) 
   return (
     <section className="bg-card @container flex flex-col rounded-2xl p-5 sm:p-6">
       <div className="mb-1 flex flex-wrap items-center justify-between gap-3">
-        <h2 className="text-lg font-semibold">Reimbursements</h2>
+        <h2 className="text-lg font-semibold">Loans</h2>
         <Segmented id="claims" label="Show" options={TABS} value={tab} onChange={setTab} />
       </div>
       <div className={cn("text-muted-foreground hidden gap-2 border-b border-divider px-1 py-2.5 text-xs font-medium @2xl:grid", TABLE_COLS)}>
         <span>ID</span>
-        <span>Reimbursement</span>
+        <span>Loan</span>
         <span>Status</span>
         <span className="text-right">Amount</span>
         <span className="pl-4">Next</span>
@@ -257,7 +257,7 @@ type Figure = "due" | "ready" | "settled";
 const DOLLARS = new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" });
 const formatDollars = (n: number) => DOLLARS.format(n);
 
-const claimCount = (n: number) => `${n} ${n === 1 ? "reimbursement" : "reimbursements"}`;
+const claimCount = (n: number) => `${n} ${n === 1 ? "loan" : "loans"}`;
 
 function GuarantyCard({ row, className }: { row: Row; className?: string }) {
   const amount = usd(BigInt(row.claim.requestedAmount));
@@ -278,7 +278,7 @@ function GuarantyCard({ row, className }: { row: Row; className?: string }) {
 
 function HomeView({ rows, orgName }: { rows: Row[]; orgName: string | null }) {
   const [figure, setFigure] = useState<Figure>("due");
-  if (rows.length === 0) return <EmptyClaims text="No reimbursements yet." />;
+  if (rows.length === 0) return <EmptyClaims text="No loans yet." />;
   const mine = rows.filter((r) => r.role === "claimant");
   const dueRows = mine.filter((r) => r.state === "Funded" || r.state === "GuarantorCalled");
   const due = dueRows.reduce((sum, r) => sum + amountFor(r), 0n);
@@ -288,7 +288,7 @@ function HomeView({ rows, orgName }: { rows: Row[]; orgName: string | null }) {
   const settledRows = mine.filter((r) => (r.state === "Settled" || r.state === "Recovered") && new Date(r.claim.updatedAt).getFullYear() === year);
   const settledThisYear = settledRows.reduce((sum, r) => sum + amountFor(r), 0n);
   const shown = {
-    due: { value: due, caption: `From ${claimCount(dueRows.length)}. Send it when ASUC pays you.` },
+    due: { value: due, caption: `From ${claimCount(dueRows.length)}. Pay it back, with interest, when the payment arrives.` },
     ready: { value: ready, caption: `From ${claimCount(readyRows.length)}, approved and ready to collect.` },
     settled: { value: settledThisYear, caption: `From ${claimCount(settledRows.length)} closed out in ${year}.` },
   }[figure];
@@ -312,7 +312,7 @@ function HomeView({ rows, orgName }: { rows: Row[]; orgName: string | null }) {
             </span>
             <p className="text-on-ink/80 text-sm">{shown.caption}</p>
           </div>
-          {/* only what applies right now; "Get reimbursed now" is already top right, and reporting ASUC lives on the reimbursement */}
+          {/* only what applies right now; "Expedite a payment" is already top right, and reporting a payer problem lives on the loan */}
           <div className="mt-auto flex flex-wrap gap-2">
             {settleHref ? (
               <Button asChild variant="light" size="sm">
@@ -322,18 +322,18 @@ function HomeView({ rows, orgName }: { rows: Row[]; orgName: string | null }) {
           </div>
         </GradientPanel>
         {guarantyRow ? <GuarantyCard row={guarantyRow} className="lg:hidden" /> : null}
-        <ClaimsSection rows={rows} emptyText="No reimbursements yet." />
+        <ClaimsSection rows={rows} emptyText="No loans yet." />
       </div>
       {cardRow || guarantyRow ? (
         <aside className="hidden w-[364px] shrink-0 flex-col gap-5 lg:flex">
           {cardRow ? (
             <section className="flex flex-col items-center gap-3.5">
-              <h2 className="text-muted-foreground w-full text-sm font-medium">Latest reimbursement</h2>
+              <h2 className="text-muted-foreground w-full text-sm font-medium">Latest loan</h2>
               <ClaimCard
                 claimId={cardNumber(cardRow.claim.status === "Draft" ? null : cardRow.claim.number)}
                 amount={usd(amountFor(cardRow))}
                 state={STATE_LABEL[cardRow.state]}
-                org={orgName ?? "Your org"}
+                org={orgName ?? "Your business"}
                 tone={CARD_TONE[cardRow.state]}
               />
             </section>
@@ -351,7 +351,7 @@ function ClaimsView({ me }: { me: MeResponse }) {
   const orgs = useOrgs();
   const firstName = (me.profile?.displayName ?? "").trim().split(/\s+/)[0] || "there";
   const orgName = resolveOrgName(rows.data ?? [], orgs.data);
-  const title = view === "claims" ? "My reimbursements" : view === "guaranties" ? "Sign-offs" : `Hi, ${firstName}`;
+  const title = view === "claims" ? "My loans" : view === "guaranties" ? "Sign-offs" : `Hi, ${firstName}`;
   const crumb = view ? undefined : crumbFor(me, orgName);
 
   return (
@@ -365,7 +365,7 @@ function ClaimsView({ me }: { me: MeResponse }) {
       ) : view === "guaranties" ? (
         <ClaimsSection rows={rows.data.filter((r) => r.role === "guarantor")} emptyText="No sign-offs yet." />
       ) : view === "claims" ? (
-        <ClaimsSection rows={rows.data} emptyText="No reimbursements yet." />
+        <ClaimsSection rows={rows.data} emptyText="No loans yet." />
       ) : (
         <HomeView rows={rows.data} orgName={orgName} />
       )}
@@ -375,7 +375,7 @@ function ClaimsView({ me }: { me: MeResponse }) {
 
 export default function ClaimsPage() {
   return (
-    <AccountGate reason="Sign in to see your reimbursements and sign-offs.">
+    <AccountGate reason="Sign in to see your loans and sign-offs.">
       {(me) => (
         <Suspense fallback={<Skeleton className="h-96 w-full rounded-3xl" />}>
           <ClaimsView me={me} />

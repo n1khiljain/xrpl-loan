@@ -114,7 +114,7 @@ export function createClaimsHandler(deps: ClaimsDeps): Handler {
       return json(await withDocuments(await db.insertClaim(draft)), { status: 201 });
     } catch (error) {
       if (error instanceof UniqueViolation) {
-        throw conflict("this CalLink purchase request already has a claim", "duplicate_callink");
+        throw conflict("this payment reference already has a loan", "duplicate_callink");
       }
       throw error;
     }
@@ -135,7 +135,7 @@ export function createClaimsHandler(deps: ClaimsDeps): Handler {
       return json(await withDocuments(await db.updateClaim(id, update)));
     } catch (error) {
       if (error instanceof UniqueViolation) {
-        throw conflict("this CalLink purchase request already has a claim", "duplicate_callink");
+        throw conflict("this payment reference already has a loan", "duplicate_callink");
       }
       throw error;
     }

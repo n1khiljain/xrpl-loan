@@ -22,7 +22,7 @@ import type { KycStatus, MeResponse, OffchainClaim, WalletView } from "@/lib/typ
 
 function statusText(me: MeResponse): { label: string; detail: string } {
   const status = me.profile?.kycStatus ?? "not_started";
-  if (status === "approved") return { label: "Approved", detail: "You're verified. You can get reimbursed now or sign off for a teammate." };
+  if (status === "approved") return { label: "Approved", detail: "You're verified. You can expedite a payment or sign off for a teammate." };
   if (status === "rejected") return { label: "Rejected", detail: "A reviewer couldn't verify you. Reply to the email we sent, or contact the team." };
   if (status === "pending") return { label: "Pending", detail: "Your email is verified. A reviewer approves you next, usually within a day." };
   return { label: "Not started", detail: "Verify your email to start. Press the button above while signed in with it." };
@@ -50,8 +50,8 @@ function checklistSteps(me: MeResponse, kycApproved: boolean, claims: OffchainCl
     { label: "Account created", detail: me.profile?.email ?? "Your account is set up", done: true },
     { label: "Verify your email", detail: me.profile?.emailVerified ? (me.profile.email ?? "Verified") : "Sign in with your email or Google", done: Boolean(me.profile?.emailVerified) },
     { label: "Reviewer approval", detail: kycApproved ? "You're approved" : "Usually within a day", done: kycApproved },
-    { label: "Join your org", detail: orgNames || (inOrg ? "You're reimbursing for your org" : "An admin adds you as a member or officer"), done: inOrg },
-    { label: "Get your first reimbursement", detail: first ? "You're all set" : "Or sign off for a teammate", done: first },
+    { label: "Join your business", detail: orgNames || (inOrg ? "You're set up for your business" : "An admin adds you as a borrower or approver"), done: inOrg },
+    { label: "Get your first loan", detail: first ? "You're all set" : "Or sign off for a teammate", done: first },
   ];
 }
 
@@ -199,7 +199,7 @@ function Verify({ me }: { me: MeResponse }) {
         <Wallet me={me} />
 
         <Button asChild size="lg" variant={current === "approved" ? "default" : "outline"} className="self-start">
-          <Link href="/claims/new/">Get reimbursed now</Link>
+          <Link href="/claims/new/">Expedite a payment</Link>
         </Button>
       </div>
     </div>

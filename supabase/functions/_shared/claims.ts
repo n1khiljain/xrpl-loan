@@ -59,7 +59,7 @@ export function requireKycApproved(caller: Caller, role: "member" | "officer"): 
   if (caller.profile.kycStatus === "approved") return;
   throw forbidden(
     role === "member"
-      ? "Finish verification before you ask for a reimbursement."
+      ? "Finish verification before you ask for a loan."
       : "Finish verification before you sign off.",
     "kyc_required",
   );

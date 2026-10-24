@@ -46,7 +46,7 @@ Deno.test("POST makes a 7-day link, stores only its hash, and emails the guarant
 
   const [email] = w.mailer.sent;
   assertEquals(email?.to, w.guarantor.profile.email);
-  assertEquals(email?.subject, "Ada asked you to sign off on a reimbursement");
+  assertEquals(email?.subject, "Ada asked you to sign off on a loan");
   assert(email?.text.includes(inviteUrl));
 });
 

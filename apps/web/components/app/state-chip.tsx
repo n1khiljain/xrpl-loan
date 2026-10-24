@@ -20,7 +20,7 @@ export const STATE_LABEL: Record<DisplayState, string> = {
   Submitted: "In review",
   Approved: "Approved",
   Funded: "Paid",
-  GuarantorCalled: "Officer asked to cover",
+  GuarantorCalled: "Approver asked to cover",
   Settled: "Closed out",
   Recovered: "Closed out",
   WrittenOff: "Written off",

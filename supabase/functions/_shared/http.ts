@@ -18,7 +18,7 @@ export const forbidden = (message: string, code = "forbidden") => new HttpError(
 export const notFound = (message = "not found") => new HttpError(404, "not_found", message);
 export const conflict = (message: string, code = "conflict") => new HttpError(409, code, message);
 
-/** JSON with bigints written as decimal strings, so wei amounts survive the trip. */
+/** JSON with bigints written as decimal strings, so amounts stay exact. */
 export function json(body: unknown, init: ResponseInit = {}): Response {
   const text = JSON.stringify(body, (_key, value) => (typeof value === "bigint" ? value.toString() : value));
   const headers = new Headers(init.headers);

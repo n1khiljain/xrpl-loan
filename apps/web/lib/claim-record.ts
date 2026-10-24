@@ -20,7 +20,7 @@ export function timeline(claim: OffchainClaim, onchain: ClaimView | null): Timel
   const steps: TimelineStep[] = [
     { label: "Started", detail: dateTime(claim.createdAt), status: "done" },
     {
-      label: "Officer signed off",
+      label: "Approver signed off",
       status: claim.guarantySigned || reached(afterSubmit) ? "done" : claim.packetHash ? "current" : "upcoming",
     },
     {
@@ -44,7 +44,7 @@ export function timeline(claim: OffchainClaim, onchain: ClaimView | null): Timel
     },
   );
   if (state === "GuarantorCalled" || state === "WrittenOff" || state === "Recovered" && (onchain?.guarantorCalledAt ?? 0) > 0) {
-    steps.push({ label: "Officer asked to cover", detail: at(onchain?.guarantorCalledAt), status: state === "Recovered" ? "done" : "failed" });
+    steps.push({ label: "Approver asked to cover", detail: at(onchain?.guarantorCalledAt), status: state === "Recovered" ? "done" : "failed" });
   }
   if (state === "WrittenOff") steps.push({ label: "Written off", status: "failed" });
   steps.push({

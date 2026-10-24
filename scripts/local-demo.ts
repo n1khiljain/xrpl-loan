@@ -15,7 +15,7 @@ import { LOCAL_STACK } from "../supabase/functions/_shared/local-stack.ts";
 import { assertLocal, ensureLocalStaff } from "../supabase/functions/_tests/local-underwriter.ts";
 
 const DIR = Deno.args[0] ?? new URL("../apps/web/e2e/.cache", import.meta.url).pathname;
-const ORG_NAME = "Blockchain at Berkeley (demo)";
+const ORG_NAME = "Northwind Supply (demo)";
 const USD = 1_000_000n;
 
 if (!LOCAL_STACK) throw new Error("no local Supabase running (supabase start)");
@@ -127,10 +127,10 @@ async function signOff(id: string) {
 }
 
 const STEPS: Array<{ pr: string; dollars: bigint; description: string; to: "draft" | "signed" | "submitted" | "approved" }> = [
-  { pr: "PR-DEMO-1", dollars: 2400n, description: "Hackathon catering", to: "approved" },
-  { pr: "PR-DEMO-2", dollars: 850n, description: "AV rental", to: "submitted" },
-  { pr: "PR-DEMO-3", dollars: 320n, description: "T-shirts", to: "signed" },
-  { pr: "PR-DEMO-4", dollars: 120n, description: "Prize gift cards", to: "draft" },
+  { pr: "PAY-DEMO-1", dollars: 2400n, description: "Supplier invoice", to: "approved" },
+  { pr: "PAY-DEMO-2", dollars: 850n, description: "Freight transfer", to: "submitted" },
+  { pr: "PAY-DEMO-3", dollars: 320n, description: "Vendor payment", to: "signed" },
+  { pr: "PAY-DEMO-4", dollars: 120n, description: "Equipment deposit", to: "draft" },
 ];
 for (const step of STEPS) {
   if (have.has(step.pr)) continue;

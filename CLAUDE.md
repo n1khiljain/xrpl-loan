@@ -1,6 +1,6 @@
 # CLAUDE.md
 
-Receivables financing on the XRP Ledger. Someone who is owed money (today: a student org member waiting on an ASUC reimbursement) gets paid now from a lending vault, and the vault is paid back when their payer pays. Built by Blockchain at Berkeley for an XRPL hackathon (Lending & Borrowing track). `STATUS.md` has where things stand; the Frax-era docs are in `docs/archive/frax/` for history only.
+Install. Businesses selectively expedite a transaction, transfer, or payment with an upfront loan from a lending vault on the XRP Ledger, paid back with interest that depends on the loan horizon. `STATUS.md` has where things stand.
 
 ## Ground rules
 
@@ -18,7 +18,7 @@ Receivables financing on the XRP Ledger. Someone who is owed money (today: a stu
 | Wallets | Custodial: the `me` function makes an XRPL wallet per person, encrypts the seed with `WALLET_ENCRYPTION_KEY` (AES-GCM, bound to the address), and funds it from the Devnet faucet. The browser never holds a key and never talks to the ledger. |
 | Sign-in | Privy (email code or Google), sign-in only. No Privy wallets. |
 | KYC | A Privy identity token proves the email, then staff approve on `/admin/kyc`. Approval is what the app will issue an XRPL Credential for. |
-| Branding | Blockchain at Berkeley only. No Frax, Ripple, or XRPL logos; name the network and asset in text. |
+| Branding | The product name is Install, set in type. No third-party logos; name the network and asset in text. |
 | Git | Commit each phase on `xrpl-migration`. Never push; the user pushes. |
 
 ## Repo layout
@@ -34,8 +34,7 @@ Receivables financing on the XRP Ledger. Someone who is owed money (today: a stu
 │   └── functions/                  # Deno edge functions; _shared/ has auth, db, ledger (xrpl.js), wallets (custody)
 ├── apps/web/                       # Next.js static export; talks only to the edge functions
 ├── scripts/local-up.sh             # pnpm local: Supabase + functions + demo seed + web
-├── scripts/local-demo.ts           # pnpm demo: demo people with funded Devnet wallets and claims in each state
-└── docs/archive/frax/              # the original Frax PRD, design, runbook (history only)
+└── scripts/local-demo.ts           # pnpm demo: demo people with funded Devnet wallets and claims in each state
 ```
 
 ## Commands

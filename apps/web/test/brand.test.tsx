@@ -12,29 +12,15 @@ const NONE = { bab: null, babOnDark: null };
 const ALL = { bab: "/brand/bab-logo.png", babOnDark: "/brand/bab-logo-on-dark.png" };
 
 describe("header lockup", () => {
-  it("falls back to the org name as text when the files are missing", () => {
-    const html = renderToStaticMarkup(<LockupView files={NONE} />);
-    expect(html).toContain("Blockchain at Berkeley");
-    expect(html).not.toContain("<img");
-    expect(html.match(/data-fallback="text"/g)).toHaveLength(1);
-  });
-
-  it("uses the official B@B file and names no other brand's logo", () => {
-    const html = renderToStaticMarkup(<LockupView files={ALL} />);
-    expect(html).toContain('src="/brand/bab-logo.png"');
-    expect(html).not.toContain("on-dark.png");
-    expect(html.match(/<img/g)).toHaveLength(1);
-    expect(html).not.toMatch(/frax|ripple|xrpl-logo/i);
-  });
-
-  it("on dark surfaces uses the on-dark file", () => {
-    const html = renderToStaticMarkup(<LockupView files={ALL} tone="on-dark" />);
-    expect(html).toContain('src="/brand/bab-logo-on-dark.png"');
-  });
-
-  it("falls back to the other variant when only one exists", () => {
-    const html = renderToStaticMarkup(<LockupView files={{ ...NONE, babOnDark: "/brand/bab-logo-on-dark.png" }} />);
-    expect(html).toContain('src="/brand/bab-logo-on-dark.png"');
+  it("shows the product name and draws no logo", () => {
+    for (const files of [NONE, ALL, { ...NONE, babOnDark: "/brand/bab-logo-on-dark.png" }]) {
+      for (const tone of ["auto", "on-dark", "on-light"] as const) {
+        const html = renderToStaticMarkup(<LockupView files={files} tone={tone} />);
+        expect(html).toContain("Install");
+        expect(html).not.toContain("<img");
+        expect(html).not.toMatch(/ripple|xrpl-logo|berkeley/i);
+      }
+    }
   });
 
   it("finds each file in public/brand at build time, SVG before PNG", () => {
@@ -46,9 +32,8 @@ describe("header lockup", () => {
     expect(logoFiles(dir)).toEqual({ ...NONE, bab: "/brand/bab-logo.svg" });
   });
 
-  it("the repo ships the official files and no Frax ones", () => {
+  it("the repo ships the brand files", () => {
     expect(logoFiles(fileURLToPath(new URL("../public/brand", import.meta.url)))).toEqual(ALL);
-    expect(readdirSync(fileURLToPath(new URL("../public/brand", import.meta.url))).filter((f) => /frax|frxusd/i.test(f))).toEqual([]);
   });
 
   it("no logo is drawn in code: no inline SVG anywhere in app/ or components/", () => {

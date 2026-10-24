@@ -118,14 +118,14 @@ function SignIn({ reason }: { reason: string }) {
         <div className="flex flex-1 items-center justify-center pb-10 lg:pb-0">
           <div className="-rotate-6">
             <span className="lg:hidden">
-              <ClaimCard claimId="0001" amount="$0.00" state="YOURS NEXT" org="Your org" scale={0.5} />
+              <ClaimCard claimId="0001" amount="$0.00" state="YOURS NEXT" org="Your business" scale={0.5} />
             </span>
             <span className="hidden lg:block">
-              <ClaimCard claimId="0001" amount="$0.00" state="YOURS NEXT" org="Your org" />
+              <ClaimCard claimId="0001" amount="$0.00" state="YOURS NEXT" org="Your business" />
             </span>
           </div>
         </div>
-        <h2 className="display-type hidden max-w-md text-[38px] lg:block">Stop waiting on reimbursements</h2>
+        <h2 className="display-type hidden max-w-md text-[38px] lg:block">Expedite the payments you choose</h2>
       </section>
       <section className="signin-ink bg-surface text-foreground relative -mt-8 flex flex-1 flex-col justify-center gap-5 rounded-t-3xl px-[18px] pt-6 pb-10 lg:mt-0 lg:rounded-none lg:px-[120px]">
         <span aria-hidden className="bg-border -mt-2 h-1 w-9 self-center rounded-full lg:hidden" />
@@ -272,7 +272,7 @@ function SetUpAccount() {
         <span className="text-muted-foreground text-xs font-medium">One last thing</span>
         <h2 className="display-type text-3xl">What should we call you?</h2>
         <p className="text-muted-foreground text-sm leading-relaxed">
-          Your name shows on your reimbursements and sign-offs.
+          Your name shows on your loans and sign-offs.
           {session.email ? (
             <>
               {" "}

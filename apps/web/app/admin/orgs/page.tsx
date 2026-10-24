@@ -35,14 +35,14 @@ function AddOfficer({ org }: { org: AdminOrg }) {
   return (
     <div className="flex flex-col gap-2">
       <div className="flex flex-col gap-2 sm:flex-row">
-        <Input aria-label="Officer wallet" placeholder="r... wallet address" className="font-mono sm:flex-1" value={wallet} onChange={(e) => setWallet(e.target.value.trim())} />
+        <Input aria-label="Approver wallet" placeholder="r... wallet address" className="font-mono sm:flex-1" value={wallet} onChange={(e) => setWallet(e.target.value.trim())} />
         <Input aria-label="Title" placeholder="Title (optional)" className="sm:w-48" value={title} onChange={(e) => setTitle(e.target.value)} />
         <Button
           variant="secondary"
           disabled={!isAddress(wallet) || action.isPending}
           onClick={() => action.mutate({ action: "set-officer", orgId: org.id, wallet, title: title.trim() || null, active: true }, { onSuccess: () => setWallet("") })}
         >
-          Add officer
+          Add approver
         </Button>
       </div>
       {action.isError ? <ErrorNotice>{friendlyError(action.error)}</ErrorNotice> : null}
@@ -65,7 +65,7 @@ function OrgCard({ org }: { org: AdminOrg }) {
       </CardHeader>
       <CardContent className="flex flex-col gap-4">
         <ul className="divide-divider flex flex-col divide-y text-sm">
-          {org.officers.length === 0 ? <li className="text-muted-foreground py-2">No officers yet.</li> : null}
+          {org.officers.length === 0 ? <li className="text-muted-foreground py-2">No approvers yet.</li> : null}
           {org.officers.map((o) => (
             <li key={o.wallet} className="flex items-center justify-between gap-3 py-2">
               <span className="flex min-w-0 flex-col">
@@ -98,24 +98,24 @@ function Orgs({ me }: { me: MeResponse }) {
   const [name, setName] = useState("");
   const create = useOrgAction();
   const orgs = useQuery({ queryKey: ["admin-orgs"], enabled: me.staffRole === "admin", queryFn: () => call<{ orgs: AdminOrg[] }>("orgs") });
-  if (me.staffRole !== "admin") return <ErrorNotice title="Admins only">Only the admin role can manage orgs.</ErrorNotice>;
+  if (me.staffRole !== "admin") return <ErrorNotice title="Admins only">Only the admin role can manage businesses.</ErrorNotice>;
   if (orgs.isPending) return <Skeleton className="h-48 w-full rounded-3xl" />;
   if (orgs.isError) return <ErrorNotice>{friendlyError(orgs.error)}</ErrorNotice>;
   return (
     <div className="flex max-w-3xl flex-col gap-5">
       <Card>
         <CardContent className="flex flex-col gap-2 pt-6">
-          <Label htmlFor="org-name">New org</Label>
+          <Label htmlFor="org-name">New business</Label>
           <div className="flex flex-col gap-2 sm:flex-row">
             <Input id="org-name" value={name} onChange={(e) => setName(e.target.value)} maxLength={120} className="sm:flex-1" />
             <Button disabled={!name.trim() || create.isPending} onClick={() => create.mutate({ action: "create", name: name.trim() }, { onSuccess: () => setName("") })}>
-              Add org
+              Add business
             </Button>
           </div>
           {create.isError ? <ErrorNotice>{friendlyError(create.error)}</ErrorNotice> : null}
         </CardContent>
       </Card>
-      {orgs.data.orgs.length === 0 ? <InfoNotice title="No orgs yet" /> : null}
+      {orgs.data.orgs.length === 0 ? <InfoNotice title="No businesses yet" /> : null}
       {orgs.data.orgs.map((org) => (
         <OrgCard key={org.id} org={org} />
       ))}
@@ -124,5 +124,5 @@ function Orgs({ me }: { me: MeResponse }) {
 }
 
 export default function OrgsPage() {
-  return <AdminShell title="Orgs and officers">{(me) => <Orgs me={me} />}</AdminShell>;
+  return <AdminShell title="Businesses and approvers">{(me) => <Orgs me={me} />}</AdminShell>;
 }

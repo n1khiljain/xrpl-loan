@@ -84,8 +84,8 @@ function Guarantee() {
   }
 
   const { claim } = view.data;
-  const name = claim.claimantName ?? "A member of your org";
-  const org = claim.orgName ?? "Your org";
+  const name = claim.claimantName ?? "Someone at your business";
+  const org = claim.orgName ?? "Your business";
   const signed = view.data.signed || sign.isSuccess;
 
   return (
@@ -106,8 +106,8 @@ function Guarantee() {
             </h1>
             <p className="text-on-ink/80 max-w-sm text-[15px] leading-relaxed">
               {signed
-                ? `${name} can send it for review now. You'll only hear from us if ASUC never pays.`
-                : `The lending vault pays ${name} now instead of waiting on ASUC. You vouch that ASUC will pay. If ASUC never does, you cover what's left.`}
+                ? `${name} can send it for review now. You'll only hear from us if the payment never arrives.`
+                : `The lending vault pays ${name} now instead of waiting on the payment. You confirm it will arrive. If it never does, you cover what's left.`}
             </p>
           </Swap>
           <div className="flex justify-center pt-2 lg:mt-auto lg:pt-0">
@@ -135,7 +135,7 @@ function Guarantee() {
         {/* The claim, the obligation, and the sign action */}
         <section className="bg-card flex flex-1 flex-col gap-6 rounded-2xl p-5 sm:p-6">
           <div className="space-y-3">
-            <h2 className="text-lg font-semibold">The reimbursement</h2>
+            <h2 className="text-lg font-semibold">The loan</h2>
             <div className="grid grid-cols-[auto_1fr] gap-x-4 gap-y-2.5 text-sm">
               <span className="text-muted-foreground">Requested by</span>
               <span className="text-right font-semibold">{name}</span>
@@ -145,7 +145,7 @@ function Guarantee() {
               </span>
               <span className="text-muted-foreground">Purchase request amount</span>
               <span className="tabular text-right font-semibold">{usd(claim.faceValue)}</span>
-              <span className="text-muted-foreground">CalLink request</span>
+              <span className="text-muted-foreground">Payment reference</span>
               <span className="text-right font-semibold">{claim.callinkPrNumber}</span>
               <span className="text-muted-foreground">Receipts</span>
               <span className="text-right font-semibold">{claim.documentCount}</span>
@@ -157,7 +157,7 @@ function Guarantee() {
           <div className="border-border flex flex-col gap-2 rounded-xl border p-4 sm:p-5">
             <span className="text-muted-foreground text-xs font-medium">What you&apos;re agreeing to</span>
             <p className="text-[15px] leading-relaxed font-semibold" data-testid="obligation">
-              If ASUC never pays this, you pay the vault whatever is left.
+              If the payment never arrives, you pay the vault whatever is left, including interest.
             </p>
             <p className="text-muted-foreground text-sm leading-relaxed">
               Signing off costs nothing and isn&apos;t a payment. We&apos;ll email you if you&apos;re ever asked to cover it, and you&apos;d pay in {ASSET}.
@@ -185,7 +185,7 @@ function Guarantee() {
                   <p className="font-semibold">Signed off. {name} can now send it for review.</p>
                 </div>
                 <Button variant="secondary" size="lg" asChild>
-                  <Link href={`/claim/?id=${claim.id}`}>See the reimbursement</Link>
+                  <Link href={`/claim/?id=${claim.id}`}>See the loan</Link>
                 </Button>
               </motion.div>
             ) : (
@@ -199,7 +199,7 @@ function Guarantee() {
                     <Link href="/claims/">Decline</Link>
                   </Button>
                 </div>
-                <span className="text-muted-foreground text-center text-xs">A sign-off, not a payment. Nothing moves unless ASUC doesn&apos;t pay.</span>
+                <span className="text-muted-foreground text-center text-xs">A sign-off, not a payment. Nothing moves unless the payment never arrives.</span>
               </>
             )}
             {sign.isError ? <ErrorNotice>{friendlyError(sign.error)}</ErrorNotice> : null}

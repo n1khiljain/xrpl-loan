@@ -121,7 +121,7 @@ function ReviewCard({
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div className="flex min-w-0 flex-col gap-1.5">
             <span className="text-on-ink/70 truncate text-[13px]">
-              Reimbursement {number} · {exposure?.name ?? `Org ${claim.orgId}`}
+              Loan {number} · {exposure?.name ?? `Business ${claim.orgId}`}
               {claimant?.displayName ? ` · ${claimant.displayName}` : ""}
             </span>
             <Money units={ledger.requestedAmount} size="lg" />
@@ -141,7 +141,7 @@ function ReviewCard({
         <div className="grid gap-4 lg:grid-cols-2">
           <div className="bg-surface-muted flex flex-col gap-2.5 rounded-md p-4 text-sm">
             <div className="flex items-center justify-between gap-3">
-              <span className="text-muted-foreground">CalLink request</span>
+              <span className="text-muted-foreground">Payment reference</span>
               <span className="font-semibold">{claim.callinkPrNumber}</span>
             </div>
             <div className="flex items-center justify-between gap-3">
@@ -149,7 +149,7 @@ function ReviewCard({
               <span className="tabular font-semibold">{usd(ledger.faceValue)}</span>
             </div>
             <div className="flex items-center justify-between gap-3">
-              <span className="text-muted-foreground">Member wallet</span>
+              <span className="text-muted-foreground">Borrower wallet</span>
               <span className="font-mono text-xs">{shortAddress(claim.recipientWallet)}</span>
             </div>
             <div className="flex items-center justify-between gap-3">
@@ -158,14 +158,14 @@ function ReviewCard({
             </div>
           </div>
           <div className="border-border divide-divider flex flex-col divide-y rounded-md border px-4">
-            <Kyc person={claimant} role="Member" />
-            <Kyc person={guarantor} role="Officer" />
+            <Kyc person={claimant} role="Borrower" />
+            <Kyc person={guarantor} role="Approver" />
             <div className="flex items-center justify-between gap-3 py-2.5 text-sm">
-              <span className="text-muted-foreground">Officer sign-off</span>
+              <span className="text-muted-foreground">Approver sign-off</span>
               <StatusText tone={claim.guarantySigned ? "success" : "warning"}>{claim.guarantySigned ? "Signed" : "Not signed"}</StatusText>
             </div>
             <div className="flex items-center justify-between gap-3 py-2.5 text-sm">
-              <span className="text-muted-foreground">Org exposure</span>
+              <span className="text-muted-foreground">Business exposure</span>
               <span className="tabular font-semibold">
                 {usd(exposure?.outstanding)} of {usd(exposure?.cap)}
               </span>
@@ -173,9 +173,9 @@ function ReviewCard({
           </div>
         </div>
         {!kycReady ? (
-          <InfoNotice title="Waiting on verification">The member and the officer both need to be verified before this can be approved.</InfoNotice>
+          <InfoNotice title="Waiting on verification">The borrower and the approver both need to be verified before this can be approved.</InfoNotice>
         ) : null}
-        {overCap ? <InfoNotice title="This would go over the org's cap">Funding will fail until others are closed out.</InfoNotice> : null}
+        {overCap ? <InfoNotice title="This would go over the business's cap">Funding will fail until others are closed out.</InfoNotice> : null}
         <div className="grid gap-5 lg:grid-cols-2">
           <div className="space-y-2.5">
             <Label htmlFor={`amount-${number}`}>Approve for ($)</Label>
@@ -232,7 +232,7 @@ function Queue() {
         {items.map(({ ledger, claim }) => {
           const id = ledger.id.toString();
           const on = id === activeId;
-          const org = exposure.find((e) => e.orgId === claim.orgId)?.name ?? `Org ${claim.orgId}`;
+          const org = exposure.find((e) => e.orgId === claim.orgId)?.name ?? `Business ${claim.orgId}`;
           return (
             <a
               key={id}

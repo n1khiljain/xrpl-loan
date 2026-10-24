@@ -10,8 +10,8 @@ export const REJECT_REASONS = [
 
 /** Why the guarantor is called. The first two can be called any time; overdue only after the due date. */
 export const CALL_REASONS = [
-  { value: "asuc_rejected", label: "ASUC rejected it" },
-  { value: "partial_shortfall", label: "ASUC paid less" },
+  { value: "asuc_rejected", label: "The payer rejected it" },
+  { value: "partial_shortfall", label: "The payer paid less" },
   { value: "overdue", label: "Overdue" },
 ] as const;
 export type CallReasonValue = (typeof CALL_REASONS)[number]["value"];

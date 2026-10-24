@@ -36,7 +36,7 @@ select throws_ok(
   '23514', null, 'a manual KYC change must name the staff member'
 );
 select throws_ok(
-  $$insert into public.wallets (address, encrypted_seed) values ('0x70997970c51812dc3a010c7d01b50e0d17dc79c8', repeat('x', 40))$$,
+  $$insert into public.wallets (address, encrypted_seed) values ('not-an-address', repeat('x', 40))$$,
   '23514', null, 'addresses must be classic XRPL addresses'
 );
 select throws_ok(

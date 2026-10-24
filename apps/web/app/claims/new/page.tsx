@@ -32,7 +32,7 @@ import { amountDue, parseUsd, unitsToInput, usd } from "@/lib/format";
 import type { ClaimWithDocuments, DocumentView, InviteCreated, MeResponse, PacketResponse } from "@/lib/types";
 
 /** Once a draft is saved, it waits in this list with "Finish". */
-const BACK = { href: "/claims/?view=claims", label: "My reimbursements" };
+const BACK = { href: "/claims/?view=claims", label: "My loans" };
 
 const STEPS = ["Details", "Receipts", "Sign-off", "Review"] as const;
 const RECEIPT_TYPES = "application/pdf,image/png,image/jpeg,image/heic,image/webp";
@@ -42,7 +42,7 @@ function maxRequest(face: bigint): bigint {
   return byRate < params.perClaimCap ? byRate : params.perClaimCap;
 }
 
-/** A draft always has org, amounts, and the CalLink number saved (that's what creates it); resume past Details. */
+/** A draft always has the business, amounts, and the payment reference saved (that's what creates it); resume past Details. */
 function initialStep(initial: ClaimWithDocuments | null): number {
   if (!initial) return 0;
   const { claim, documents } = initial;
@@ -67,7 +67,7 @@ function Wizard({ me }: { me: MeResponse }) {
   if (id && (draft.isPending || frozen)) {
     return (
       <div>
-        <Topbar title="Get reimbursed now" crumb="Loading your draft" action={null} back={BACK} />
+        <Topbar title="Expedite a payment" crumb="Loading your draft" action={null} back={BACK} />
         <Skeleton className="h-64 w-full rounded-3xl" />
       </div>
     );
@@ -75,7 +75,7 @@ function Wizard({ me }: { me: MeResponse }) {
   if (draft.isError) {
     return (
       <div>
-        <Topbar title="Get reimbursed now" action={null} back={BACK} />
+        <Topbar title="Expedite a payment" action={null} back={BACK} />
         <ErrorNotice>{friendlyError(draft.error)}</ErrorNotice>
       </div>
     );
@@ -192,28 +192,28 @@ function WizardForm({ me, initial }: { me: MeResponse; initial: ClaimWithDocumen
   const due = requestedUnits ? amountDue(requestedUnits, params.feeBps, params.overdueWindowSeconds) : 0n;
   const fee = due - requestedUnits;
   const overdueDays = Math.round(params.overdueWindowSeconds / 86_400);
-  const guarantorName = officers.find((o) => o.wallet === guarantor)?.displayName ?? "your officer";
-  const previewOrgName = org?.name ?? "Your org";
+  const guarantorName = officers.find((o) => o.wallet === guarantor)?.displayName ?? "your approver";
+  const previewOrgName = org?.name ?? "Your business";
   const previewState = (STEPS[step] ?? STEPS[0]).toUpperCase();
 
   const reviewMoney: Array<[string, string]> = [
-    ["Amount on the request", usd(faceUnits)],
-    ["Fee, at most, if sent by the due date", usd(fee)],
-    ["You send back, at most", usd(due)],
-    ["Send by", `${overdueDays} days after you're paid`],
+    ["Amount of the payment", usd(faceUnits)],
+    ["Interest, at most, if paid back by the due date", usd(fee)],
+    ["You pay back, at most", usd(due)],
+    ["Pay back by", `${overdueDays} days after the payment arrives`],
   ];
   const reviewDetails: Array<[string, string]> = [
-    ["Org", org?.name ?? "Not picked"],
-    ["Who paid", recipientType === "member" ? "You" : "The org"],
-    ["CalLink request", callink || "Not entered"],
+    ["Business", org?.name ?? "Not picked"],
+    ["Who paid", recipientType === "member" ? "You" : "The business"],
+    ["Payment reference", callink || "Not entered"],
     ["What it was for", description.trim() || "Not entered"],
-    ["Officer signing off", guarantorName],
+    ["Approver signing off", guarantorName],
     ["Receipts", `${documents.length} ${documents.length === 1 ? "file" : "files"}`],
   ];
 
   return (
     <div>
-      <Topbar title="Get reimbursed now" crumb={`Step ${step + 1} of ${STEPS.length} · ${STEPS[step]}`} action={null} back={BACK} />
+      <Topbar title="Expedite a payment" crumb={`Step ${step + 1} of ${STEPS.length} · ${STEPS[step]}`} action={null} back={BACK} />
       <div className="flex flex-col gap-5 lg:flex-row lg:items-start">
         <Card className="min-w-0 lg:flex-1">
           <CardContent className="flex flex-col gap-6">
@@ -222,8 +222,8 @@ function WizardForm({ me, initial }: { me: MeResponse; initial: ClaimWithDocumen
               {step === 0 ? (
                 <>
                   <div className="space-y-1">
-                    <h2 className="display-type text-2xl">What did you pay for?</h2>
-                    <p className="text-muted-foreground text-sm">Get it now instead of waiting on ASUC. When ASUC pays you, you send it back to the vault.</p>
+                    <h2 className="display-type text-2xl">Which payment do you want to expedite?</h2>
+                    <p className="text-muted-foreground text-sm">Get an upfront loan instead of waiting. You pay it back with interest based on how long it runs.</p>
                   </div>
 
                   {/* one org is picked for you; the pills only show when there's a real choice */}
@@ -240,8 +240,8 @@ function WizardForm({ me, initial }: { me: MeResponse; initial: ClaimWithDocumen
                     </p>
                   ) : orgList.length > 1 ? (
                     <div className="space-y-2.5">
-                      <p className="text-sm font-semibold">Org</p>
-                      <RadioGroup value={orgId ? String(orgId) : ""} onValueChange={(v) => setOrgId(Number(v))} aria-label="Org" disabled={Boolean(claimId)} className="flex flex-wrap gap-2.5">
+                      <p className="text-sm font-semibold">Business</p>
+                      <RadioGroup value={orgId ? String(orgId) : ""} onValueChange={(v) => setOrgId(Number(v))} aria-label="Business" disabled={Boolean(claimId)} className="flex flex-wrap gap-2.5">
                         {orgList.map((o) => (
                           <Label
                             key={o.id}
@@ -256,14 +256,14 @@ function WizardForm({ me, initial }: { me: MeResponse; initial: ClaimWithDocumen
                           </Label>
                         ))}
                       </RadioGroup>
-                      {claimId ? <p className="text-muted-foreground text-xs">The org can&apos;t change once you&apos;ve started.</p> : null}
+                      {claimId ? <p className="text-muted-foreground text-xs">The business can&apos;t change once you&apos;ve started.</p> : null}
                     </div>
                   ) : null}
 
                   <div className="space-y-2">
                     <MoneyField
                       id="face"
-                      label="Amount on the purchase request"
+                      label="Amount of the payment"
                       value={face}
                       onChange={(v) => {
                         setFace(v);
@@ -288,7 +288,7 @@ function WizardForm({ me, initial }: { me: MeResponse; initial: ClaimWithDocumen
                             You get <span className="text-foreground font-semibold">{usd(requestedUnits)}</span> now.{" "}
                           </>
                         ) : (
-                          `Up to ${usd(params.perClaimCap)} per reimbursement. `
+                          `Up to ${usd(params.perClaimCap)} per loan. `
                         )}
                         {faceUnits ? (
                           <button type="button" className="text-foreground font-medium underline underline-offset-4" onClick={() => setTakeLess(true)}>
@@ -302,15 +302,15 @@ function WizardForm({ me, initial }: { me: MeResponse; initial: ClaimWithDocumen
                   <div className="grid gap-5 sm:grid-cols-2">
                     <div className="space-y-2">
                       <Label htmlFor="callink" className="text-sm font-semibold">
-                        CalLink purchase request number
+                        Payment reference
                       </Label>
-                      <Input id="callink" value={callink} onChange={(e) => setCallink(e.target.value)} placeholder="PR-123456" />
+                      <Input id="callink" value={callink} onChange={(e) => setCallink(e.target.value)} placeholder="PAY-10482" />
                     </div>
                     <div className="space-y-2">
                       <Label htmlFor="description" className="text-sm font-semibold">
                         What was it for?
                       </Label>
-                      <Input id="description" value={description} onChange={(e) => setDescription(e.target.value)} maxLength={2000} placeholder="Catering for the hackathon" />
+                      <Input id="description" value={description} onChange={(e) => setDescription(e.target.value)} maxLength={2000} placeholder="Vendor payment" />
                     </div>
                   </div>
 
@@ -325,7 +325,7 @@ function WizardForm({ me, initial }: { me: MeResponse; initial: ClaimWithDocumen
                         onChange={setRecipientType}
                         options={[
                           { value: "member", label: "I did" },
-                          { value: "org_treasurer", label: "The org, I'm treasurer" },
+                          { value: "org_treasurer", label: "The business, I'm treasurer" },
                         ]}
                       />
                     </div>
@@ -347,7 +347,7 @@ function WizardForm({ me, initial }: { me: MeResponse; initial: ClaimWithDocumen
                 <>
                   <div className="space-y-1">
                     <h2 className="display-type text-2xl">Add your receipts</h2>
-                    <p className="text-muted-foreground text-sm">Upload what you sent to CalLink: receipts and proof you paid, up to 10 MB each.</p>
+                    <p className="text-muted-foreground text-sm">Upload invoices, receipts, and proof you paid, up to 10 MB each.</p>
                   </div>
                   <Label
                     htmlFor="receipts"
@@ -388,13 +388,13 @@ function WizardForm({ me, initial }: { me: MeResponse; initial: ClaimWithDocumen
               {step === 2 ? (
                 <>
                   <div className="space-y-1">
-                    <h2 className="display-type text-2xl">Pick an officer to sign off</h2>
+                    <h2 className="display-type text-2xl">Pick an approver to sign off</h2>
                     <p className="text-muted-foreground text-sm">
-                      An officer of {org?.name ?? "your org"} who isn&apos;t you. They vouch that ASUC will pay you. If ASUC never does, they cover it. We&apos;ll email them a link.
+                      Someone at {org?.name ?? "your business"} who isn&apos;t you. They confirm the payment will arrive. If it never does, they cover it. We&apos;ll email them a link.
                     </p>
                   </div>
-                  {officers.length === 0 ? <ErrorNotice title="No other officers">Ask your org&apos;s officers to sign up first, or ask an admin to add them.</ErrorNotice> : null}
-                  <RadioGroup value={guarantor ?? ""} onValueChange={setGuarantor} aria-label="Officer" className="grid gap-2.5 sm:grid-cols-2">
+                  {officers.length === 0 ? <ErrorNotice title="No other approvers">Ask your business&apos;s approvers to sign up first, or ask an admin to add them.</ErrorNotice> : null}
+                  <RadioGroup value={guarantor ?? ""} onValueChange={setGuarantor} aria-label="Approver" className="grid gap-2.5 sm:grid-cols-2">
                     {officers.map((o) => (
                       <Label
                         key={o.wallet}
@@ -405,7 +405,7 @@ function WizardForm({ me, initial }: { me: MeResponse; initial: ClaimWithDocumen
                           {initials(o.displayName)}
                         </span>
                         <span className="flex flex-1 flex-col gap-0.5">
-                          <span className="text-sm font-semibold">{o.displayName ?? "Officer without a name yet"}</span>
+                          <span className="text-sm font-semibold">{o.displayName ?? "Approver without a name yet"}</span>
                           {o.title ? <span className="text-muted-foreground text-xs">{o.title}</span> : null}
                         </span>
                         <RadioGroupItem value={o.wallet} id={`g-${o.wallet}`} />
@@ -451,7 +451,7 @@ function WizardForm({ me, initial }: { me: MeResponse; initial: ClaimWithDocumen
                     ))}
                   </div>
                   <p className="text-sm">
-                    You&apos;ll get {usd(requestedUnits)} now. When ASUC pays you, send {usd(due)} back to the vault. {guarantorName} gets an email to sign off first, then you send it for review.
+                    You&apos;ll get {usd(requestedUnits)} now. When the payment arrives, pay {usd(due)} back to the vault, with interest. {guarantorName} gets an email to sign off first, then you send it for review.
                   </p>
                   {/* stacked on phones, primary on top, so a long label or wider font never pushes past 375px  */}
                   <div className="flex flex-col-reverse gap-3 sm:flex-row sm:items-center sm:justify-between">
@@ -477,7 +477,7 @@ function WizardForm({ me, initial }: { me: MeResponse; initial: ClaimWithDocumen
 
 export default function NewClaimPage() {
   return (
-    <AccountGate reason="Sign in to get reimbursed now.">
+    <AccountGate reason="Sign in to expedite a payment.">
       {(me) =>
         me.profile?.kycStatus === "approved" ? (
           <Suspense fallback={<Skeleton className="h-64 w-full rounded-3xl" />}>
@@ -485,7 +485,7 @@ export default function NewClaimPage() {
           </Suspense>
         ) : (
           <>
-            <Topbar title="Get reimbursed now" action={null} back={BACK} />
+            <Topbar title="Expedite a payment" action={null} back={BACK} />
             <VerifyFirst status={me.profile?.kycStatus ?? "not_started"} role="member" />
           </>
         )

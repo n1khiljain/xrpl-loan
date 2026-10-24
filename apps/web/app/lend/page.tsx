@@ -14,7 +14,7 @@ const STEPS = [
   { title: "Get verified", body: "A reviewer approves you, then the app issues you an XRPL credential." },
   { title: "Join the vault's domain", body: "The vault is private: only accounts holding that credential can deposit." },
   { title: `Deposit ${ASSET}`, body: "You get vault shares back. Withdraw any time there's idle cash." },
-  { title: "Earn from repayments", body: "Each funded reimbursement is a loan from the vault; repayments and fees flow back to it." },
+  { title: "Earn the interest", body: "Each funded payment is an upfront loan from the vault. Borrowers pay it back with interest, and that interest flows back to the vault." },
 ];
 
 /**
@@ -28,10 +28,10 @@ export default function LendPage() {
       <div className="flex max-w-4xl flex-col gap-5">
         <GradientPanel tone="ledger" className="flex flex-col gap-4 p-6 sm:p-7">
           <span className="text-on-ink/75 text-[13px]">Single asset vault · {ASSET}</span>
-          <h2 className="display-type text-[28px] sm:text-[36px]">Fund receivables, earn as they&apos;re paid</h2>
+          <h2 className="display-type text-[28px] sm:text-[36px]">Fund loans, earn the interest</h2>
           <p className="text-on-ink/82 max-w-xl text-sm leading-relaxed sm:text-[15px]">
-            Lenders deposit {ASSET} into a private vault on the XRP Ledger. Verified members get paid from it right away, and
-            the vault is repaid when their payer pays. A first-loss cushion from the loan broker sits in front of lenders.
+            Lenders deposit {ASSET} into a private vault on the XRP Ledger. Verified businesses get an upfront loan from it,
+            and pay it back with interest based on the loan horizon. A first-loss cushion from the loan broker sits in front of lenders.
           </p>
           {config.ledger.vaultId ? (
             <div>
@@ -80,11 +80,11 @@ export default function LendPage() {
               <span className="tabular font-semibold">{usd(config.params.poolDepositCap)}</span>
             </div>
             <div className="flex flex-col gap-0.5">
-              <span className="text-muted-foreground">Largest single reimbursement</span>
+              <span className="text-muted-foreground">Largest single loan</span>
               <span className="tabular font-semibold">{usd(config.params.perClaimCap)}</span>
             </div>
             <div className="flex flex-col gap-0.5">
-              <span className="text-muted-foreground">Fee</span>
+              <span className="text-muted-foreground">Interest</span>
               <span className="tabular font-semibold">{config.params.feeBps / 100}% a year</span>
             </div>
           </CardContent>

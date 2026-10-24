@@ -53,21 +53,21 @@ export function emailDataFrom(kind: NotificationKind, data: Record<string, strin
 
 /** Plain-text emails, with no receipt details. */
 export function renderEmail(to: string, data: EmailData): Email {
-  const sign = "\n\nBlockchain at Berkeley receivables financing on the XRP Ledger";
+  const sign = "\n\nInstall on the XRP Ledger";
   switch (data.kind) {
     case "guaranty_requested":
       return {
         to,
-        subject: `${data.claimantName} asked you to sign off on a reimbursement`,
+        subject: `${data.claimantName} asked you to sign off on a loan`,
         text:
-          `${data.claimantName} wants to get their ${data.amount} ASUC reimbursement for ${data.orgName} now, and asked you to sign off as an officer. ` +
-          `If the payer never pays it, you cover what's left.\n\nReview and sign off: ${data.link}\n\nThis link expires ${data.expires}.${sign}`,
+          `${data.claimantName} wants an upfront loan of ${data.amount} for ${data.orgName}, and asked you to sign off. ` +
+          `If the payment never arrives, you cover what's left.\n\nReview and sign off: ${data.link}\n\nThis link expires ${data.expires}.${sign}`,
       };
     case "claim_approved":
       return {
         to,
-        subject: "Your reimbursement was approved",
-        text: `You're approved for ${usd(data.amount)}. Open it to get paid before the approval expires: ${data.link}${sign}`,
+        subject: "Your loan was approved",
+        text: `You're approved for ${usd(data.amount)}. Open it to get the loan before the approval expires: ${data.link}${sign}`,
       };
     case "claim_funded":
       return {
@@ -75,20 +75,20 @@ export function renderEmail(to: string, data: EmailData): Email {
         subject: "You got paid",
         text:
           `${usd(data.price)} of RLUSD is in your wallet. ` +
-          `When you're paid, send ${usd(data.due)} back to the vault by ${day(data.dueAt)}: ${data.link}${sign}`,
+          `Pay ${usd(data.due)} back to the vault, with interest, by ${day(data.dueAt)}: ${data.link}${sign}`,
       };
     case "due_soon":
       return {
         to,
         subject: "Your payment to the vault is due within 14 days",
-        text: `Once you're paid, send ${usd(data.remaining)} back to the vault by ${day(data.dueAt)}. Do it here: ${data.link}${sign}`,
+        text: `Pay ${usd(data.remaining)} back to the vault, with interest, by ${day(data.dueAt)}. Do it here: ${data.link}${sign}`,
       };
     case "guarantor_called":
       return {
         to,
-        subject: "You're asked to cover a reimbursement you signed off on",
+        subject: "You're asked to cover a loan you signed off on",
         text:
-          `The payer didn't pay a reimbursement you signed off on in full. You cover the ${usd(data.remaining)} that's left. ` +
+          `The payer didn't pay a loan you signed off on in full. You cover the ${usd(data.remaining)} that's left. ` +
           `Pay it here: ${data.link}${sign}`,
       };
   }

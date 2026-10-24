@@ -10,7 +10,7 @@ import { EASE } from "@/components/motion";
  * The landing hero: centred copy over the panel gradient and a soft glow.
  */
 
-const HEADLINE = "Get reimbursed for club expenses today";
+const HEADLINE = "Expedite the payments you choose";
 
 export function Hero() {
   return (
@@ -41,12 +41,12 @@ export function Hero() {
               transition={{ duration: 0.7, delay: 0.8, ease: EASE }}
             >
               <p className="text-on-ink/80 max-w-xl text-base leading-relaxed lg:text-[19px] lg:leading-[1.55]">
-                Skip the weeks of waiting on ASUC. A lending vault on the XRP Ledger pays you in RLUSD within a day.
+                Install lends against a transaction, transfer, or payment. You get the money up front and pay the loan back with interest based on how long it runs.
               </p>
               <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
                 <Button asChild size="lg" variant="light" className="pr-2">
                   <Link href="/claims/new/">
-                    <CtaLabel invert>Get reimbursed now</CtaLabel>
+                    <CtaLabel invert>Expedite a payment</CtaLabel>
                   </Link>
                 </Button>
                 <Button asChild size="lg" variant="glass">

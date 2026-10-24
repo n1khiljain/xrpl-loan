@@ -1,4 +1,4 @@
-/** Paths of the official B@B logo files found in public/brand, or null for a missing one. */
+/** Logo file paths kept for the brand folder lookup. The wordmark does not draw them. */
 export type LogoFiles = { bab: string | null; babOnDark: string | null };
 
 /**
@@ -7,31 +7,17 @@ export type LogoFiles = { bab: string | null; babOnDark: string | null };
  */
 export type LockupTone = "auto" | "on-dark" | "on-light";
 
-/** The product's name, set in the display font next to the logo. Text only: no third-party logo is drawn. */
-export const PRODUCT_NAME = "Receivables";
+/** The product's name, set in the display font. Text only: no logo is drawn. */
+export const PRODUCT_NAME = "Install";
 
 /**
- * The Blockchain at Berkeley logo, a thin rule, then the product name, sized by font-size (set text-2xl etc. on a
- * parent). Official files only; the lockup never recolors, stretches, or boxes the logo. A missing file shows the
- * org name as text instead.
+ * The product wordmark, sized by font-size (set text-2xl etc. on a parent).
  */
-export function LockupView({ files, tone = "auto" }: { files: LogoFiles; tone?: LockupTone }) {
-  const src = tone === "on-dark" ? (files.babOnDark ?? files.bab) : (files.bab ?? files.babOnDark);
-  const rule = tone === "on-dark" ? "bg-on-ink/40" : tone === "on-light" ? "bg-ink/40" : "bg-foreground/40";
+export function LockupView({ tone = "auto" }: { files?: LogoFiles; tone?: LockupTone }) {
+  const color = tone === "on-dark" ? "text-on-ink" : tone === "on-light" ? "text-ink" : "text-foreground";
   return (
-    <span className="inline-flex items-center gap-[0.55em]" aria-label={`Blockchain at Berkeley ${PRODUCT_NAME}`}>
-      {src ? (
-        <span data-logo="bab" data-fallback="file" className="inline-flex items-center">
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src={src} alt="Blockchain at Berkeley" className="h-[1.2em] w-auto" />
-        </span>
-      ) : (
-        <span data-logo="bab" data-fallback="text" className="display-type text-[0.7em] leading-none">
-          Blockchain at Berkeley
-        </span>
-      )}
-      <span aria-hidden className={`h-[1.1em] w-px ${rule}`} />
-      <span className="display-type text-[0.7em] leading-none">{PRODUCT_NAME}</span>
+    <span className={`display-type inline-flex items-center text-[1em] leading-none font-semibold ${color}`} aria-label={PRODUCT_NAME}>
+      {PRODUCT_NAME}
     </span>
   );
 }

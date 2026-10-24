@@ -77,20 +77,20 @@ function navFor(area: Area, guaranties: number): NavItem[] {
       { key: "queue", label: "Review queue", href: "/admin/", icon: Inbox },
       { key: "exceptions", label: "Exceptions", href: "/admin/exceptions/", icon: AlertTriangle },
       { key: "params", label: "Parameters", href: "/admin/params/", icon: SlidersHorizontal },
-      { key: "orgs", label: "Orgs and officers", href: "/admin/orgs/", icon: Users },
+      { key: "orgs", label: "Businesses and approvers", href: "/admin/orgs/", icon: Users },
       { key: "kyc", label: "KYC status", href: "/admin/kyc/", icon: IdCard },
     ];
   }
   return [
     { key: "home", label: "Home", href: "/claims/", icon: House },
-    { key: "new", label: "Get reimbursed now", href: "/claims/new/", icon: Plus, primary: true },
-    { key: "claims", label: "My reimbursements", href: "/claims/?view=claims", icon: FileText },
+    { key: "new", label: "Expedite a payment", href: "/claims/new/", icon: Plus, primary: true },
+    { key: "claims", label: "My loans", href: "/claims/?view=claims", icon: FileText },
     { key: "guaranties", label: "Sign-offs", href: "/claims/?view=guaranties", icon: Handshake, badge: guaranties || undefined },
     { key: "verify", label: "Verification", href: "/onboard/", icon: ShieldCheck },
   ];
 }
 
-const SECTION: Record<Area, string> = { member: "Member", lender: "Lender", admin: "Admin" };
+const SECTION: Record<Area, string> = { member: "Borrower", lender: "Lender", admin: "Admin" };
 
 
 function Sidebar({ area, logos, active }: { area: Area; logos: LogoFiles; active: string }) {
@@ -102,7 +102,7 @@ function Sidebar({ area, logos, active }: { area: Area; logos: LogoFiles; active
   const name = me.data?.profile?.displayName ?? (session.status === "signed-in" ? "Signed in" : "Not signed in");
   const meta = me.data?.profile?.email ?? SECTION[area];
   const others: { href: string; label: string }[] = [
-    ...(area !== "member" ? [{ href: "/claims/", label: "Member home" }] : []),
+    ...(area !== "member" ? [{ href: "/claims/", label: "Your loans" }] : []),
     ...(area !== "lender" ? [{ href: "/lend/", label: "Lend to the vault" }] : []),
     ...(area !== "admin" && me.data?.staffRole ? [{ href: "/admin/", label: "Admin" }] : []),
   ];
@@ -171,7 +171,7 @@ function Sidebar({ area, logos, active }: { area: Area; logos: LogoFiles; active
               </button>
             ) : null}
           </div>
-          <p className="text-on-ink/45 px-1 text-[10px] leading-snug">Built by Blockchain at Berkeley on the XRP Ledger. Test network only.</p>
+          <p className="text-on-ink/45 px-1 text-[10px] leading-snug">Install on the XRP Ledger. Test network only.</p>
         </div>
       </nav>
     </div>

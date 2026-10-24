@@ -64,7 +64,7 @@ describe("network safety", () => {
 
   it("refuses an address that isn't a classic XRPL address", () => {
     const raw = devnet();
-    raw.ledger.broker = "0xf39fd6e51aad88f6f4ce6ab8827279cfffb92266";
+    raw.ledger.broker = "not-an-address";
     expect(issuesOf(raw)).toEqual([expect.stringMatching(/^ledger\.broker: must be a classic XRPL address/)]);
   });
 });

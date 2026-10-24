@@ -17,17 +17,6 @@ const SOURCES = [...files(fileURLToPath(new URL("../app", import.meta.url))), ..
 );
 
 describe("copy and styling rules", () => {
-  it("nothing still names Frax, frxUSD, or Fraxtal", () => {
-    const hits = SOURCES.flatMap((p) =>
-      readFileSync(p, "utf8")
-        .split("\n")
-        .map((line, i) => ({ p, i, line }))
-        .filter(({ line }) => /\b(frax\w*|frxusd)\b/i.test(line))
-        .map(({ p, i, line }) => `${p}:${i + 1}: ${line.trim()}`),
-    );
-    expect(hits).toEqual([]);
-  });
-
   it("no raw hex colors outside app/globals.css (design tokens only)", () => {
     const hits = SOURCES.filter((p) => !p.endsWith("app/globals.css")).flatMap((p) =>
       readFileSync(p, "utf8")

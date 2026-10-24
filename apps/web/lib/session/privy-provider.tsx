@@ -47,7 +47,7 @@ export function PrivySessionProvider({ children }: { children: ReactNode }) {
       config={{
         loginMethods: ["email", "google"],
         appearance: { theme: "light", ...(accent ? { accentColor: accent as `#${string}` } : {}) },
-        embeddedWallets: { ethereum: { createOnLogin: "off" }, showWalletUIs: false },
+        embeddedWallets: { showWalletUIs: false },
       }}
     >
       <PrivySession>{children}</PrivySession>

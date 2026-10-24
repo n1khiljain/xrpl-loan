@@ -13,13 +13,13 @@ const days = (seconds: number) => `${Math.round(seconds / 86_400)} days`;
 
 const LIMITS: Row[] = [
   { label: "Advance rate", value: `${config.params.advanceRateBps / 100}%`, hint: "Share of face value that can be paid out" },
-  { label: "Fee", value: `${config.params.feeBps / 100}% a year`, hint: "Yearly rate on unpaid principal" },
-  { label: "Per-reimbursement cap", value: usd(config.params.perClaimCap), hint: "Largest single one" },
-  { label: "Per-org cap", value: usd(config.params.perOrgCap), hint: "Outstanding across one org" },
+  { label: "Interest", value: `${config.params.feeBps / 100}% a year`, hint: "Yearly rate on the unpaid loan. A shorter horizon costs less." },
+  { label: "Per-loan cap", value: usd(config.params.perClaimCap), hint: "Largest single one" },
+  { label: "Per-business cap", value: usd(config.params.perOrgCap), hint: "Outstanding across one business" },
   { label: "Vault deposit cap", value: usd(config.params.poolDepositCap), hint: "Most the vault takes in" },
   { label: "Due window", value: days(config.params.overdueWindowSeconds), hint: "From payout to due date" },
   { label: "Approval expiry", value: days(config.params.approvalExpirySeconds), hint: "Time to collect after approval" },
-  { label: "Write-off grace", value: days(config.params.writeOffGraceSeconds), hint: "After the officer is asked to cover" },
+  { label: "Write-off grace", value: days(config.params.writeOffGraceSeconds), hint: "After the approver is asked to cover" },
 ];
 
 /** The ledger accounts and objects `pnpm xrpl:setup` writes into deployments/<network>.json. */

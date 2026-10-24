@@ -6,8 +6,8 @@ import type { KycStatus } from "@/lib/types";
 import { GradientPanel } from "./gradient-panel";
 
 const WHAT: Record<"member" | "officer", string> = {
-  member: "Only verified people can get reimbursed. Verify your email, then a reviewer approves you. It usually takes less than a day.",
-  officer: "Officers who sign off need to be verified too, since you'd cover what's left if the payer never pays.",
+  member: "Only verified people can take a loan. Verify your email, then a reviewer approves you. It usually takes less than a day.",
+  officer: "Approvers who sign off need to be verified too, since you'd cover what's left if the payment never arrives.",
 };
 
 /** Stands in for a screen that needs a verified person, and points to Verification. */

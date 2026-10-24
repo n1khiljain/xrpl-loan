@@ -1,14 +1,14 @@
 # Status
 
-Last updated 2026-10-24. Branch `xrpl-migration`. The project moved from Frax/Fraxtal to the XRP Ledger for an XRPL hackathon (Lending & Borrowing track); the Frax-era status, PRD, and runbook are in `docs/archive/frax/`.
+Last updated 2026-10-24. Branch `xrpl-migration`.
 
 ## Plan
 
 | Phase | What | State |
 |---|---|---|
 | 0 | Understand the repo, agree the plan | Done |
-| 1 | Remove Frax and EVM, add XRPL foundations (config, custodial wallets, xrpl.js), B@B-only branding | Done |
-| 2 | Generalize from club reimbursements to any receivable (Receivable model with a type) | Next |
+| 1 | XRPL foundations (config, custodial wallets, xrpl.js) and Install branding | Done |
+| 2 | Generalize to any payment a business wants to expedite (Receivable model with a type) | Next |
 | 3 | Native XRPL lending: credentials, permissioned domain, private single asset vault, loan broker, first-loss cover, loans | |
 | 4 | Auto-repay when the payer pays (QuickNode Streams webhook, WebSocket fallback) | Needs a decision on who submits LoanPay |
 | 5 | AI underwriter | Needs a model provider and key |

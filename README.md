@@ -1,6 +1,6 @@
-# XRPL Receivables
+# Install
 
-Get paid now for money you're owed. A student org member waiting weeks on an ASUC reimbursement gets it today from a lending vault on the XRP Ledger, and sends it back to the vault when ASUC pays. Built by Blockchain at Berkeley for an XRPL hackathon (Lending & Borrowing track).
+Expedite a transaction, transfer, or payment. Install serves businesses that want liquidity on the ones they choose: an upfront loan from a lending vault on the XRP Ledger, paid back with interest that depends on how long the loan runs.
 
 **Test networks only.** The app runs on XRPL Devnet, the one network with the Single Asset Vault (XLS-65) and Lending Protocol (XLS-66) amendments enabled. No real money moves.
 
@@ -10,17 +10,17 @@ Where things stand: [STATUS.md](STATUS.md). Repo rules: [CLAUDE.md](CLAUDE.md).
 
 - **Sign in** with an email code or Google (Privy). The app makes you a custodial XRPL wallet and funds it with test XRP from the Devnet faucet.
 - **Get verified.** Your Privy identity token proves your email; a reviewer approves you on the admin KYC page.
-- **Ask for a reimbursement.** Enter the amount and CalLink request, upload receipts, and pick an officer to sign off. The officer agrees to cover what's left if ASUC never pays.
-- **Review.** An underwriter approves or rejects it. Attesters handle the exceptions: a payer that rejected or short-paid, or an overdue claim.
-- **Get paid and send it back.** Coming next: funding is an XLS-66 loan from a private, credential-gated vault, and repayment happens automatically when the payer pays.
+- **Ask for a loan.** Name the payment you want to expedite, enter the amount and a payment reference, upload documents, and pick someone at your business to sign off. They agree to cover what's left if that payment never arrives.
+- **Review.** An underwriter approves or rejects it. Attesters handle the exceptions: a payer that rejected or short-paid, or an overdue loan.
+- **Get the loan and pay it back.** Coming next: funding is an XLS-66 loan from a private, credential-gated vault, and repayment, with interest based on the loan horizon, happens when the original payment arrives.
 
 | On screen | In the code |
 |---|---|
-| reimbursement | claim |
-| officer sign-off | guaranty, by the guarantor |
-| You got paid / Paid | `Funded` |
+| loan | claim |
+| approver sign-off | guaranty, by the guarantor |
+| You got the loan / Paid | `Funded` |
 | Closed out | `Settled`, `Recovered` |
-| Officer asked to cover | `GuarantorCalled` |
+| Approver asked to cover | `GuarantorCalled` |
 
 ## Run it locally
 
@@ -31,7 +31,7 @@ pnpm install
 pnpm local
 ```
 
-`pnpm local` starts Supabase and the edge functions, signs up four demo people (a member, an officer, a lender, an admin) whose wallets are funded on Devnet, adds reimbursements in several states, and serves the site at http://localhost:3000. The sign-in screen offers the demo people as one-click buttons, so you don't need a Privy app locally. The keys it uses (a Privy test key and a wallet encryption key) are generated into `apps/web/e2e/.cache/`, which git ignores.
+`pnpm local` starts Supabase and the edge functions, signs up four demo people (a borrower, an approver, a lender, an admin) whose wallets are funded on Devnet, adds loans in several states, and serves the site at http://localhost:3000. The sign-in screen offers the demo people as one-click buttons, so you don't need a Privy app locally. The keys it uses (a Privy test key and a wallet encryption key) are generated into `apps/web/e2e/.cache/`, which git ignores.
 
 ### Real Google and email sign-in locally
 
