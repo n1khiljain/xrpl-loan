@@ -1,6 +1,6 @@
 import type { NetworkConfig } from "@app/config";
-import { valueToUnits } from "@app/adapters";
-import { Client, type SubmittableTransaction, type TxResponse, type Wallet as XrplWallet } from "xrpl";
+import { createdNodeId, valueToUnits } from "@app/adapters";
+import { Client, type SubmittableTransaction, type TxResponse, type Wallet as XrplWallet, signLoanSetByCounterparty } from "xrpl";
 import type { Db, Wallet } from "./db/types.ts";
 
 /** What a custodial account holds on the ledger. */
@@ -13,7 +13,7 @@ export type Balances = {
   asset: string | null;
 };
 
-export type Submitted = { hash: string; result: string; ledgerIndex: number | null };
+export type Submitted = { hash: string; result: string; ledgerIndex: number | null; createdId: string | null };
 
 /** Why a transaction was recorded, for ledger_txs and explorer links. */
 export type TxPurpose = { purpose: string; claimId?: string | null };
@@ -28,6 +28,13 @@ export interface Ledger {
   balances(address: Wallet): Promise<Balances>;
   /** Autofills, signs with `signer`, submits, and waits for validation. */
   submit(signer: XrplWallet, tx: SubmittableTransaction, why: TxPurpose): Promise<Submitted>;
+  /**
+   * A LoanSet needs the borrower and the broker. The borrower signs first; autofill has already priced the
+   * broker's signature. The broker's signature is added and the one transaction is submitted.
+   */
+  submitCoSigned(signer: XrplWallet, counterparty: XrplWallet, tx: SubmittableTransaction, why: TxPurpose): Promise<Submitted>;
+  /** A ledger object by its index, or null when the network has no such entry. */
+  readEntry(index: string): Promise<Record<string, unknown> | null>;
 }
 
 export class LedgerError extends Error {
@@ -109,7 +116,47 @@ export function xrplLedger(config: NetworkConfig, db: Db): Ledger {
           result,
         });
         if (result !== "tesSUCCESS") throw new LedgerError(result, `${tx.TransactionType} failed with ${result}`, signed.hash);
-        return { hash: signed.hash, result, ledgerIndex: response.result.ledger_index ?? null };
+        return { hash: signed.hash, result, ledgerIndex: response.result.ledger_index ?? null, createdId: null };
+      });
+    },
+
+    submitCoSigned(signer, counterparty, tx, why) {
+      return withClient(config, async (client) => {
+        const prepared = await client.autofill(tx);
+        const first = signer.sign(prepared);
+        const combined = signLoanSetByCounterparty(counterparty, first.tx_blob);
+        let response: TxResponse;
+        try {
+          response = await client.submitAndWait(combined.tx_blob);
+        } catch (error) {
+          throw new LedgerError("submit_failed", error instanceof Error ? error.message : String(error), combined.hash);
+        }
+        const meta = response.result.meta;
+        const result = typeof meta === "object" && meta !== null && "TransactionResult" in meta ? String(meta.TransactionResult) : "unknown";
+        await db.recordLedgerTx({
+          txHash: combined.hash,
+          txType: tx.TransactionType,
+          account: tx.Account as Wallet,
+          claimId: why.claimId ?? null,
+          purpose: why.purpose,
+          result,
+        });
+        if (result !== "tesSUCCESS") throw new LedgerError(result, `${tx.TransactionType} failed with ${result}`, combined.hash);
+        return { hash: combined.hash, result, ledgerIndex: response.result.ledger_index ?? null, createdId: createdNodeId(meta, "Loan") };
+      });
+    },
+
+    readEntry(index) {
+      return withClient(config, async (client) => {
+        try {
+          const info = await client.request({ command: "ledger_entry", index, ledger_index: "validated" });
+          const node = info.result.node;
+          return node && typeof node === "object" ? (node as unknown as Record<string, unknown>) : null;
+        } catch (error) {
+          const code = (error as { data?: { error?: string } }).data?.error;
+          if (code === "entryNotFound" || code === "actNotFound") return null;
+          throw error;
+        }
       });
     },
   };
@@ -120,6 +167,9 @@ export class FakeLedger implements Ledger {
   readonly funded: Wallet[] = [];
   readonly submitted: Array<{ tx: SubmittableTransaction; why: TxPurpose }> = [];
   readonly balanceOf = new Map<Wallet, Balances>();
+  readonly entries = new Map<string, Record<string, unknown>>();
+  /** Ledger index the next co-signed submit reports as created. */
+  nextCreatedId: string | null = "D".repeat(64);
   failFund = false;
 
   async fund(address: Wallet) {
@@ -133,6 +183,18 @@ export class FakeLedger implements Ledger {
   }
   async submit(_signer: XrplWallet, tx: SubmittableTransaction, why: TxPurpose) {
     this.submitted.push({ tx, why });
-    return { hash: this.submitted.length.toString(16).toUpperCase().padStart(64, "0"), result: "tesSUCCESS", ledgerIndex: 1 };
+    return { hash: this.submitted.length.toString(16).toUpperCase().padStart(64, "0"), result: "tesSUCCESS", ledgerIndex: 1, createdId: null };
+  }
+  async submitCoSigned(_signer: XrplWallet, _counterparty: XrplWallet, tx: SubmittableTransaction, why: TxPurpose) {
+    this.submitted.push({ tx, why });
+    return {
+      hash: this.submitted.length.toString(16).toUpperCase().padStart(64, "0"),
+      result: "tesSUCCESS",
+      ledgerIndex: 1,
+      createdId: this.nextCreatedId,
+    };
+  }
+  async readEntry(index: string) {
+    return this.entries.get(index) ?? null;
   }
 }

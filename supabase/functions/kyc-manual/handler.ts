@@ -1,9 +1,15 @@
 import { z } from "zod";
 import { type TokenVerifier, normalizeWallet, requireCaller, requireStaff } from "../_shared/auth.ts";
-import type { Db } from "../_shared/db/types.ts";
+import type { Db, Wallet } from "../_shared/db/types.ts";
 import { type Handler, conflict, json, methodNotAllowed, notFound, readJson } from "../_shared/http.ts";
 
-export type KycManualDeps = { auth: TokenVerifier; db: Db; now?: () => Date };
+export type KycManualDeps = {
+  auth: TokenVerifier;
+  db: Db;
+  now?: () => Date;
+  /** When approval should also put the vault credential on the account. Absent until the vault exists. */
+  issueCredential?: (wallet: Wallet) => Promise<void>;
+};
 
 const Body = z.strictObject({
   wallet: z.string(),
@@ -60,6 +66,14 @@ export function createKycManualHandler(deps: KycManualDeps): Handler {
       target: wallet,
       payload: { from: target.kycStatus, to: body.status, note: body.note, at },
     });
+    if (body.status === "approved" && deps.issueCredential) {
+      try {
+        await deps.issueCredential(wallet);
+      } catch (error) {
+        const message = error instanceof Error ? error.message : "the credential didn't issue";
+        throw conflict(`they're approved, but the credential didn't issue: ${message}`, "credential_failed");
+      }
+    }
     return json({ profile });
   };
 }

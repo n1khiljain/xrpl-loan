@@ -99,7 +99,7 @@ function Hero({ me, onVerify, verifying }: { me: MeResponse; onVerify: () => voi
   const title = status === "approved" ? "You're verified" : emailVerified ? "Waiting on a reviewer" : "Verify your email";
   const body =
     status === "approved"
-      ? "A reviewer approved you. Once the XRPL credential flow is live, the app issues you a credential that unlocks the lending vault."
+      ? "A reviewer approved you. That approval issues the credential this account needs to use the vault."
       : emailVerified
         ? "Your email is verified. A reviewer checks who you are next and approves you, usually within a day."
         : "Sign-in already proved your email to Privy. Press below to share that proof with this app, so a reviewer can approve you.";

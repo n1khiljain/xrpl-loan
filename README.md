@@ -12,7 +12,7 @@ Where things stand: [STATUS.md](STATUS.md). Repo rules: [CLAUDE.md](CLAUDE.md).
 - **Get verified.** Your Privy identity token proves your email; a reviewer approves you on the admin KYC page.
 - **Ask for a loan.** Name the payment you want to expedite, enter the amount and a payment reference, upload documents, and pick someone at your business to sign off. They agree to cover what's left if that payment never arrives.
 - **Review.** An underwriter approves or rejects it. Attesters handle the exceptions: a payer that rejected or short-paid, or an overdue loan.
-- **Get the loan and pay it back.** Coming next: funding is an XLS-66 loan from a private, credential-gated vault, and repayment, with interest based on the loan horizon, happens when the original payment arrives.
+- **Get the loan and pay it back.** After `pnpm xrpl:setup`, an approved request becomes one loan from a private, credential-gated vault, and the borrower pays it back from their wallet. Interest follows the yearly rate in the deployment, prorated to the loan's length. Deposits are open for 90 days; loans start once that window closes. Automatic repayment when the original payment arrives is still to come.
 
 | On screen | In the code |
 |---|---|

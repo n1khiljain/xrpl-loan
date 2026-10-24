@@ -11,6 +11,9 @@ export const ENV_NAMES = [
   "RESEND_API_KEY",
   "EMAIL_FROM",
   "APP_BASE_URL",
+  // The setup script writes these. Functions read them only when a vault, loan, or credential step runs.
+  "BROKER_SEED",
+  "ISSUER_SEED",
 ] as const;
 export type EnvName = (typeof ENV_NAMES)[number];
 

@@ -462,6 +462,18 @@ verify_jwt = false
 import_map = "./functions/deno.json"
 entrypoint = "./functions/wallet/index.ts"
 
+[functions.loans]
+enabled = true
+verify_jwt = false
+import_map = "./functions/deno.json"
+entrypoint = "./functions/loans/index.ts"
+
+[functions.vault]
+enabled = true
+verify_jwt = false
+import_map = "./functions/deno.json"
+entrypoint = "./functions/vault/index.ts"
+
 [analytics]
 enabled = false
 port = 54327

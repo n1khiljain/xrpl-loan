@@ -66,7 +66,9 @@ function Params() {
           </CardDescription>
         </CardHeader>
         <CardContent className="flex flex-col gap-4">
-          {!ledgerReady ? <InfoNotice title="Run the setup script">pnpm xrpl:setup creates the issuer, domain, vault, and loan broker.</InfoNotice> : null}
+          {!ledgerReady ? (
+            <InfoNotice title="Run the setup script">pnpm xrpl:setup creates the issuer, domain, vault, and loan broker, and posts the first-loss cover.</InfoNotice>
+          ) : null}
           <dl className="divide-divider divide-y text-sm">
             {ACCOUNTS.map((a) => (
               <div key={a.label} className="flex items-center justify-between gap-3 py-2.5">

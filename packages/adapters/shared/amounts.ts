@@ -29,6 +29,32 @@ export function valueToUnits(value: string): bigint {
   return sign ? -digits : digits;
 }
 
+/**
+ * Like `valueToUnits`, but any remainder past the sixth decimal rounds up. Loan payments have to cover the
+ * ledger's high-precision figure, and paying a hair more is ignored rather than rejected.
+ */
+export function ceilToUnits(value: string): bigint {
+  const units = valueToUnits(value);
+  if (units < 0n) return units;
+  const exact = scaled(unitsToValue(units));
+  const given = scaled(value);
+  if (exact === null || given === null) return units;
+  return given > exact ? units + 1n : units;
+}
+
+/** The value as an integer at 30 decimal places, so two amounts can be compared past the sixth decimal. */
+function scaled(value: string): bigint | null {
+  const match = /^(-)?(\d+)(?:\.(\d+))?(?:[eE]([+-]?\d+))?$/.exec(value.trim());
+  if (!match) return null;
+  const [, sign, whole = "0", fraction = "", exp = "0"] = match;
+  let digits = BigInt(whole + fraction);
+  const shift = Number(exp) - fraction.length + 30;
+  if (!Number.isFinite(shift) || Math.abs(shift) > 1_000) return null;
+  if (shift >= 0) digits *= 10n ** BigInt(shift);
+  else digits /= 10n ** BigInt(-shift);
+  return sign ? -digits : digits;
+}
+
 /** XRP drops (1 XRP = 1,000,000 drops) as a decimal XRP string. */
 export function dropsToXrp(drops: bigint | string): string {
   const d = BigInt(drops);

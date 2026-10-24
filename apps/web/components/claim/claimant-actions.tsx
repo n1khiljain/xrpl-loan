@@ -228,9 +228,24 @@ function PaidCelebration({ onchain, onContinue }: { onchain: ClaimView; onContin
 /** The one action that fits the claim's state, for the person who sold it (SYSTEM_DESIGN 6.2). */
 export function ClaimantActions({ claim, onchain }: { claim: OffchainClaim; onchain: ClaimView | null }) {
   const action = useClaimAction(claim);
+  const call = useCall();
+  const queryClient = useQueryClient();
   const now = useNowSeconds();
   const state = claim.status;
   const [justFunded, setJustFunded] = useState(false);
+  const fund = useMutation({
+    mutationFn: () => call("loans", { method: "POST", body: { action: "fund", claimId: claim.id } }),
+    onSuccess: async () => {
+      setJustFunded(true);
+      await queryClient.invalidateQueries();
+    },
+  });
+  const vault = useQuery({
+    queryKey: ["vault"],
+    enabled: ledgerReady && state === "Approved",
+    queryFn: () => call<{ phase: string; subscriptionAt: number | null; redemptionAt: number | null }>("vault"),
+  });
+  const loansClosed = vault.data?.phase === "subscription" || vault.data?.phase === "closed";
 
   const requested = usd(BigInt(claim.requestedAmount));
   if (state === "Draft") {
@@ -288,14 +303,32 @@ export function ClaimantActions({ claim, onchain }: { claim: OffchainClaim; onch
         lead={`You're approved for ${usd(onchain.approvedAmount)}.`}
         description={`Collect it by ${dateFromSeconds(onchain.approvalExpiresAt)}. ${days} ${days === 1 ? "day" : "days"} left.`}
       >
-        {/* funding is an XLS-66 loan from the vault; it switches on once the ledger setup has run */}
         <div className="flex flex-col gap-3">
-          <Button size="lg" className="pr-2 self-start" disabled data-testid="get-paid">
-            <CtaLabel>{`Get ${usd(onchain.approvedAmount)} in ${ASSET}`}</CtaLabel>
+          <Button
+            size="lg"
+            className="pr-2 self-start"
+            disabled={!ledgerReady || loansClosed || fund.isPending || fund.isSuccess}
+            onClick={() => fund.mutate()}
+            data-testid="get-paid"
+          >
+            <CtaLabel>{fund.isPending ? "Getting your loan..." : `Get ${usd(onchain.approvedAmount)} in ${ASSET}`}</CtaLabel>
           </Button>
-          <InfoNotice title={ledgerReady ? "Funding is coming soon" : "The lending vault isn't set up yet"}>
-            Payouts come from the XRPL lending vault. You&apos;ll be able to collect here once it&apos;s live.
-          </InfoNotice>
+          {fund.isError ? <ErrorNotice>{friendlyError(fund.error)}</ErrorNotice> : null}
+          {!ledgerReady ? (
+            <InfoNotice title="The lending vault isn't set up yet">
+              Payouts come from the XRPL lending vault. They switch on once that vault is created.
+            </InfoNotice>
+          ) : null}
+          {vault.data?.phase === "subscription" ? (
+            <InfoNotice title="Deposits are still open">
+              Loans start once that window closes{vault.data.subscriptionAt ? ` on ${dateFromSeconds(vault.data.subscriptionAt)}` : ""}.
+            </InfoNotice>
+          ) : null}
+          {vault.data?.phase === "closed" ? (
+            <InfoNotice title="This vault isn't taking new loans">
+              A loan of this length would end after the vault's redemption date.
+            </InfoNotice>
+          ) : null}
         </div>
         <div>
           <Button variant="outline" size="sm" disabled={action.isPending} onClick={() => action.mutate("cancel")} data-testid="cancel-claim">
@@ -317,7 +350,7 @@ export function ClaimantActions({ claim, onchain }: { claim: OffchainClaim; onch
           </StatePanel>
         )}
         <PageSection title="Pay it back">
-          <SettlePanel onchain={onchain} />
+          <SettlePanel claimId={claim.id} onchain={onchain} who="borrower" live={ledgerReady && Boolean(claim.loanId)} />
         </PageSection>
         <div className="border-divider divide-divider flex flex-col divide-y border-t [&>*]:py-4">
           <ReportOutcome claim={claim} onchain={onchain} />
@@ -333,7 +366,7 @@ export function ClaimantActions({ claim, onchain }: { claim: OffchainClaim; onch
           description={`You can still send the ${usd(onchain.amountRemaining)} yourself.`}
         />
         <PageSection title="Pay it back">
-          <SettlePanel onchain={onchain} />
+          <SettlePanel claimId={claim.id} onchain={onchain} who="borrower" live={ledgerReady && Boolean(claim.loanId)} />
         </PageSection>
       </div>
     );

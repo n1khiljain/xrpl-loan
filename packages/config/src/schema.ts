@@ -72,7 +72,7 @@ export const networkConfigShape = z.strictObject({
     perClaimCap: units,
     perOrgCap: units,
     poolDepositCap: units,
-    /** Yearly fee on unpaid principal, in basis points. */
+    /** Yearly interest on unpaid principal, in basis points. On the ledger this is ten times as many tenths of a basis point. */
     feeBps: bps,
     overdueWindowSeconds: seconds,
     approvalExpirySeconds: seconds,

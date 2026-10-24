@@ -6,6 +6,7 @@ import { InfoNotice } from "@/components/app/notice";
 import { Topbar } from "@/components/app/topbar";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { VaultActions } from "@/components/lend/vault-actions";
 import { ASSET, accountUrl, config, ledgerReady } from "@/lib/config";
 import { usd } from "@/lib/format";
 
@@ -13,7 +14,7 @@ import { usd } from "@/lib/format";
 const STEPS = [
   { title: "Get verified", body: "A reviewer approves you, then the app issues you an XRPL credential." },
   { title: "Join the vault's domain", body: "The vault is private: only accounts holding that credential can deposit." },
-  { title: `Deposit ${ASSET}`, body: "You get vault shares back. Withdraw any time there's idle cash." },
+  { title: `Deposit ${ASSET}`, body: "Deposits are open during the subscription window. After it closes, the vault lends, and withdrawals wait until the ledger allows them." },
   { title: "Earn the interest", body: "Each funded payment is an upfront loan from the vault. Borrowers pay it back with interest, and that interest flows back to the vault." },
 ];
 
@@ -44,12 +45,21 @@ export default function LendPage() {
           ) : null}
         </GradientPanel>
 
-        {!ledgerReady ? (
+        {ledgerReady ? (
+          <Card>
+            <CardHeader>
+              <CardTitle>Your deposit</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <VaultActions />
+            </CardContent>
+          </Card>
+        ) : (
           <InfoNotice title="The vault isn't set up yet">
             Deposits, withdrawals, and live vault numbers switch on once the vault, loan broker, and credential domain are
             created on the ledger.
           </InfoNotice>
-        ) : null}
+        )}
 
         <Card>
           <CardHeader>

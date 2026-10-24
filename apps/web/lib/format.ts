@@ -50,11 +50,4 @@ export function shortAddress(address: string): string {
   return `${address.slice(0, 6)}...${address.slice(-4)}`;
 }
 
-const FEE_YEAR_SECONDS = 365n * 86_400n;
-
-/** Amount due on a purchase price after `seconds` with nothing paid: price plus the yearly fee at `feeBps`, rounded up. */
-export function amountDue(price: bigint, feeBps: bigint, seconds: number): bigint {
-  const denominator = 10_000n * FEE_YEAR_SECONDS;
-  const fee = (price * feeBps * BigInt(seconds) + denominator - 1n) / denominator;
-  return price + fee;
-}
+export { amountDue } from "@app/adapters";

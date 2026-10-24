@@ -5,4 +5,5 @@
 export * from "./shared/errors.ts";
 export * from "./shared/claims.ts";
 export * from "./shared/amounts.ts";
+export * from "./shared/lending.ts";
 export * from "./shared/explorer.ts";

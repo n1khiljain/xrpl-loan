@@ -86,3 +86,38 @@ Deno.test("GET lists people and their KYC status for staff only", async () => {
   const ada = people.find((p) => p.wallet === member.wallet);
   assertEquals([ada?.kycStatus, ada?.emailVerified], ["pending", true]);
 });
+
+Deno.test("approval issues the vault credential, and a failed credential still leaves them approved", async () => {
+  const db = new MemoryDb();
+  const target = await makeUser(db);
+  const staff = await makeUser(db, { staff: "underwriter" });
+  const issued: string[] = [];
+  const handler = createKycManualHandler({
+    auth: verifier,
+    db,
+    now: () => FIXED_NOW,
+    issueCredential: async (wallet) => {
+      issued.push(wallet);
+    },
+  });
+  const approved = await call(handler, "POST", ENDPOINT, {
+    token: staff.token,
+    body: { wallet: target.wallet, status: "approved", note: "checked their ID" },
+  });
+  assertEquals(approved.status, 200);
+  assertEquals(issued, [target.wallet]);
+
+  const failing = createKycManualHandler({
+    auth: verifier,
+    db,
+    now: () => FIXED_NOW,
+    issueCredential: () => Promise.reject(new Error("ledger down")),
+  });
+  const again = await call(failing, "POST", ENDPOINT, {
+    token: staff.token,
+    body: { wallet: target.wallet, status: "approved", note: "checked their ID" },
+  });
+  assertEquals(again.status, 409);
+  assertEquals(again.body.error?.code, "credential_failed");
+  assertEquals((await db.getProfile(target.wallet))?.kycStatus, "approved");
+});

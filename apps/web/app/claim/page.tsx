@@ -53,7 +53,7 @@ function GuarantorPanel({ claim, onchain, state }: { claim: OffchainClaim; oncha
       <div className="flex flex-col gap-10">
         <StatePanel lead={`Cover the ${usd(onchain.amountRemaining)} that's left.`} description="You signed off, so you cover what's left." />
         <PageSection title="Pay it back">
-          <SettlePanel onchain={onchain} />
+          <SettlePanel claimId={claim.id} onchain={onchain} who="approver" live={false} />
         </PageSection>
       </div>
     );

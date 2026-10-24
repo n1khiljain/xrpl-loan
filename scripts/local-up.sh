@@ -51,6 +51,14 @@ else
   WEB_PRIVY_APP=""
   DEMO=true
 fi
+# pnpm xrpl:setup writes these into .env. The loan and vault functions need them; the other functions don't.
+SERVE_ENV="$CACHE/functions.serve.env"
+grep -vE '^(BROKER_SEED|ISSUER_SEED)=' "$FUNCTIONS_ENV" > "$SERVE_ENV" || true
+for name in BROKER_SEED ISSUER_SEED; do
+  value="$(envval "$name")"
+  [ -n "$value" ] && echo "$name=$value" >> "$SERVE_ENV"
+done
+FUNCTIONS_ENV="$SERVE_ENV"
 pkill -f "supabase functions serve" 2>/dev/null || true
 echo "serving the edge functions"
 supabase functions serve --env-file "$FUNCTIONS_ENV" >"$CACHE/functions.log" 2>&1 &
