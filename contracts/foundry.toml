@@ -1,0 +1,49 @@
+[profile.default]
+src = "src"
+out = "out"
+test = "test"
+script = "script"
+libs = ["lib"]
+solc_version = "0.8.28"
+# UNCERTAIN: U-35 (no Cancun opcodes until Fraxtal support is confirmed)
+evm_version = "shanghai"
+optimizer = true
+optimizer_runs = 200
+bytecode_hash = "none"
+remappings = [
+    "@openzeppelin/contracts/=lib/openzeppelin-contracts/contracts/",
+    "forge-std/=lib/forge-std/src/",
+]
+# the deploy script reads deployments/<NETWORK>.json and writes addresses back
+fs_permissions = [{ access = "read-write", path = "../deployments" }]
+
+[lint]
+# every time check here is a window of days (approval expiry, due date, write-off grace), so a validator
+# nudging block.timestamp by seconds cannot change an outcome in a way that matters
+exclude_lints = ["block-timestamp"]
+
+[fuzz]
+runs = 1000
+
+[invariant]
+runs = 256
+depth = 50
+fail_on_revert = true
+
+[fmt]
+line_length = 120
+tab_width = 4
+bracket_spacing = false
+int_types = "long"
+quote_style = "double"
+number_underscore = "thousands"
+
+# security campaign (contracts/audits/security-campaign.md): deeper, seeded runs; CI keeps the default profile
+[profile.deep.fuzz]
+runs = 10000
+seed = "0x5ec0"
+
+[profile.deep.invariant]
+runs = 2000
+depth = 300
+fail_on_revert = true

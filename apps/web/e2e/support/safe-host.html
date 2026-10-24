@@ -1,0 +1,33 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>Safe host (test)</title>
+<style>body{margin:0}iframe{border:0;width:100vw;height:100vh}</style>
+</head>
+<body>
+<iframe id="app"></iframe>
+<script>
+// A stand-in for Frax's Safe UI: frames the app and answers the Safe Apps SDK the way Safe{Wallet} does.
+const params = new URLSearchParams(location.search);
+const safe = params.get("safe");
+const chainId = Number(params.get("chainId"));
+window.__proposed = [];
+window.addEventListener("message", (event) => {
+  const msg = event.data;
+  if (!msg || typeof msg.method !== "string" || !msg.id) return;
+  const reply = (data) => event.source.postMessage({ id: msg.id, success: true, version: "9.1.0", data }, "*");
+  const fail = (error) => event.source.postMessage({ id: msg.id, success: false, version: "9.1.0", error }, "*");
+  if (msg.method === "getSafeInfo") {
+    reply({ safeAddress: safe, chainId, owners: [safe], threshold: 1, isReadOnly: false, network: "LOCAL" });
+  } else if (msg.method === "sendTransactions") {
+    window.__proposed.push(msg.params.txs);
+    reply({ safeTxHash: "0x" + window.__proposed.length.toString(16).padStart(2, "0").repeat(32) });
+  } else {
+    fail("not supported by the test host: " + msg.method);
+  }
+});
+document.getElementById("app").src = params.get("app");
+</script>
+</body>
+</html>

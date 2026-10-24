@@ -1,0 +1,7 @@
+packages:
+  - apps/*
+  - packages/*
+
+# esbuild's postinstall only verifies its platform binary; @wagmi/cli uses it to load wagmi.config.ts
+onlyBuiltDependencies:
+  - esbuild

@@ -1,0 +1,370 @@
+@import "tailwindcss";
+
+/*
+ * Design tokens. The names come from docs/BRAND.md. The values started from the B@B design team's "B@B x Frax College
+ * Screens" canvas (U-38, U-65) and now follow the landing page: near-black and neutral greys, Figtree, and blue kept for
+ * the claim card (U-75). There is one theme, light; dark mode was taken out (U-76).
+ * This is the only file with raw color values. Components use the Tailwind names mapped below; Tailwind's own
+ * palette and radii are switched off, so a color or radius that isn't a token produces no CSS at all.
+ */
+
+/* the only theme: the app is light, with near-black ink surfaces for the sidebar and panels */
+:root {
+  --bg: #f3f5f9;
+  --surface: #ffffff;
+  --surface-muted: #f3f5f9;
+  --border: #e4e6ee;
+  --divider: #eef0f5;
+  --text: #0a0a0a;
+  --text-muted: #5f6478;
+  --accent: #0a0a0a;
+  --accent-contrast: #ffffff;
+  --link: #2c4bd8;
+  --info: #2446c7;
+  --info-soft: #e8eeff;
+  --success: #137a3f;
+  --success-soft: #e7f7ee;
+  --warning: #8a5a00;
+  --warning-soft: #fff4d6;
+  --danger: #b42318;
+  --danger-soft: #fdecec;
+  --highlight: #ffc72c;
+  --highlight-contrast: #0a0a0a;
+  color-scheme: light;
+}
+
+:root {
+  /* the dark "ink" surfaces (sidebar, panels) are the landing's near-black (U-75) */
+  --ink: #0a0a0a;
+  --ink-2: #18181b;
+  --on-ink: #ffffff;
+
+  /*
+   * Panels are the landing's black glass: near-black with a faint light from the top. Gold and called keep a trace of
+   * their color so the state still reads; the claim card gradients below stay blue and gold.
+   */
+  --grad-panel:
+    radial-gradient(120% 70% at 50% -20%, rgba(255, 255, 255, 0.1) 0%, rgba(255, 255, 255, 0) 60%),
+    linear-gradient(180deg, #141416 0%, #0a0a0a 100%);
+  --grad-hero: var(--grad-panel);
+  --grad-hero-mobile: var(--grad-panel);
+  --grad-sky: var(--grad-panel);
+  /* FraxNet's own panel (identity check) keeps the design canvas's Frax blue (U-75) */
+  --grad-frax:
+    radial-gradient(60% 90% at 88% 10%, rgba(170, 230, 248, 0.85) 0%, rgba(170, 230, 248, 0) 60%),
+    radial-gradient(50% 80% at 10% 110%, rgba(60, 80, 220, 0.9) 0%, rgba(60, 80, 220, 0) 70%),
+    linear-gradient(120deg, #05060f 0%, #0d1450 42%, #2b52c8 74%, #8cc7ee 100%);
+  /* the sign-in screen keeps the design canvas's sky: pale cyan into periwinkle into ink (U-75) */
+  --grad-signin:
+    radial-gradient(70% 50% at 70% 20%, rgba(170, 230, 248, 0.8) 0%, rgba(170, 230, 248, 0) 60%),
+    linear-gradient(180deg, #a9e7f1 0%, #6c84de 38%, #2a2e86 62%, #0a0b24 82%, #05060f 100%);
+  --grad-aside: var(--grad-panel);
+  --grad-paid: var(--grad-panel);
+  --grad-gold:
+    radial-gradient(120% 70% at 50% -20%, rgba(255, 199, 44, 0.16) 0%, rgba(255, 199, 44, 0) 60%),
+    linear-gradient(180deg, #141416 0%, #0a0a0a 100%);
+  --grad-called:
+    radial-gradient(120% 70% at 50% -20%, rgba(255, 120, 100, 0.16) 0%, rgba(255, 120, 100, 0) 60%),
+    linear-gradient(180deg, #141416 0%, #0a0a0a 100%);
+  --grad-avatar: linear-gradient(160deg, #9ed3f2, #2a45c8 60%, #03040c);
+  --grad-card-deep:
+    radial-gradient(80% 45% at 30% 74%, rgba(10, 12, 40, 0.9) 0%, rgba(10, 12, 40, 0) 70%),
+    linear-gradient(180deg, #b6e1f6 0%, #5ca2e4 28%, #1b2b94 58%, #070921 80%, #020308 100%);
+  /* still waiting (draft, in review): frosted silver, so it reads as not yet real money */
+  --grad-card-frost:
+    radial-gradient(90% 60% at 75% 10%, rgba(255, 255, 255, 0.85) 0%, rgba(255, 255, 255, 0) 60%),
+    linear-gradient(180deg, #f1f4f8 0%, #c9d2de 35%, #8391a8 62%, #3d4a61 84%, #1c2433 100%);
+  --grad-card-sky:
+    radial-gradient(90% 60% at 80% 10%, rgba(255, 255, 255, 0.8) 0%, rgba(255, 255, 255, 0) 60%),
+    linear-gradient(180deg, #d8f4fb 0%, #8cc7ee 40%, #4c6fdb 75%, #1b2b94 100%);
+  --grad-card-gold:
+    radial-gradient(90% 60% at 20% 15%, rgba(255, 236, 170, 0.9) 0%, rgba(255, 236, 170, 0) 60%),
+    linear-gradient(180deg, #ffd65a 0%, #eba83a 35%, #6b4a12 70%, #0b0906 100%);
+  /* fades the hex texture into the ink behind it */
+  --fade-ink-up: linear-gradient(180deg, #0a0a0a 0%, rgba(10, 10, 10, 0.25) 60%, rgba(10, 10, 10, 0.6) 100%);
+  --fade-tabbar: linear-gradient(180deg, rgba(243, 245, 249, 0) 0%, rgba(243, 245, 249, 0.92) 60%);
+
+  /* plain black lifts, never a navy glow */
+  --shadow-card: 0 30px 60px -24px rgba(0, 0, 0, 0.6);
+  --shadow-float: 0 12px 30px rgba(0, 0, 0, 0.14), 0 0 0 1px rgba(0, 0, 0, 0.05);
+  --shadow-soft: 0 1px 2px rgba(0, 0, 0, 0.08);
+
+  --font-display: var(--font-figtree), "Figtree", system-ui, sans-serif;
+  --font-body: var(--font-figtree), "Figtree", system-ui, sans-serif;
+  --font-mono: var(--font-geist-mono), "Geist Mono", ui-monospace, monospace;
+  --radius: 14px;
+
+  /* shadcn/ui variables, pointed at the brand tokens */
+  --background: var(--bg);
+  --foreground: var(--text);
+  --card: var(--surface);
+  --card-foreground: var(--text);
+  --popover: var(--surface);
+  --popover-foreground: var(--text);
+  --primary: var(--accent);
+  --primary-foreground: var(--accent-contrast);
+  --secondary: var(--surface-muted);
+  --secondary-foreground: var(--text);
+  --muted: var(--surface-muted);
+  --muted-foreground: var(--text-muted);
+  --destructive: var(--danger);
+  --input: var(--border);
+  --ring: var(--link);
+}
+
+@theme inline {
+  --color-*: initial;
+  --radius-*: initial;
+  --font-*: initial;
+  --shadow-*: initial;
+
+  --color-background: var(--bg);
+  --color-foreground: var(--text);
+  --color-surface: var(--surface);
+  --color-surface-muted: var(--surface-muted);
+  --color-card: var(--surface);
+  --color-card-foreground: var(--text);
+  --color-popover: var(--surface);
+  --color-popover-foreground: var(--text);
+  --color-primary: var(--accent);
+  --color-primary-foreground: var(--accent-contrast);
+  --color-secondary: var(--surface-muted);
+  --color-secondary-foreground: var(--text);
+  --color-muted: var(--surface-muted);
+  --color-muted-foreground: var(--text-muted);
+  /* shadcn's "accent" is a hover surface */
+  --color-accent: var(--surface-muted);
+  --color-accent-foreground: var(--text);
+  --color-brand: var(--accent);
+  --color-brand-contrast: var(--accent-contrast);
+  --color-link: var(--link);
+  --color-info: var(--info);
+  --color-info-soft: var(--info-soft);
+  --color-destructive: var(--danger);
+  --color-success: var(--success);
+  --color-success-soft: var(--success-soft);
+  --color-warning: var(--warning);
+  --color-warning-soft: var(--warning-soft);
+  --color-danger: var(--danger);
+  --color-danger-soft: var(--danger-soft);
+  --color-highlight: var(--highlight);
+  --color-highlight-contrast: var(--highlight-contrast);
+  --color-ink: var(--ink);
+  --color-ink-2: var(--ink-2);
+  --color-on-ink: var(--on-ink);
+  --color-border: var(--border);
+  --color-divider: var(--divider);
+  --color-input: var(--border);
+  --color-ring: var(--link);
+  /* text on a filled status color (destructive button) */
+  --color-on-status: var(--surface);
+  --color-transparent: transparent;
+
+  --font-sans: var(--font-body);
+  --font-display: var(--font-display);
+  --font-mono: var(--font-mono);
+
+  --radius-xs: 8px;
+  --radius-sm: 10px;
+  --radius-md: var(--radius);
+  --radius-lg: 18px;
+  --radius-xl: 20px;
+  --radius-2xl: 24px;
+  --radius-3xl: 28px;
+  --radius-full: 9999px;
+
+  --shadow-card: var(--shadow-card);
+  --shadow-float: var(--shadow-float);
+  --shadow-soft: var(--shadow-soft);
+}
+
+@layer base {
+  * {
+    @apply border-border outline-ring/50;
+  }
+  html {
+    background: var(--bg);
+  }
+  /* in-page links (the landing's #how and #faq) glide instead of jumping; Next turns this off for route changes */
+  @media (prefers-reduced-motion: no-preference) {
+    html {
+      scroll-behavior: smooth;
+    }
+  }
+  body {
+    @apply bg-background text-foreground font-sans antialiased;
+  }
+  /* money is the main content; figures line up */
+  .tabular {
+    font-variant-numeric: tabular-nums;
+  }
+}
+
+/* headings: Figtree, sentence case, tight, as on the landing page */
+@utility display-type {
+  font-family: var(--font-display);
+  font-weight: 500;
+  letter-spacing: -0.01em;
+  line-height: 1.08;
+}
+
+/* big dollar figures: Figtree 600, tight */
+@utility money-type {
+  font-weight: 600;
+  letter-spacing: -0.035em;
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+}
+
+/* small labels above a value ("Due to pool"), quiet and in sentence case */
+@utility eyebrow {
+  font-size: 12px;
+  font-weight: 500;
+  line-height: 1.3;
+}
+
+@utility bg-grad-panel {
+  background: var(--grad-panel);
+}
+@utility bg-grad-hero {
+  background: var(--grad-hero-mobile);
+  @media (width >= 64rem) {
+    background: var(--grad-hero);
+  }
+}
+@utility bg-grad-sky {
+  background: var(--grad-sky);
+}
+@utility bg-grad-frax {
+  background: var(--grad-frax);
+}
+@utility bg-grad-signin {
+  background: var(--grad-signin);
+}
+@utility bg-grad-aside {
+  background: var(--grad-aside);
+}
+@utility bg-grad-paid {
+  background: var(--grad-paid);
+}
+@utility bg-grad-gold {
+  background: var(--grad-gold);
+}
+@utility bg-grad-called {
+  background: var(--grad-called);
+}
+@utility bg-grad-avatar {
+  background: var(--grad-avatar);
+}
+@utility bg-grad-card-deep {
+  background: var(--grad-card-deep);
+}
+/*
+ * Claim card finishes and moments (U-75). Frosted glass while it waits and brushed metal when closed out; the shine
+ * plays once on approval, and the glare follows the pointer on a live card.
+ */
+@utility card-frost-edge {
+  box-shadow:
+    inset 0 0 0 1px rgba(255, 255, 255, 0.55),
+    inset 0 1.5px 0 rgba(255, 255, 255, 0.9);
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.18) 0%, rgba(255, 255, 255, 0) 45%);
+}
+@utility card-brushed {
+  background: repeating-linear-gradient(90deg, rgba(255, 255, 255, 0.07) 0 1px, rgba(0, 0, 0, 0.06) 1px 2px, rgba(0, 0, 0, 0) 2px 4px);
+  mix-blend-mode: overlay;
+}
+@utility card-shine {
+  background: linear-gradient(105deg, rgba(255, 255, 255, 0) 30%, rgba(255, 255, 255, 0.6) 50%, rgba(255, 255, 255, 0) 70%);
+}
+@utility card-glare {
+  background: radial-gradient(45% 40% at var(--glare-x, 50%) var(--glare-y, -10%), rgba(255, 255, 255, 0.32), rgba(255, 255, 255, 0) 70%);
+}
+@utility bg-grad-card-frost {
+  background: var(--grad-card-frost);
+}
+@utility bg-grad-card-sky {
+  background: var(--grad-card-sky);
+}
+@utility bg-grad-card-gold {
+  background: var(--grad-card-gold);
+}
+@utility bg-fade-ink-up {
+  background: var(--fade-ink-up);
+}
+@utility bg-fade-tabbar {
+  background: var(--fade-tabbar);
+}
+
+/*
+ * Film grain over a gradient surface. It sits between the element's background and its content (z-index -1 inside
+ * an isolated stacking context), so children need nothing special. Pair with `relative overflow-hidden`.
+ */
+@utility grain {
+  isolation: isolate;
+  &::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    z-index: -1;
+    pointer-events: none;
+    background-image: url("/images/grain.svg");
+    mix-blend-mode: overlay;
+    opacity: 0.45;
+  }
+}
+
+/*
+ * The landing's film grain, visible on light and dark surfaces alike. Sits between an element's background and its
+ * content; set --noise-opacity to tune it. Pair with relative. noise-dark puts it on pure black at a lower strength,
+ * so dark panels stay as dark as the footer.
+ */
+@utility noise-dark {
+  background-color: #000000;
+  --noise-opacity: 0.16;
+}
+
+@utility noise {
+  isolation: isolate;
+  &::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    z-index: -1;
+    pointer-events: none;
+    border-radius: inherit;
+    background-image: url("/images/landing/noise.svg");
+    background-size: 240px 240px;
+    opacity: var(--noise-opacity, 0.16);
+  }
+}
+
+/* fades an image out toward its bottom edge, for the how-it-works panel's pixel cloud */
+@utility mask-fade-bottom {
+  mask-image: linear-gradient(to bottom, black 55%, transparent 100%);
+}
+
+/* feathers Project One's glow art into the panel around it */
+@utility mask-feather {
+  mask-image: radial-gradient(ellipse 50% 50% at 50% 50%, black 45%, transparent 100%);
+}
+
+/* the dark hex texture from the design, behind the sidebar and the landing hero */
+@utility hex-texture {
+  background-image: url("/images/hex-texture.jpg");
+  background-size: cover;
+  background-position: center;
+}
+
+/*
+ * The sign-in form keeps the design canvas's navy ink instead of the app's near-black, so it sits with the sky panel
+ * beside it (U-75).
+ */
+.signin-ink {
+  --text: #0a0b24;
+  --accent: #0a0b24;
+  --foreground: #0a0b24;
+  --card-foreground: #0a0b24;
+  --popover-foreground: #0a0b24;
+  --primary: #0a0b24;
+  --secondary-foreground: #0a0b24;
+}

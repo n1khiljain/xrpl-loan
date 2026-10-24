@@ -1,0 +1,19 @@
+{
+  "name": "@app/abi",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "generate": "wagmi generate",
+    "test": "vitest run",
+    "typecheck": "tsc -p tsconfig.json"
+  },
+  "devDependencies": {
+    "@wagmi/cli": "^2.10.0",
+    "typescript": "6.0.3",
+    "vitest": "^5.0.1"
+  }
+}

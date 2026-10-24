@@ -1,0 +1,47 @@
+{
+  "network": "fraxtal",
+  "chainId": 252,
+  "rpcUrl": "https://rpc.frax.com",
+  "explorer": "https://fraxscan.com",
+  "safeUi": "https://safe.mainnet.frax.com",
+  "gasFaucet": null,
+  "frxUSD": "0xfc00000000000000000000000000000000000001",
+  "fraxnet": {
+    "appUrl": "https://net.frax.com",
+    "apiBase": null,
+    "oauthIssuer": null,
+    "walletChainId": 252
+  },
+  "fraxMesh": null,
+  "cashOutSink": null,
+  "nftBaseUri": null,
+  "goldskyUrl": null,
+  "roles": {
+    "admin": "SET_AFTER_SAFE_CREATED",
+    "underwriter": "SET_AFTER_SAFE_CREATED",
+    "attester": "SET_AFTER_SAFE_CREATED",
+    "emergencyPauser": "SET_AFTER_SAFE_CREATED"
+  },
+  "params": {
+    "advanceRateBps": 10000,
+    "perClaimCap": "2500000000000000000000",
+    "perOrgCap": "10000000000000000000000",
+    "poolDepositCap": "50000000000000000000000",
+    "feeBps": 0,
+    "overdueWindowSeconds": 15552000,
+    "approvalExpirySeconds": 1209600,
+    "writeOffGraceSeconds": 5184000,
+    "lenderAllowlistEnabled": true
+  },
+  "adapters": {
+    "fraxnet": "real",
+    "gasSponsor": "drip",
+    "cashOut": "mesh",
+    "chainReader": "rpc"
+  },
+  "features": {
+    "simulateAsucPayout": false,
+    "testnetBanner": false
+  },
+  "deployed": {}
+}

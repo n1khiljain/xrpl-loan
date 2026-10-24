@@ -1,0 +1,4 @@
+-- Runs on every `supabase db reset`. Deliberately makes nobody staff: anvil's dev accounts have publicly known keys,
+-- and a reset against a hosted project would install them (security campaign E-6a). On local, `pnpm local`,
+-- `pnpm demo`, the Playwright setup, and the backend e2e test add anvil's first account as the underwriter through
+-- supabase/functions/_tests/local-underwriter.ts. Hosted projects add staff by hand.

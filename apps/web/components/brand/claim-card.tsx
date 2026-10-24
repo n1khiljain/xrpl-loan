@@ -1,0 +1,87 @@
+import type { ReactNode } from "react";
+import { cn } from "@/lib/utils";
+
+export type ClaimCardTone = "frost" | "sky" | "deep" | "gold";
+
+/** Each tone's surface on top of its gradient: glass while waiting, brushed gold when done. */
+const FINISH: Partial<Record<ClaimCardTone, string>> = {
+  frost: "card-frost-edge",
+  gold: "card-brushed",
+};
+
+const TONE: Record<ClaimCardTone, string> = {
+  frost: "bg-grad-card-frost",
+  deep: "bg-grad-card-deep",
+  sky: "bg-grad-card-sky",
+  gold: "bg-grad-card-gold",
+};
+
+/**
+ * The claim as a card: a receivable with its number, state, and amount, from the design canvas. The marks are the
+ * official B@B and frxUSD files; nothing is drawn in code. `size` scales the whole card (1 = 280x400). The number and
+ * state are quiet text in the surrounding font, as on the landing page, not a monospace number and a pill (U-75).
+ * `amountNode` replaces the printed amount (a count-up), and `children` sit over the card for a state's moment
+ * (see LiveClaimCard).
+ */
+export function ClaimCard({
+  claimId,
+  amount,
+  state,
+  org,
+  tone = "deep",
+  scale = 1,
+  amountNode,
+  children,
+  className,
+}: {
+  claimId: string;
+  amount: string;
+  state: string;
+  org: string;
+  tone?: ClaimCardTone;
+  scale?: number;
+  amountNode?: ReactNode;
+  children?: ReactNode;
+  className?: string;
+}) {
+  const finish = FINISH[tone];
+  return (
+    <div
+      role="img"
+      aria-label={`Reimbursement ${claimId}, ${amount}, ${state.toLowerCase()}`}
+      className={cn("grain text-on-ink shadow-card relative shrink-0 overflow-hidden rounded-[22px] font-sans", TONE[tone], className)}
+      style={{ width: 280 * scale, height: 400 * scale, fontSize: 16 * scale }}
+    >
+      {finish ? <span aria-hidden className={cn("pointer-events-none absolute inset-0 rounded-[inherit]", finish)} /> : null}
+      {/* every tone starts pale at the top, so the top labels are ink; the canvas's white failed contrast there */}
+      <span className="text-ink/80 absolute top-[1em] left-[1.125em] text-[0.75em] font-semibold tracking-[0.02em]">
+        {claimId === "DRAFT" ? "Draft" : `No. ${claimId}`}
+      </span>
+      <span className="text-ink/80 absolute top-[1em] right-[1.125em] text-[0.75em] font-semibold tracking-[0.02em]">{sentenceCase(state)}</span>
+      {/* eslint-disable-next-line @next/next/no-img-element */}
+      <img src="/brand/bab-mark-on-dark.png" alt="" className="absolute top-[8.25em] left-[5.5em] w-[6.5em] opacity-95" />
+      <span className="money-type absolute right-[0.64em] bottom-[1.8em] left-[0.64em] text-[1.75em]">{amountNode ?? amount}</span>
+      {/* one row, so a long org name truncates instead of running into the label */}
+      <span className="absolute right-[1.125em] bottom-[1em] left-[1.125em] flex items-center justify-between gap-[0.75em]">
+        <span className="flex min-w-0 items-center gap-[0.5em] text-[0.75em] opacity-90">
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src="/brand/frxusd-mark-on-dark.png" alt="" className="h-[1.5em] w-auto" />
+          <span className="truncate">{org}</span>
+        </span>
+        <span className="shrink-0 text-[0.8em] font-semibold">Reimbursement</span>
+      </span>
+      {children}
+    </div>
+  );
+}
+
+/** "Closed out" from "CLOSED OUT". */
+function sentenceCase(label: string): string {
+  return label.charAt(0) + label.slice(1).toLowerCase();
+}
+
+/** "0012" from 12, the way claim cards number claims. */
+export function cardNumber(id: bigint | number | string | null | undefined): string {
+  if (id === null || id === undefined || id === "") return "DRAFT";
+  return String(id).padStart(4, "0");
+}

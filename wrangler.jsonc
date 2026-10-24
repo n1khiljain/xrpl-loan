@@ -1,0 +1,13 @@
+// The hosted testnet preview: the static export in apps/web/out served as an assets-only Cloudflare Worker.
+// docs/RUNBOOK.md "Hosted preview" has the build command and the NEXT_PUBLIC_* values it needs.
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "fraxnet-college",
+  "compatibility_date": "2026-09-01",
+  "assets": {
+    "directory": "./apps/web/out",
+    // the export writes claim/index.html for /claim/ and a 404.html (FR-F1)
+    "html_handling": "auto-trailing-slash",
+    "not_found_handling": "404-page"
+  }
+}

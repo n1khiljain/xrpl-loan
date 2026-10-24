@@ -1,0 +1,25 @@
+node_modules/
+.pnpm-store/
+.env
+.env.*
+!.env.example
+.DS_Store
+*.log
+
+# foundry
+contracts/out/
+contracts/cache/
+contracts/broadcast/*/31337/
+contracts/lcov.info
+contracts/report.md
+
+# next
+apps/web/.next/
+apps/web/out/
+
+# supabase
+supabase/.branches/
+supabase/.temp/
+
+# local demo sessions for the sign-in picker (scripts/local-demo.ts)
+apps/web/public/local-demo-sessions.json

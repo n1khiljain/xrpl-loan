@@ -1,0 +1,27 @@
+{
+  "name": "@app/adapters",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./index.ts",
+    "./fraxnet": "./fraxnet/index.ts",
+    "./gas-sponsor": "./gas-sponsor/index.ts",
+    "./cash-out": "./cash-out/index.ts",
+    "./chain-reader": "./chain-reader/index.ts"
+  },
+  "scripts": {
+    "test": "vitest run",
+    "typecheck": "tsc -p tsconfig.json && tsc -p tsconfig.test.json"
+  },
+  "dependencies": {
+    "@app/abi": "workspace:*",
+    "@app/config": "workspace:*",
+    "viem": "^2.56.8"
+  },
+  "devDependencies": {
+    "@types/node": "^24.13.6",
+    "typescript": "6.0.3",
+    "vitest": "^5.0.1"
+  }
+}
