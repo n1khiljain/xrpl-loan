@@ -1,5 +1,5 @@
-import type { ClaimCardTone } from "@/components/brand/claim-card";
-import type { CardMoment } from "@/components/brand/live-claim-card";
+import type { ReceivableCardTone } from "@/components/brand/receivable-card";
+import type { CardMoment } from "@/components/brand/live-receivable-card";
 import { cn } from "@/lib/utils";
 
 export type DisplayState =
@@ -15,13 +15,12 @@ export type DisplayState =
   | "Cancelled";
 
 /** Plain-language names. The chip always shows the name, so color is never the only signal (BRAND.md). */
-// UNCERTAIN: U-71 (student-facing words differ from the PRD's claim and settle)
 export const STATE_LABEL: Record<DisplayState, string> = {
   Draft: "Draft",
   Submitted: "In review",
   Approved: "Approved",
   Funded: "Paid",
-  GuarantorCalled: "Officer asked to cover",
+  GuarantorCalled: "Approver asked to cover",
   Settled: "Closed out",
   Recovered: "Closed out",
   WrittenOff: "Written off",
@@ -30,10 +29,10 @@ export const STATE_LABEL: Record<DisplayState, string> = {
 };
 
 /**
- * The claim card's color for each state, so the card itself shows how far along it is: frosted silver while it's
- * waiting, sky blue once approved, deep blue once paid, gold when it's closed out (U-75).
+ * The receivable card's color for each state, so the card itself shows how far along it is: frosted silver while it's
+ * waiting, sky blue once approved, deep blue once paid, gold when it's closed out.
  */
-export const CARD_TONE: Record<DisplayState, ClaimCardTone> = {
+export const CARD_TONE: Record<DisplayState, ReceivableCardTone> = {
   Draft: "frost",
   Submitted: "frost",
   Approved: "sky",

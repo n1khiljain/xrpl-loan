@@ -1,19 +1,17 @@
 "use client";
 
 import { useQueryClient } from "@tanstack/react-query";
-import { bindingMessage } from "@app/adapters";
 import { ArrowLeft } from "lucide-react";
 import Link from "next/link";
 import { type ReactNode, useState } from "react";
-import { useSignMessage } from "wagmi";
-import { ClaimCard } from "@/components/brand/claim-card";
+import { ReceivableCard } from "@/components/brand/receivable-card";
 import { ClientLockup } from "@/components/brand/logos-context";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useCall, useMe } from "@/hooks/use-api";
-import { config } from "@/lib/config";
+import { PUBLIC_ENV } from "@/lib/env";
 import { friendlyError } from "@/lib/errors";
 import { useSession } from "@/lib/session/context";
 import type { MeResponse } from "@/lib/types";
@@ -54,7 +52,7 @@ const COPY: Record<Mode, { heading: string; blurb: string; submit: string }> = {
   },
   "sign-up": {
     heading: "Create your account",
-    blurb: "Use your Berkeley Google account or email. We make a wallet for you, no crypto setup needed.",
+    blurb: "Use your Google account or email. We make an XRP Ledger wallet for you, no crypto setup needed.",
     submit: "Create account",
   },
 };
@@ -120,14 +118,14 @@ function SignIn({ reason }: { reason: string }) {
         <div className="flex flex-1 items-center justify-center pb-10 lg:pb-0">
           <div className="-rotate-6">
             <span className="lg:hidden">
-              <ClaimCard claimId="0001" amount="$0.00" state="YOURS NEXT" org="Your org" scale={0.5} />
+              <ReceivableCard receivableId="0001" amount="$0.00" state="YOURS NEXT" org="Your customer" kind="Invoice" scale={0.5} />
             </span>
             <span className="hidden lg:block">
-              <ClaimCard claimId="0001" amount="$0.00" state="YOURS NEXT" org="Your org" />
+              <ReceivableCard receivableId="0001" amount="$0.00" state="YOURS NEXT" org="Your customer" kind="Invoice" />
             </span>
           </div>
         </div>
-        <h2 className="display-type hidden max-w-md text-[38px] lg:block">Stop waiting on reimbursements</h2>
+        <h2 className="display-type hidden max-w-md text-[38px] lg:block">Stop waiting on payments</h2>
       </section>
       <section className="signin-ink bg-surface text-foreground relative -mt-8 flex flex-1 flex-col justify-center gap-5 rounded-t-3xl px-[18px] pt-6 pb-10 lg:mt-0 lg:rounded-none lg:px-[120px]">
         <span aria-hidden className="bg-border -mt-2 h-1 w-9 self-center rounded-full lg:hidden" />
@@ -173,7 +171,7 @@ function SignIn({ reason }: { reason: string }) {
                 <Label htmlFor="sign-in-email" className="text-[13px] font-bold">
                   Email
                 </Label>
-                <Input id="sign-in-email" type="email" autoComplete="email" required value={email} onChange={(e) => setEmail(e.target.value)} placeholder="you@berkeley.edu" className="h-[54px] rounded-lg text-base" />
+                <Input id="sign-in-email" type="email" autoComplete="email" required value={email} onChange={(e) => setEmail(e.target.value)} placeholder="you@example.com" className="h-[54px] rounded-lg text-base" />
                 <Button type="submit" variant="outline" size="lg" className="w-full" data-testid="gate-sign-in">
                   {busy === "send" ? "Sending..." : "Email me a code"}
                 </Button>
@@ -217,22 +215,11 @@ function SignIn({ reason }: { reason: string }) {
             </form>
           )}
           {error || session.loginError ? <ErrorNotice>{error ?? signInError(new Error(session.loginError ?? ""), mode)}</ErrorNotice> : null}
-          <div className="text-muted-foreground flex items-center gap-3 text-[11px] font-bold tracking-[0.1em]">
-            <span className="bg-border h-px flex-1" />
-            LENDERS AND ADMINS
-            <span className="bg-border h-px flex-1" />
-          </div>
-          <Button type="button" variant="ghost" size="lg" className="w-full" onClick={() => session.login({ method: "wallet" })}>
-            Connect a wallet or Safe
-          </Button>
         </fieldset>
-        {config.network === "local" ? (
-          <LocalDemoPicker />
-        ) : session.unavailableReason ? (
-          <ErrorNotice title="Sign-in isn't available">{session.unavailableReason}</ErrorNotice>
-        ) : null}
+        {session.unavailableReason ? <ErrorNotice title="Sign-in isn't available">{session.unavailableReason}</ErrorNotice> : null}
+        {PUBLIC_ENV.demoSessions ? <LocalDemoPicker /> : null}
         <p className="text-muted-foreground text-center text-[11px] leading-normal lg:text-left lg:text-xs">
-          By continuing you agree to the pilot terms. Identity checks run on FraxNet. You stay signed in on this device for 30 days.
+          Test network only: no real money moves. You stay signed in on this device for 30 days.
         </p>
       </section>
     </div>
@@ -240,31 +227,30 @@ function SignIn({ reason }: { reason: string }) {
 }
 
 /**
- * First visit only: their name, and a signature that links the wallet to the account (U-50). The email is the one
- * they signed in with, so it isn't asked again; only a wallet login, which has none, gets an optional field.
+ * First visit only: their name. Saving makes the account and its custodial XRP Ledger wallet on the server; the
+ * identity token proves the email they signed in with, so it isn't asked again.
  */
-function LinkWallet() {
+function SetUpAccount() {
   const session = useSession();
   const call = useCall();
   const queryClient = useQueryClient();
-  const { signMessageAsync } = useSignMessage();
   const [email, setEmail] = useState("");
   const [name, setName] = useState(session.name ?? "");
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
-  async function link() {
-    if (!session.address || !session.userId) return;
+  async function setUp() {
     setBusy(true);
     setError(null);
     try {
-      const issuedAt = new Date().toISOString();
-      const signature = await signMessageAsync({
-        message: bindingMessage({ privyUserId: session.userId, wallet: session.address, issuedAt }),
-      });
+      const identityToken = await session.getIdentityToken();
       await call<MeResponse>("me", {
         method: "POST",
-        body: { wallet: session.address, signature, issuedAt, email: session.email ?? (email.trim() || null), displayName: name.trim() || null },
+        body: {
+          ...(identityToken ? { identityToken } : {}),
+          email: session.email ?? (email.trim() || null),
+          displayName: name.trim() || null,
+        },
       });
       await queryClient.invalidateQueries({ queryKey: ["me"] });
     } catch (e) {
@@ -279,14 +265,14 @@ function LinkWallet() {
       className="bg-card mx-auto flex w-full max-w-xl flex-col gap-5 rounded-3xl p-5 sm:p-7"
       onSubmit={(e) => {
         e.preventDefault();
-        void link();
+        void setUp();
       }}
     >
       <div className="space-y-2">
         <span className="text-muted-foreground text-xs font-medium">One last thing</span>
         <h2 className="display-type text-3xl">What should we call you?</h2>
         <p className="text-muted-foreground text-sm leading-relaxed">
-          Your name shows on your reimbursements and sign-offs.
+          Your name shows on your loans and sign-offs.
           {session.email ? (
             <>
               {" "}
@@ -317,9 +303,10 @@ function LinkWallet() {
           <Input id="email" type="email" value={email} onChange={(e) => setEmail(e.target.value)} autoComplete="email" />
         </div>
       )}
+      <p className="text-muted-foreground text-xs">We&apos;ll make your XRP Ledger wallet and fund it with test XRP. It takes a few seconds.</p>
       {error ? <ErrorNotice>{error}</ErrorNotice> : null}
       <Button type="submit" size="lg" disabled={busy || !name.trim()} className="w-full sm:w-auto sm:self-start">
-        {busy ? "Setting up..." : "Continue"}
+        {busy ? "Making your wallet..." : "Continue"}
       </Button>
     </form>
   );
@@ -335,8 +322,8 @@ export function AccountGate({ children, reason }: { children: (me: MeResponse) =
 
   if (session.status === "loading") return <Loading />;
   if (session.status === "signed-out") return <SignIn reason={reason} />;
-  if (me.isPending || !session.address) return <Loading />;
+  if (me.isPending) return <Loading />;
   if (me.isError) return <ErrorNotice>{friendlyError(me.error)}</ErrorNotice>;
-  if (!me.data.profile) return <LinkWallet />;
+  if (!me.data.profile) return <SetUpAccount />;
   return <>{children(me.data)}</>;
 }

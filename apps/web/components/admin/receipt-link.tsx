@@ -5,7 +5,7 @@ import { FileText } from "lucide-react";
 import { useCall } from "@/hooks/use-api";
 import { storageUrl } from "@/lib/api";
 
-/** Opens one receipt through a five-minute signed URL (FR-B3). */
+/** Opens one receipt through a five-minute signed URL. */
 export function ReceiptLink({ documentId, index }: { documentId: string; index: number }) {
   const call = useCall();
   const open = useMutation({

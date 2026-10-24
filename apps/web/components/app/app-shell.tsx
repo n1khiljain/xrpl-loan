@@ -10,7 +10,6 @@ import {
   House,
   IdCard,
   Inbox,
-  Landmark,
   LogOut,
   type LucideIcon,
   Plus,
@@ -18,7 +17,6 @@ import {
   SlidersHorizontal,
   UserRound,
   Users,
-  Wallet,
 } from "lucide-react";
 import Link from "next/link";
 import { usePathname, useSearchParams } from "next/navigation";
@@ -26,9 +24,8 @@ import { type ReactNode, Suspense } from "react";
 import type { LogoFiles } from "@/components/brand/lockup-view";
 import { LockupView } from "@/components/brand/lockup-view";
 import { useCall, useMe } from "@/hooks/use-api";
-import { shortAddress } from "@/lib/format";
 import { useSession } from "@/lib/session/context";
-import type { OffchainClaim } from "@/lib/types";
+import type { OffchainReceivable } from "@/lib/types";
 import { Avatar } from "./avatar";
 import { cn } from "@/lib/utils";
 
@@ -45,9 +42,9 @@ export function areaFor(pathname: string): Area {
 
 function activeKey(pathname: string, view: string | null): string {
   const p = pathname.replace(/\/$/, "") || "/";
-  if (p === "/claims") return view === "guaranties" ? "guaranties" : view === "cash-out" ? "cashout" : view === "claims" ? "claims" : "home";
-  if (p === "/claims/new") return "new";
-  if (p === "/claim") return "claims";
+  if (p === "/receivables") return view === "guaranties" ? "guaranties" : view === "receivables" ? "receivables" : "home";
+  if (p === "/receivables/new") return "new";
+  if (p === "/receivable") return "receivables";
   if (p === "/guarantee") return "guaranties";
   if (p === "/onboard") return "verify";
   if (p === "/lend") return view === "deposit" ? "deposit" : "pool";
@@ -60,10 +57,10 @@ function useGuarantyRequests(wallet: string | undefined) {
   const call = useCall();
   const session = useSession();
   return useQuery({
-    queryKey: ["claims", "mine", "raw"],
+    queryKey: ["receivables", "mine", "raw"],
     enabled: session.status === "signed-in" && Boolean(wallet),
-    queryFn: () => call<{ claims: OffchainClaim[] }>("claims"),
-    select: (data) => data.claims.filter((c) => c.guarantorWallet === wallet && c.packetHash && !c.guarantySigned).length,
+    queryFn: () => call<{ receivables: OffchainReceivable[] }>("receivables"),
+    select: (data) => data.receivables.filter((c) => c.guarantorWallet === wallet && c.packetHash && !c.guarantySigned).length,
     staleTime: 30_000,
   });
 }
@@ -71,7 +68,7 @@ function useGuarantyRequests(wallet: string | undefined) {
 function navFor(area: Area, guaranties: number): NavItem[] {
   if (area === "lender") {
     return [
-      { key: "pool", label: "Pool", href: "/lend/", icon: ChartColumn },
+      { key: "pool", label: "Vault", href: "/lend/", icon: ChartColumn },
       { key: "deposit", label: "Deposit and withdraw", href: "/lend/?view=deposit", icon: ArrowDownToLine, primary: true },
     ];
   }
@@ -80,22 +77,20 @@ function navFor(area: Area, guaranties: number): NavItem[] {
       { key: "queue", label: "Review queue", href: "/admin/", icon: Inbox },
       { key: "exceptions", label: "Exceptions", href: "/admin/exceptions/", icon: AlertTriangle },
       { key: "params", label: "Parameters", href: "/admin/params/", icon: SlidersHorizontal },
-      { key: "orgs", label: "Orgs and officers", href: "/admin/orgs/", icon: Users },
+      { key: "orgs", label: "Businesses and approvers", href: "/admin/orgs/", icon: Users },
       { key: "kyc", label: "KYC status", href: "/admin/kyc/", icon: IdCard },
-      { key: "lenders", label: "Lenders", href: "/admin/lenders/", icon: Wallet },
     ];
   }
   return [
-    { key: "home", label: "Home", href: "/claims/", icon: House },
-    { key: "new", label: "Get reimbursed now", href: "/claims/new/", icon: Plus, primary: true },
-    { key: "claims", label: "My reimbursements", href: "/claims/?view=claims", icon: FileText },
-    { key: "guaranties", label: "Sign-offs", href: "/claims/?view=guaranties", icon: Handshake, badge: guaranties || undefined },
-    { key: "cashout", label: "Cash out", href: "/claims/?view=cash-out", icon: Landmark },
+    { key: "home", label: "Home", href: "/receivables/", icon: House },
+    { key: "new", label: "Expedite a payment", href: "/receivables/new/", icon: Plus, primary: true },
+    { key: "receivables", label: "My loans", href: "/receivables/?view=receivables", icon: FileText },
+    { key: "guaranties", label: "Sign-offs", href: "/receivables/?view=guaranties", icon: Handshake, badge: guaranties || undefined },
     { key: "verify", label: "Verification", href: "/onboard/", icon: ShieldCheck },
   ];
 }
 
-const SECTION: Record<Area, string> = { member: "Member", lender: "Lender", admin: "Admin · Frax Safe" };
+const SECTION: Record<Area, string> = { member: "Borrower", lender: "Lender", admin: "Admin" };
 
 
 function Sidebar({ area, logos, active }: { area: Area; logos: LogoFiles; active: string }) {
@@ -105,11 +100,10 @@ function Sidebar({ area, logos, active }: { area: Area; logos: LogoFiles; active
   const guaranties = useGuarantyRequests(wallet);
   const items = navFor(area, guaranties.data ?? 0);
   const name = me.data?.profile?.displayName ?? (session.status === "signed-in" ? "Signed in" : "Not signed in");
-  // member screens never show an address (FR-F8); lender and staff screens can
-  const meta = area === "member" ? (me.data?.profile?.email ?? "Member") : session.address ? shortAddress(session.address) : SECTION[area];
+  const meta = me.data?.profile?.email ?? SECTION[area];
   const others: { href: string; label: string }[] = [
-    ...(area !== "member" ? [{ href: "/claims/", label: "Member home" }] : []),
-    ...(area !== "lender" ? [{ href: "/lend/", label: "Lend to the pool" }] : []),
+    ...(area !== "member" ? [{ href: "/receivables/", label: "Member home" }] : []),
+    ...(area !== "lender" ? [{ href: "/lend/", label: "Lend to the vault" }] : []),
     ...(area !== "admin" && me.data?.staffRole ? [{ href: "/admin/", label: "Admin" }] : []),
   ];
 
@@ -119,7 +113,7 @@ function Sidebar({ area, logos, active }: { area: Area; logos: LogoFiles; active
       <nav aria-label={SECTION[area]} className="text-on-ink sticky top-0 flex h-screen flex-col overflow-hidden px-4 pt-6 pb-4">
         <div aria-hidden className="hex-texture pointer-events-none absolute inset-x-0 bottom-0 h-[360px] opacity-55" />
         <div aria-hidden className="bg-fade-ink-up pointer-events-none absolute inset-x-0 bottom-0 h-[360px]" />
-        <Link href={area === "admin" ? "/admin/" : area === "lender" ? "/lend/" : "/claims/"} className="relative px-2 text-2xl" aria-label="Home">
+        <Link href={area === "admin" ? "/admin/" : area === "lender" ? "/lend/" : "/receivables/"} className="relative px-2 text-2xl" aria-label="Home">
           <LockupView files={logos} tone="on-dark" />
         </Link>
         <div className="eyebrow text-on-ink/50 relative mx-2 mt-7 mb-2.5">{SECTION[area]}</div>
@@ -163,7 +157,7 @@ function Sidebar({ area, logos, active }: { area: Area; logos: LogoFiles; active
             <Avatar name={me.data?.profile?.displayName} onInk />
             <span className="flex min-w-0 flex-1 flex-col gap-0.5">
               <span className="truncate text-[13px] font-semibold">{name}</span>
-              <span className={cn("text-on-ink/60 truncate text-[11px]", area !== "member" && "font-mono")}>{meta}</span>
+              <span className="text-on-ink/60 truncate text-[11px]">{meta}</span>
             </span>
             {session.status === "signed-in" ? (
               <button
@@ -177,7 +171,7 @@ function Sidebar({ area, logos, active }: { area: Area; logos: LogoFiles; active
               </button>
             ) : null}
           </div>
-          <p className="text-on-ink/45 px-1 text-[10px] leading-snug">Built by Blockchain at Berkeley in collaboration with Frax. frxUSD is issued by Frax.</p>
+          <p className="text-on-ink/45 px-1 text-[10px] leading-snug">Built by Blockchain at Berkeley on the XRP Ledger. Test network only.</p>
         </div>
       </nav>
     </div>
@@ -188,7 +182,7 @@ function TabBar({ area, active }: { area: Area; active: string }) {
   const me = useMe();
   const guaranties = useGuarantyRequests(me.data?.profile?.wallet);
   const all = navFor(area, guaranties.data ?? 0);
-  // the phone bar keeps five: Home, My claims, Sell, Guaranties, and Me (verification and profile)
+  // the phone bar keeps five: Home, My receivables, Sell, Guaranties, and Me (verification and profile)
   const items =
     area === "member"
       ? [all[0], all[2], all[1], all[3], { key: "verify", label: "Verification and profile", href: "/onboard/", icon: UserRound }]

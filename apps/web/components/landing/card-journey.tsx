@@ -2,23 +2,22 @@
 
 import { motion, useInView, useReducedMotion } from "motion/react";
 import { useEffect, useRef, useState } from "react";
-import type { ClaimCardTone } from "@/components/brand/claim-card";
-import { type CardMoment, LiveClaimCard } from "@/components/brand/live-claim-card";
+import type { ReceivableCardTone } from "@/components/brand/receivable-card";
+import { type CardMoment, LiveReceivableCard } from "@/components/brand/live-receivable-card";
 import { EASE, Swap } from "@/components/motion";
 import { cn } from "@/lib/utils";
 
 const STEP_MS = 2600;
 
-// the app's own claim card, walked through the states a member sees (labels and colors match state-chip.tsx)
-const STAGES: { state: string; label: string; tone: ClaimCardTone; moment?: CardMoment; caption: string }[] = [
-  { state: "IN REVIEW", label: "In review", tone: "frost", caption: "Your officer signed off. Blockchain at Berkeley checks the receipts." },
-  { state: "APPROVED", label: "Approved", tone: "sky", moment: "approved", caption: "Approved. Frax is ready to pay you." },
-  // UNCERTAIN: U-73
-  { state: "PAID", label: "Paid", tone: "deep", moment: "paid", caption: "Frax pays you in under 24 hours." },
-  { state: "CLOSED OUT", label: "Closed out", tone: "gold", moment: "closed", caption: "ASUC pays you, you send it to Frax, and you're done." },
+// the app's own loan card, walked through the states a borrower sees (labels and colors match state-chip.tsx)
+const STAGES: { state: string; label: string; tone: ReceivableCardTone; moment?: CardMoment; caption: string }[] = [
+  { state: "IN REVIEW", label: "In review", tone: "frost", caption: "Your approver signed off. A reviewer checks the payment." },
+  { state: "APPROVED", label: "Approved", tone: "sky", moment: "approved", caption: "Approved. The vault is ready to pay you." },
+  { state: "PAID", label: "Paid", tone: "deep", moment: "paid", caption: "The vault pays you within a day." },
+  { state: "CLOSED OUT", label: "Closed out", tone: "gold", moment: "closed", caption: "The payment arrives, you pay the loan back with interest, and you're done." },
 ];
 
-/** One reimbursement, start to finish. Advances on its own while on screen; the steps are also buttons. */
+/** One loan, start to finish. Advances on its own while on screen; the steps are also buttons. */
 export function CardJourney() {
   const [current, setCurrent] = useState(0);
   const reduced = useReducedMotion();
@@ -35,8 +34,7 @@ export function CardJourney() {
 
   return (
     <div ref={ref} className="flex w-full max-w-4xl flex-col items-center gap-10 px-4 lg:gap-14">
-      {/* UNCERTAIN: U-73 */}
-      <h2 className="display-type text-center text-3xl sm:text-4xl lg:text-5xl xl:text-6xl">From receipt to paid, in a day</h2>
+      <h2 className="display-type text-center text-3xl sm:text-4xl lg:text-5xl xl:text-6xl">From request to funded, in a day</h2>
 
       {/* grows in on a soft spring the first time it scrolls into view, like the dashboard shot on the first landing */}
       <motion.div
@@ -51,13 +49,13 @@ export function CardJourney() {
             { scale: 1, className: "hidden sm:block" },
             { scale: 0.8, className: "sm:hidden" },
           ].map((size) => (
-            <LiveClaimCard
+            <LiveReceivableCard
               key={size.scale}
-              claimId="0014"
+              receivableId="0014"
               amount="$240.00"
               amountValue={240}
               state={stage.state}
-              org="Machine Learning at Berkeley"
+              org="Northwind Supply"
               tone={stage.tone}
               moment={stage.moment}
               scale={size.scale}
@@ -68,7 +66,7 @@ export function CardJourney() {
       </motion.div>
 
       <div className="flex w-full flex-col items-center gap-5">
-        <div role="tablist" aria-label="Reimbursement states" className="grid w-full grid-cols-4 gap-2 sm:gap-3">
+        <div role="tablist" aria-label="Loan states" className="grid w-full grid-cols-4 gap-2 sm:gap-3">
           {STAGES.map((s, i) => (
             <button
               key={s.state}

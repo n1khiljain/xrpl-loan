@@ -3,8 +3,6 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import dynamic from "next/dynamic";
 import { type ReactNode, useState, useSyncExternalStore } from "react";
-import { WagmiProvider, createConfig, http } from "wagmi";
-import { chain, config } from "../config";
 import { PUBLIC_ENV } from "../env";
 import { SIGNED_OUT, SessionContext } from "./context";
 import { DevSessionProvider } from "./dev-provider";
@@ -13,23 +11,17 @@ import { DEV_SESSION_KEY, type DevSessionSeed } from "./types";
 // Privy touches window at import, so it loads in the browser only
 const PrivySessionProvider = dynamic(() => import("./privy-provider").then((m) => m.PrivySessionProvider), { ssr: false });
 
-const readOnlyWagmi = createConfig({ chains: [chain], transports: { [chain.id]: http(config.rpcUrl) }, ssr: true });
-
 type ModeKind = "pending" | "dev" | "privy" | "none";
 
-function storedSeed(): DevSessionSeed | undefined {
+function devSeed(): DevSessionSeed | undefined {
+  // the demo session is honored only in builds made with NEXT_PUBLIC_DEMO_SESSIONS=true
+  if (!PUBLIC_ENV.demoSessions || typeof window === "undefined") return undefined;
   try {
     const raw = window.sessionStorage.getItem(DEV_SESSION_KEY);
     return raw ? (JSON.parse(raw) as DevSessionSeed) : undefined;
   } catch {
     return undefined;
   }
-}
-
-function devSeed(): DevSessionSeed | undefined {
-  // UNCERTAIN: U-62 (the injected session is honored on the local network only)
-  if (config.network !== "local" || typeof window === "undefined") return undefined;
-  return window.__FRAXNET_DEV_SESSION__ ?? storedSeed();
 }
 
 function modeKind(): ModeKind {
@@ -53,13 +45,15 @@ export function AppProviders({ children }: { children: ReactNode }) {
   else {
     const session =
       mode === "none"
-        ? { ...SIGNED_OUT, status: "signed-out" as const, unavailableReason: "Sign-in isn't set up in this build (NEXT_PUBLIC_PRIVY_APP_ID)." }
+        ? {
+            ...SIGNED_OUT,
+            status: "signed-out" as const,
+            unavailableReason: PUBLIC_ENV.demoSessions
+              ? "Google and email sign-in need a Privy app, and this local build has none. Sign in as a demo person below, or set NEXT_PUBLIC_PRIVY_APP_ID (see README)."
+              : "Sign-in isn't set up in this build (NEXT_PUBLIC_PRIVY_APP_ID).",
+          }
         : SIGNED_OUT;
-    inner = (
-      <WagmiProvider config={readOnlyWagmi}>
-        <SessionContext.Provider value={session}>{children}</SessionContext.Provider>
-      </WagmiProvider>
-    );
+    inner = <SessionContext.Provider value={session}>{children}</SessionContext.Provider>;
   }
   return <QueryClientProvider client={queryClient}>{inner}</QueryClientProvider>;
 }

@@ -11,7 +11,7 @@ export function logoFiles(dir = join(process.cwd(), "public", "brand")): LogoFil
     for (const ext of ["svg", "png"]) if (existsSync(join(dir, `${stem}.${ext}`))) return `/brand/${stem}.${ext}`;
     return null;
   };
-  return { bab: find("bab-logo"), babOnDark: find("bab-logo-on-dark"), frax: find("frax-logo"), fraxOnDark: find("frax-logo-on-dark") };
+  return { bab: find("bab-logo"), babOnDark: find("bab-logo-on-dark") };
 }
 
 /** Server component; pass the result of logoFiles() down to client components that need the lockup. */

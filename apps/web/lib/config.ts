@@ -1,23 +1,23 @@
-import { type DeployedContracts, type NetworkConfig, isTestnet, loadNetworkConfig } from "@app/config";
-import { chainFromConfig } from "@app/adapters";
+import { type NetworkConfig, isSetUp, isTestnet, loadNetworkConfig } from "@app/config";
+import { explorerAccount, explorerTx } from "@app/adapters";
 import { PUBLIC_ENV } from "./env";
 
-/** The network this build targets (FR-F3). Addresses come from deployments/<network>.json, never hand-copied (FR-F11). */
+/** The network this build targets. Addresses and ledger IDs come from deployments/<network>.json, never hand-copied. */
 export const config: NetworkConfig = loadNetworkConfig(PUBLIC_ENV.network);
-export const chain = chainFromConfig(config);
-/** From the chain ID, never the file (security campaign E-1). */
+/** From the network ID, never the file. */
 export const onTestnet = isTestnet(config);
+/** Whether `pnpm xrpl:setup` has created the vault, broker, domain, and issuer on this network. */
+export const ledgerReady = isSetUp(config);
 
-/** Deployed addresses, or null until Deploy.s.sol has run for this network. */
-export function deployedContracts(): DeployedContracts | null {
-  const d = config.deployed;
-  if (d.block === undefined || !d.frxUSD || !d.orgRegistry || !d.claimRegistry || !d.pool || !d.claimNft) return null;
-  return d as DeployedContracts;
-}
+/** The loan asset's name as people see it, e.g. "RLUSD". */
+export const ASSET = config.asset.code;
+
+export const txUrl = (hash: string) => explorerTx(config, hash);
+export const accountUrl = (address: string) => explorerAccount(config, address);
 
 export const params = {
   advanceRateBps: BigInt(config.params.advanceRateBps),
-  perClaimCap: BigInt(config.params.perClaimCap),
+  perReceivableCap: BigInt(config.params.perReceivableCap),
   feeBps: BigInt(config.params.feeBps),
   overdueWindowSeconds: config.params.overdueWindowSeconds,
   approvalExpirySeconds: config.params.approvalExpirySeconds,

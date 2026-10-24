@@ -1,5 +1,5 @@
 {
   "extends": "../../tsconfig.base.json",
   "compilerOptions": { "types": [] },
-  "include": ["index.ts", "shared", "fraxnet", "gas-sponsor", "cash-out", "chain-reader"]
+  "include": ["index.ts", "shared", "test"]
 }

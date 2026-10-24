@@ -1,0 +1,37 @@
+{
+  "network": "xrpl-devnet",
+  "networkId": 2,
+  "wsUrl": "wss://s.devnet.rippletest.net:51233",
+  "rpcUrl": "https://s.devnet.rippletest.net:51234",
+  "faucetUrl": "https://faucet.devnet.rippletest.net/accounts",
+  "explorer": "https://devnet.xrpl.org",
+  "asset": {
+    "code": "RLUSD",
+    "currency": "524C555344000000000000000000000000000000",
+    "issuer": "rwbbPno21X7bg348R1yG4oAY9qwreGb5Qb",
+    "standIn": true
+  },
+  "params": {
+    "advanceRateBps": 10000,
+    "perReceivableCap": "2500000000",
+    "perOrgCap": "10000000000",
+    "poolDepositCap": "50000000000",
+    "feeBps": 500,
+    "overdueWindowSeconds": 15552000,
+    "approvalExpirySeconds": 1209600,
+    "writeOffGraceSeconds": 5184000
+  },
+  "features": {
+    "simulatePayment": true,
+    "testnetBanner": true
+  },
+  "ledger": {
+    "broker": "rEw4L3FT1qvXypkDsyDikZhAVuT1b4xNz3",
+    "credentialIssuer": "rEw4L3FT1qvXypkDsyDikZhAVuT1b4xNz3",
+    "repaymentAccount": "rEw4L3FT1qvXypkDsyDikZhAVuT1b4xNz3",
+    "credentialType": "496E7374616C6C",
+    "domainId": "874905367C314F104A83FF8F8E931E51F4FD9EA3C0E59ABE028B3847B35BB31E",
+    "vaultId": "BFFD8C8A7717C393A907995291EE77DD1E8EF37E3F09378E49FDD6DD98C68EA5",
+    "loanBrokerId": "4E6E73508881B3E6700BB1407A387FF874E5C6E13C5B5CD6B270653D8557EA7F"
+  }
+}

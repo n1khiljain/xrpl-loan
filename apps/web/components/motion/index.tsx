@@ -4,7 +4,7 @@ import { AnimatePresence, animate, MotionConfig, motion, useInView, useMotionVal
 import { type ReactNode, useEffect, useLayoutEffect, useRef, useState } from "react";
 
 /*
- * The landing page's motion, shared with the app (U-75). Each piece is small and does one thing; use one only where
+ * The landing page's motion, shared with the app. Each piece is small and does one thing; use one only where
  * the movement tells someone what just happened. Reduced motion is honored once, at the root.
  */
 
@@ -33,7 +33,7 @@ export function RiseIn({ children, delay = 0, className }: { children: ReactNode
 
 /**
  * Swaps one thing for the next when `id` changes: the old one tips up and out, the new one rises in. This is the
- * landing's claim card move, for anything that changes state in place.
+ * landing's receivable card move, for anything that changes state in place.
  */
 export function Swap({ id, children, className }: { id: string; children: ReactNode; className?: string }) {
   return (

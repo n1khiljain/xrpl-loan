@@ -1,56 +1,61 @@
 import {
-  type Claim,
-  type ClaimDocument,
-  type ClaimPatch,
-  type ClaimScope,
-  type ClaimStatus,
+  type Receivable,
+  type ReceivableDocument,
+  type ReceivablePatch,
+  type ReceivableScope,
+  type ReceivableStatus,
   type Db,
-  type FraxnetConnection,
-  type FraxnetConnectionPatch,
-  type FraxnetOAuthState,
   type GuarantorInvite,
-  type NewClaim,
-  type NotificationData,
+  type KycStatus,
+  type LedgerTx,
+  type NewReceivable,
   type NotificationKey,
   type Officer,
   type Org,
-  type PendingNotification,
   type Profile,
+  type ProfilePatch,
   type StaffRole,
   UniqueViolation,
   type Wallet,
+  type WalletRow,
 } from "./types.ts";
-
-type Drip = { id: string; wallet: Wallet; at: number; txHash: string | null; amountWei: bigint };
 
 /** In-memory `Db` with the same constraints the migrations enforce. Tests use it; it never ships. */
 export class MemoryDb implements Db {
+  readonly wallets = new Map<Wallet, WalletRow>();
   readonly profiles = new Map<Wallet, Profile>();
   readonly staff = new Map<Wallet, StaffRole>();
   readonly orgs = new Map<number, Org>();
   readonly officers = new Map<string, Officer>();
-  readonly claims = new Map<string, Claim>();
-  readonly documents = new Map<string, ClaimDocument>();
+  readonly receivables = new Map<string, Receivable>();
+  readonly documents = new Map<string, ReceivableDocument>();
   readonly invites = new Map<string, GuarantorInvite>();
-  readonly drips = new Map<string, Drip>();
+  readonly ledgerTxs: LedgerTx[] = [];
   readonly adminActions: Array<{ actorWallet: Wallet; action: string; target: string; payload: Record<string, unknown> }> = [];
-  readonly notifications = new Map<
-    string,
-    NotificationKey & { id: string; data: NotificationData; sentAt: string | null; attempts: number; lastError: string | null }
-  >();
+  readonly notifications = new Set<string>();
   readonly sync = new Map<string, number>();
   readonly onceKeys = new Set<string>();
-  readonly fraxnetStates = new Map<string, FraxnetOAuthState>();
-  readonly fraxnetConnections = new Map<Wallet, FraxnetConnection>();
-  private seq = 0;
+  private orgSeq = 0;
+  private receivableSeq = 0;
 
   constructor(private readonly now: () => Date = () => new Date()) {}
 
   private stamp() {
     return this.now().toISOString();
   }
-  private uuid() {
-    return crypto.randomUUID();
+
+  async insertWallet(w: Pick<WalletRow, "address" | "encryptedSeed">) {
+    if (this.wallets.has(w.address)) throw new UniqueViolation("wallets_pkey");
+    const row: WalletRow = { ...w, fundedTx: null, createdAt: this.stamp() };
+    this.wallets.set(w.address, row);
+    return row;
+  }
+  async getWallet(address: Wallet) {
+    return this.wallets.get(address) ?? null;
+  }
+  async setWalletFunded(address: Wallet, txHash: string) {
+    const row = this.wallets.get(address);
+    if (row) this.wallets.set(address, { ...row, fundedTx: txHash });
   }
 
   async getProfile(wallet: Wallet) {
@@ -59,7 +64,8 @@ export class MemoryDb implements Db {
   async getProfileByPrivyId(privyUserId: string) {
     return [...this.profiles.values()].find((p) => p.privyUserId === privyUserId) ?? null;
   }
-  async insertProfile(p: Pick<Profile, "wallet" | "privyUserId" | "email" | "displayName">) {
+  async insertProfile(p: Pick<Profile, "wallet" | "privyUserId" | "email" | "emailVerified" | "displayName">) {
+    if (!this.wallets.has(p.wallet)) throw new Error("profiles_wallet_address_fkey");
     if (this.profiles.has(p.wallet)) throw new UniqueViolation("profiles_pkey");
     if (await this.getProfileByPrivyId(p.privyUserId)) throw new UniqueViolation("profiles_privy_user_id_key");
     const row: Profile = {
@@ -68,74 +74,45 @@ export class MemoryDb implements Db {
       kycSource: null,
       kycUpdatedBy: null,
       kycUpdatedAt: null,
-      fraxnetAccountRef: null,
-      liquidationAddress: null,
       createdAt: this.stamp(),
     };
     this.profiles.set(p.wallet, row);
     return row;
   }
-  async updateProfile(wallet: Wallet, patch: Partial<Omit<Profile, "wallet" | "privyUserId" | "createdAt">>) {
+  async updateProfile(wallet: Wallet, patch: ProfilePatch) {
     const row = this.profiles.get(wallet);
     if (!row) throw new Error(`no profile ${wallet}`);
     const next = { ...row, ...patch };
     this.profiles.set(wallet, next);
     return next;
   }
+  async listProfilesByKyc(statuses: KycStatus[]) {
+    return [...this.profiles.values()].filter((p) => statuses.includes(p.kycStatus)).sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+  }
 
   async getStaffRole(wallet: Wallet) {
     return this.staff.get(wallet) ?? null;
   }
 
-  async insertFraxnetState(s: FraxnetOAuthState) {
-    if (!this.profiles.has(s.wallet)) throw new Error("fraxnet_oauth_states_wallet_address_fkey");
-    if (this.fraxnetStates.has(s.state)) throw new UniqueViolation("fraxnet_oauth_states_pkey");
-    for (const [key, old] of this.fraxnetStates) {
-      if (old.wallet === s.wallet && old.expiresAt < this.stamp()) this.fraxnetStates.delete(key);
-    }
-    this.fraxnetStates.set(s.state, { ...s });
+  async insertOrg(name: string) {
+    if ([...this.orgs.values()].some((o) => o.name === name)) throw new UniqueViolation("orgs_name_key");
+    const org = { id: ++this.orgSeq, name, active: true };
+    this.orgs.set(org.id, org);
+    return org;
   }
-  async takeFraxnetState(state: string, wallet: Wallet) {
-    const row = this.fraxnetStates.get(state);
-    if (!row || row.wallet !== wallet) return null;
-    this.fraxnetStates.delete(state);
-    return row;
-  }
-  async getFraxnetConnection(wallet: Wallet) {
-    return this.fraxnetConnections.get(wallet) ?? null;
-  }
-  async upsertFraxnetConnection(c: Omit<FraxnetConnection, "connectedAt" | "checkedAt">) {
-    if (!this.profiles.has(c.wallet)) throw new Error("fraxnet_connections_wallet_address_fkey");
-    for (const other of this.fraxnetConnections.values()) {
-      if (other.wallet !== c.wallet && other.fraxnetUserId === c.fraxnetUserId) {
-        throw new UniqueViolation("fraxnet_connections_fraxnet_user_id_key");
-      }
-    }
-    const row: FraxnetConnection = { ...c, scopes: [...c.scopes], connectedAt: this.stamp(), checkedAt: this.stamp() };
-    this.fraxnetConnections.set(c.wallet, row);
-    return row;
-  }
-  async updateFraxnetConnection(wallet: Wallet, patch: FraxnetConnectionPatch) {
-    const row = this.fraxnetConnections.get(wallet);
-    if (!row) throw new Error(`no fraxnet connection ${wallet}`);
-    const next = { ...row, ...patch };
-    this.fraxnetConnections.set(wallet, next);
-    return next;
-  }
-
   async getOrg(id: number) {
     return this.orgs.get(id) ?? null;
   }
-  async upsertOrg(org: Org) {
-    this.orgs.set(org.id, { ...org });
+  async listOrgs() {
+    return [...this.orgs.values()].sort((a, b) => a.id - b.id);
   }
   async setOrgActive(id: number, active: boolean) {
     const org = this.orgs.get(id);
     if (org) this.orgs.set(id, { ...org, active });
   }
-  async upsertOfficer(o: Omit<Officer, "title">) {
-    const key = `${o.orgId}:${o.wallet}`;
-    this.officers.set(key, { title: this.officers.get(key)?.title ?? null, ...o });
+  async upsertOfficer(o: Officer) {
+    if (!this.orgs.has(o.orgId)) throw new Error("org_officers_org_id_fkey");
+    this.officers.set(`${o.orgId}:${o.wallet}`, { ...o });
   }
   async isActiveOfficer(orgId: number, wallet: Wallet) {
     return this.officers.get(`${orgId}:${wallet}`)?.active === true;
@@ -146,7 +123,6 @@ export class MemoryDb implements Db {
       .map((o) => ({ orgId: o.orgId, name: this.orgs.get(o.orgId)?.name ?? "", title: o.title }))
       .sort((a, b) => a.orgId - b.orgId);
   }
-
   async listActiveOrgsWithOfficers() {
     return [...this.orgs.values()]
       .filter((o) => o.active)
@@ -159,78 +135,100 @@ export class MemoryDb implements Db {
       }));
   }
 
-  async insertClaim(c: NewClaim) {
-    if (!this.orgs.has(c.orgId)) throw new Error("claims_org_id_fkey");
-    if (!this.profiles.has(c.recipientWallet)) throw new Error("claims_recipient_wallet_fkey");
-    for (const other of this.claims.values()) {
-      if (other.orgId === c.orgId && other.callinkPrNumber === c.callinkPrNumber) {
-        throw new UniqueViolation("claims_org_id_callink_pr_number_key");
+  async insertReceivable(c: NewReceivable) {
+    if (c.orgId !== null && !this.orgs.has(c.orgId)) throw new Error("receivables_org_id_fkey");
+    if (!this.profiles.has(c.recipientWallet)) throw new Error("receivables_recipient_wallet_fkey");
+    if (c.guarantorWallet !== null && c.orgId === null) throw new Error("guarantor_needs_org");
+    for (const other of this.receivables.values()) {
+      if (other.recipientWallet === c.recipientWallet && other.reference === c.reference) {
+        throw new UniqueViolation("receivables_recipient_wallet_reference_key");
       }
     }
     const at = this.stamp();
-    const row: Claim = {
+    const row: Receivable = {
       ...c,
-      id: this.uuid(),
-      onchainClaimId: null,
+      id: crypto.randomUUID(),
+      number: ++this.receivableSeq,
       packetJson: null,
       packetHash: null,
-      guarantySignature: null,
-      guarantyNonce: null,
-      guarantyDeadline: null,
-      statusCache: "Draft",
-      asucOutcome: "none",
-      asucOutcomeNote: null,
-      asucOutcomeAt: null,
+      guarantySignedAt: null,
+      status: "Draft",
+      submittedAt: null,
+      approvedAmount: "0",
+      approvedBy: null,
+      approvalExpiresAt: null,
+      rejectReason: null,
+      feeBps: 0,
+      purchasePrice: "0",
+      amountDue: "0",
+      amountPaid: "0",
+      purchasedAt: null,
+      dueAt: null,
+      loanId: null,
+      callReason: "none",
+      guarantorCalledAt: null,
+      writeOffEligibleAt: null,
+      principalWrittenOff: false,
+      writtenOffPrincipal: "0",
+      payerOutcome: "none",
+      payerOutcomeNote: null,
+      payerOutcomeAt: null,
       createdAt: at,
       updatedAt: at,
     };
-    this.claims.set(row.id, row);
+    this.receivables.set(row.id, row);
     return row;
   }
-  async getClaim(id: string) {
-    return this.claims.get(id) ?? null;
+  async getReceivable(id: string) {
+    return this.receivables.get(id) ?? null;
   }
-  async getClaimByPacketHash(packetHash: string) {
-    return [...this.claims.values()].find((c) => c.packetHash === packetHash) ?? null;
-  }
-  async getClaimByOnchainId(onchainClaimId: number) {
-    return [...this.claims.values()].find((c) => c.onchainClaimId === onchainClaimId) ?? null;
-  }
-  async updateClaim(id: string, patch: ClaimPatch) {
-    const row = this.claims.get(id);
-    if (!row) throw new Error(`no claim ${id}`);
-    if (patch.packetHash && [...this.claims.values()].some((c) => c.id !== id && c.packetHash === patch.packetHash)) {
-      throw new UniqueViolation("claims_packet_hash_key");
+  async updateReceivable(id: string, patch: ReceivablePatch) {
+    const row = this.receivables.get(id);
+    if (!row) throw new Error(`no receivable ${id}`);
+    if (patch.packetHash && [...this.receivables.values()].some((c) => c.id !== id && c.packetHash === patch.packetHash)) {
+      throw new UniqueViolation("receivables_packet_hash_key");
     }
     const next = { ...row, ...patch, updatedAt: this.stamp() };
-    this.claims.set(id, next);
+    if (next.guarantorWallet !== null && next.orgId === null) throw new Error("guarantor_needs_org");
+    if ([...this.receivables.values()].some((c) => c.id !== id && c.recipientWallet === next.recipientWallet && c.reference === next.reference)) {
+      throw new UniqueViolation("receivables_recipient_wallet_reference_key");
+    }
+    if (BigInt(next.approvedAmount) > BigInt(next.requestedAmount)) throw new Error("approved_within_requested");
+    if (BigInt(next.amountPaid) > BigInt(next.amountDue)) throw new Error("paid_within_due");
+    this.receivables.set(id, next);
     return next;
   }
-  async listClaims(scope: ClaimScope) {
-    const all = [...this.claims.values()].sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+  async transitionReceivable(id: string, from: ReceivableStatus[], patch: ReceivablePatch) {
+    const row = this.receivables.get(id);
+    if (!row || !from.includes(row.status)) return null;
+    return this.updateReceivable(id, patch);
+  }
+  async listReceivables(scope: ReceivableScope) {
+    const all = [...this.receivables.values()].sort((a, b) => b.createdAt.localeCompare(a.createdAt) || b.number - a.number);
     if (scope.kind === "all") return all;
-    if (scope.kind === "reported") return all.filter((c) => c.asucOutcome !== "none");
+    if (scope.kind === "reported") return all.filter((c) => c.payerOutcome !== "none");
     return all.filter(
-      (c) => c.recipientWallet === scope.wallet || c.guarantorWallet === scope.wallet || scope.officerOrgIds.includes(c.orgId),
+      (c) =>
+        c.recipientWallet === scope.wallet || c.guarantorWallet === scope.wallet || (c.orgId !== null && scope.officerOrgIds.includes(c.orgId)),
     );
   }
-  async listClaimsByStatus(statuses: ClaimStatus[]) {
-    return [...this.claims.values()].filter((c) => statuses.includes(c.statusCache));
+  async listReceivablesByStatus(statuses: ReceivableStatus[]) {
+    return [...this.receivables.values()].filter((c) => statuses.includes(c.status));
   }
 
-  async insertDocument(d: Omit<ClaimDocument, "id" | "createdAt" | "sha256"> & { id?: string }) {
+  async insertDocument(d: Omit<ReceivableDocument, "id" | "createdAt" | "sha256"> & { id?: string }) {
     if ([...this.documents.values()].some((x) => x.storagePath === d.storagePath)) {
-      throw new UniqueViolation("claim_documents_storage_path_key");
+      throw new UniqueViolation("receivable_documents_storage_path_key");
     }
-    const row: ClaimDocument = { ...d, id: d.id ?? this.uuid(), sha256: null, createdAt: this.stamp() };
+    const row: ReceivableDocument = { ...d, id: d.id ?? crypto.randomUUID(), sha256: null, createdAt: this.stamp() };
     this.documents.set(row.id, row);
     return row;
   }
   async getDocument(id: string) {
     return this.documents.get(id) ?? null;
   }
-  async listDocuments(claimId: string) {
-    return [...this.documents.values()].filter((d) => d.claimId === claimId).sort((a, b) => a.createdAt.localeCompare(b.createdAt));
+  async listDocuments(receivableId: string) {
+    return [...this.documents.values()].filter((d) => d.receivableId === receivableId).sort((a, b) => a.createdAt.localeCompare(b.createdAt));
   }
   async setDocumentHash(id: string, sha256: string) {
     const row = this.documents.get(id);
@@ -241,7 +239,7 @@ export class MemoryDb implements Db {
   }
 
   async insertInvite(i: Omit<GuarantorInvite, "id" | "createdAt" | "usedAt">) {
-    const row: GuarantorInvite = { ...i, id: this.uuid(), usedAt: null, createdAt: this.stamp() };
+    const row: GuarantorInvite = { ...i, id: crypto.randomUUID(), usedAt: null, createdAt: this.stamp() };
     this.invites.set(row.id, row);
     return row;
   }
@@ -252,60 +250,29 @@ export class MemoryDb implements Db {
     const row = this.invites.get(id);
     if (row && !row.usedAt) this.invites.set(id, { ...row, usedAt: this.stamp() });
   }
-
-  async countInvitesSince(claimId: string, since: string) {
-    return [...this.invites.values()].filter((i) => i.claimId === claimId && Date.parse(i.createdAt) >= Date.parse(since)).length;
+  async countInvitesSince(receivableId: string, since: string) {
+    return [...this.invites.values()].filter((i) => i.receivableId === receivableId && Date.parse(i.createdAt) >= Date.parse(since)).length;
   }
 
-  async reserveGasDrip(wallet: Wallet, windowSeconds: number) {
-    const cutoff = this.now().getTime() - windowSeconds * 1000;
-    for (const d of this.drips.values()) if (d.wallet === wallet && d.at > cutoff) return null;
-    const id = String(++this.seq);
-    this.drips.set(id, { id, wallet, at: this.now().getTime(), txHash: null, amountWei: 0n });
-    return id;
+  async recordLedgerTx(tx: Omit<LedgerTx, "createdAt">) {
+    if (this.ledgerTxs.some((t) => t.txHash === tx.txHash)) return;
+    this.ledgerTxs.push({ ...tx, createdAt: this.stamp() });
   }
-  async confirmGasDrip(id: string, sent: { txHash: `0x${string}` | null; amountWei: bigint }) {
-    const row = this.drips.get(id);
-    if (row) this.drips.set(id, { ...row, txHash: sent.txHash, amountWei: sent.amountWei });
-  }
-  async releaseGasDrip(id: string) {
-    // same as the SQL: a sent top-up is never released
-    if (this.drips.get(id)?.txHash === null) this.drips.delete(id);
+  async listLedgerTxs(filter: { receivableId?: string; account?: Wallet; limit?: number }) {
+    return this.ledgerTxs
+      .filter((t) => (filter.receivableId === undefined || t.receivableId === filter.receivableId) && (filter.account === undefined || t.account === filter.account))
+      .slice(-(filter.limit ?? 50));
   }
 
   async insertAdminAction(a: { actorWallet: Wallet; action: string; target: string; payload: Record<string, unknown> }) {
     this.adminActions.push(a);
   }
 
-  private key(n: NotificationKey) {
-    return `${n.wallet}:${n.kind}:${n.claimId}`;
-  }
   async recordNotification(n: NotificationKey) {
-    if (this.notifications.has(this.key(n))) return false;
-    this.notifications.set(this.key(n), { ...n, id: String(++this.seq), data: {}, sentAt: this.stamp(), attempts: 1, lastError: null });
+    const key = `${n.wallet}:${n.kind}:${n.receivableId}`;
+    if (this.notifications.has(key)) return false;
+    this.notifications.add(key);
     return true;
-  }
-  async enqueueNotification(n: NotificationKey, data: NotificationData) {
-    if (this.notifications.has(this.key(n))) return false;
-    this.notifications.set(this.key(n), { ...n, id: String(++this.seq), data, sentAt: null, attempts: 0, lastError: null });
-    return true;
-  }
-  async listPendingNotifications(limit: number): Promise<PendingNotification[]> {
-    return [...this.notifications.values()]
-      .filter((n) => n.sentAt === null)
-      .slice(0, limit)
-      .map(({ wallet, kind, claimId, id, data, attempts }) => ({ wallet, kind, claimId, id, data, attempts }));
-  }
-  private byId(id: string) {
-    return [...this.notifications.entries()].find(([, n]) => n.id === id);
-  }
-  async markNotificationSent(id: string) {
-    const hit = this.byId(id);
-    if (hit) this.notifications.set(hit[0], { ...hit[1], sentAt: this.stamp(), attempts: hit[1].attempts + 1 });
-  }
-  async markNotificationFailed(id: string, error: string) {
-    const hit = this.byId(id);
-    if (hit) this.notifications.set(hit[0], { ...hit[1], attempts: hit[1].attempts + 1, lastError: error });
   }
 
   async claimOnce(key: string) {
@@ -317,10 +284,10 @@ export class MemoryDb implements Db {
     this.onceKeys.delete(key);
   }
 
-  async getSyncBlock(key: string) {
+  async getSyncLedger(key: string) {
     return this.sync.get(key) ?? null;
   }
-  async setSyncBlock(key: string, block: number) {
-    this.sync.set(key, block);
+  async setSyncLedger(key: string, ledger: number) {
+    this.sync.set(key, ledger);
   }
 }

@@ -5,7 +5,7 @@
  */
 export type LocalStack = { url: string; anonKey: string; publishableKey: string | null; serviceKey: string };
 
-const REPO_ROOT = new URL("../../..", import.meta.url).pathname;
+const REPO_ROOT = decodeURIComponent(new URL("../../..", import.meta.url).pathname);
 
 async function fromCli(): Promise<LocalStack | null> {
   const home = Deno.env.get("HOME") ?? "";

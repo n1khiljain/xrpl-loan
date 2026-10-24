@@ -64,7 +64,7 @@ export function LandingNav() {
             </NavLink>
           ))}
           <Button asChild variant="light" className="ml-2">
-            <Link href="/claims/">Sign in</Link>
+            <Link href="/receivables/">Sign in</Link>
           </Button>
         </nav>
         <button
@@ -90,7 +90,7 @@ export function LandingNav() {
             </NavLink>
           ))}
           <Button asChild variant="light" className="mt-1">
-            <Link href="/claims/" onClick={() => setOpen(false)}>
+            <Link href="/receivables/" onClick={() => setOpen(false)}>
               Sign in
             </Link>
           </Button>

@@ -1,22 +1,16 @@
-import type { FraxNetClient } from "@app/adapters";
 import { type TokenVerifier, authenticate, normalizeWallet, requireCaller, requireStaff } from "../_shared/auth.ts";
 import type { Db } from "../_shared/db/types.ts";
-import { recheck } from "../_shared/fraxnet.ts";
 import { type Handler, badRequest, json, methodNotAllowed } from "../_shared/http.ts";
 
-export type DirectoryDeps = { auth: TokenVerifier; db: Db; fraxnet: FraxNetClient; now?: () => Date };
+export type DirectoryDeps = { auth: TokenVerifier; db: Db };
 
 /**
- * Lookups the web app needs that no other function returns (U-60). `?view=orgs`: active orgs and their active
- * officers' names, for choosing a guarantor (PRD 8.1 step 4); any signed-in user. `?view=people&wallets=a,b`:
- * display names and KYC status for the review queue (PRD 8.3 step 2); staff only. Each member who connected FraxNet
- * is asked about again first, so the Approve button never rests on a verification FraxNet has since withdrawn
- * (security campaign E-2f). The approval itself is an onchain Safe transaction, so this is the last server check.
+ * Lookups the web app needs that no other function returns. `?view=orgs`: active orgs and their active officers'
+ * names, for choosing a guarantor; any signed-in user. `?view=people&wallets=a,b`: display names and KYC status for
+ * the review queue; staff only.
  */
-// UNCERTAIN: U-60
 export function createDirectoryHandler(deps: DirectoryDeps): Handler {
   const { db } = deps;
-  const now = deps.now ?? (() => new Date());
   return async (req) => {
     await authenticate(req, deps.auth);
     if (req.method !== "GET") throw methodNotAllowed(["GET"]);
@@ -32,9 +26,7 @@ export function createDirectoryHandler(deps: DirectoryDeps): Handler {
       const people = await Promise.all(
         wallets.map(async (w) => {
           const wallet = normalizeWallet(w);
-          const stored = await db.getProfile(wallet);
-          // UNCERTAIN: U-90 (if FraxNet is down, the stored status stands)
-          const profile = stored && (await recheck({ db, fraxnet: deps.fraxnet, now, walletChainId: null }, stored)).profile;
+          const profile = await db.getProfile(wallet);
           return {
             wallet,
             hasProfile: profile !== null,

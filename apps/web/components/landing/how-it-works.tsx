@@ -10,37 +10,36 @@ const STEP_MS = 7000;
 
 const STEPS: { title: string; detail: string; icon: LucideIcon; image: string; height: number; alt: string }[] = [
   {
-    title: "Verify on FraxNet",
-    detail: "Verify your identity once on FraxNet, at net.frax.com. This app never sees your ID.",
+    title: "Get verified",
+    detail: "Sign in with your email, then a reviewer approves you once. Approval earns you an XRPL credential.",
     icon: ShieldCheck,
     image: "/images/landing/step-verify.jpg",
     height: 900,
-    alt: "The verification screen, with a button that opens FraxNet",
+    alt: "The verification screen",
   },
   {
-    title: "Tell us what you paid for",
-    detail: "Add your CalLink request and receipts, and choose an officer from your club to approve it.",
+    title: "Name the payment",
+    detail: "Add the payment reference and documents, and choose someone at your business to approve the loan.",
     icon: Receipt,
     image: "/images/landing/step-details.jpg",
     height: 900,
-    alt: "The first step of a new reimbursement: what it was for and how much",
+    alt: "The first step of a new loan: which payment and how much",
   },
   {
-    title: "Get paid",
-    detail: "After Blockchain at Berkeley approves it, press one button to get frxUSD in your wallet.",
+    title: "Get the loan",
+    detail: "After a reviewer approves it, press one button to get RLUSD in your wallet.",
     icon: Wallet,
-    // shot with the testnet-only "simulate ASUC paying you" row hidden
     image: "/images/landing/step-paid.jpg",
     height: 900,
-    alt: "A paid reimbursement, with the amount to send Frax when ASUC pays",
+    alt: "A funded loan, with the amount to pay back",
   },
   {
-    title: "Send it to Frax when ASUC pays",
-    detail: "When ASUC pays you, send that amount to Frax. Your reimbursement is then closed out.",
+    title: "Pay it back with interest",
+    detail: "Pay the loan back with interest by the end of its horizon. Then it is closed out.",
     icon: CircleCheck,
     image: "/images/landing/step-closed-out.jpg",
     height: 900,
-    alt: "A closed out reimbursement",
+    alt: "A closed out loan",
   },
 ];
 
@@ -64,8 +63,7 @@ export function HowItWorks() {
           How it works
         </h2>
         <p className="text-muted-foreground text-base leading-relaxed font-medium lg:text-lg">
-          Verify your identity once. After that, each reimbursement takes three steps. frxUSD is a digital dollar issued by Frax, so you don&apos;t need any crypto experience.
-        </p>
+          Verify your identity once. After that, each loan takes three steps. Your wallet is made for you on the XRP Ledger, so you don&apos;t need any crypto setup.</p>
         {/* every step's text sits in a slot of the same height, and the old one closes while the new one opens on the
             same curve, so the list (and the page under it) never changes height as the steps advance */}
         <div role="tablist" aria-label="Steps" className="flex flex-col gap-2 [--detail-h:7rem] sm:[--detail-h:5.5rem] lg:pr-10 lg:[--detail-h:6.5rem] xl:[--detail-h:4.75rem]">

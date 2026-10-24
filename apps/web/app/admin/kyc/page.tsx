@@ -1,79 +1,120 @@
 "use client";
 
-import { useMutation, useQuery } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
-import { isAddress } from "viem";
 import { AdminShell } from "@/components/admin/admin-shell";
+import { StatusText, kycTone } from "@/components/admin/status-text";
 import { ErrorNotice, InfoNotice } from "@/components/app/notice";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Textarea } from "@/components/ui/textarea";
+import { Skeleton } from "@/components/ui/skeleton";
 import { useCall } from "@/hooks/use-api";
+import { accountUrl } from "@/lib/config";
 import { friendlyError } from "@/lib/errors";
-import type { KycStatus, MeResponse, PersonView } from "@/lib/types";
+import { dateTime, shortAddress } from "@/lib/format";
+import type { KycStatus, MeResponse } from "@/lib/types";
 
-/** Manual KYC status until Frax's API exists; every change is logged with who and when (FR-B6, U-36). */
-function ManualKyc({ me }: { me: MeResponse }) {
+type Person = {
+  wallet: string;
+  displayName: string | null;
+  email: string | null;
+  emailVerified: boolean;
+  kycStatus: KycStatus;
+  kycUpdatedAt: string | null;
+  createdAt: string;
+};
+
+function PersonRow({ person }: { person: Person }) {
   const call = useCall();
-  const [wallet, setWallet] = useState("");
-  const [status, setStatus] = useState<KycStatus>("approved");
+  const queryClient = useQueryClient();
   const [note, setNote] = useState("");
-  const valid = isAddress(wallet);
-  const person = useQuery({
-    queryKey: ["person", wallet.toLowerCase()],
-    enabled: valid,
-    queryFn: async () => (await call<{ people: PersonView[] }>("directory", { query: { view: "people", wallets: wallet } })).people[0],
+  const save = useMutation({
+    mutationFn: (status: KycStatus) => call("kyc-manual", { method: "POST", body: { wallet: person.wallet, status, note: note.trim() } }),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["kyc-people"] }),
   });
-  const save = useMutation({ mutationFn: () => call("kyc-manual", { method: "POST", body: { wallet, status, note } }), onSuccess: () => person.refetch() });
-
-  if (me.staffRole !== "underwriter") return <ErrorNotice title="Underwriters only">Only the underwriter role can set KYC status.</ErrorNotice>;
   return (
-    <Card className="max-w-2xl">
-      <CardHeader>
-        <CardTitle>Set a wallet&apos;s status</CardTitle>
-        <CardDescription>Manual until Frax&apos;s API is live. People verify on net.frax.com, so confirm with Frax before marking anyone approved. Your wallet, the time, and your note are logged.</CardDescription>
-      </CardHeader>
-      <CardContent className="flex flex-col gap-4">
-        <div className="space-y-2">
-          <Label htmlFor="kyc-wallet">Wallet</Label>
-          <Input id="kyc-wallet" className="font-mono" value={wallet} onChange={(e) => setWallet(e.target.value.trim())} />
-        </div>
-        {person.data ? (
-          <p className="bg-surface-muted rounded-md px-3.5 py-2.5 text-sm" data-testid="kyc-current">
-            {person.data.hasProfile ? `${person.data.displayName ?? "No name"}: ${person.data.kycStatus?.replace("_", " ")}` : "No profile for this wallet yet."}
-          </p>
-        ) : null}
-        <div className="space-y-2">
-          <Label>New status</Label>
-          <Select value={status} onValueChange={(v) => setStatus(v as KycStatus)}>
-            <SelectTrigger aria-label="New status" className="w-48">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="not_started">Not started</SelectItem>
-              <SelectItem value="pending">Pending</SelectItem>
-              <SelectItem value="approved">Approved</SelectItem>
-              <SelectItem value="rejected">Rejected</SelectItem>
-            </SelectContent>
-          </Select>
-        </div>
-        <div className="space-y-2">
-          <Label htmlFor="kyc-note">Note</Label>
-          <Textarea id="kyc-note" value={note} onChange={(e) => setNote(e.target.value)} maxLength={500} placeholder="Confirmed with Frax ops by email on..." />
-        </div>
-        <Button onClick={() => save.mutate()} disabled={!valid || !note.trim() || save.isPending} data-testid="save-kyc" className="self-start">
-          {save.isPending ? "Saving..." : "Save status"}
+    <li className="flex flex-col gap-3 py-4" data-testid={`kyc-row-${person.wallet}`}>
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <span className="flex min-w-0 flex-col gap-0.5">
+          <span className="font-semibold">{person.displayName ?? "No name yet"}</span>
+          <span className="text-muted-foreground text-xs">
+            {person.email ?? "No email"} · {person.emailVerified ? "email verified" : "email not verified"}
+          </span>
+          <a href={accountUrl(person.wallet)} target="_blank" rel="noopener noreferrer" className="text-muted-foreground font-mono text-xs underline underline-offset-2">
+            {shortAddress(person.wallet)}
+          </a>
+        </span>
+        <StatusText tone={kycTone(person.kycStatus)}>{person.kycStatus.replace("_", " ")}</StatusText>
+      </div>
+      <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+        <Input aria-label="Note" placeholder="What you checked" value={note} onChange={(e) => setNote(e.target.value)} maxLength={500} className="sm:flex-1" />
+        <Button size="sm" disabled={!note.trim() || !person.emailVerified || save.isPending} onClick={() => save.mutate("approved")} data-testid="kyc-approve">
+          Approve
         </Button>
-        {save.isSuccess ? <InfoNotice title="Saved" /> : null}
-        {save.isError ? <ErrorNotice>{friendlyError(save.error)}</ErrorNotice> : null}
-      </CardContent>
-    </Card>
+        <Button size="sm" variant="outline" disabled={!note.trim() || save.isPending} onClick={() => save.mutate("rejected")}>
+          Reject
+        </Button>
+      </div>
+      {save.isError ? <ErrorNotice>{friendlyError(save.error)}</ErrorNotice> : null}
+    </li>
+  );
+}
+
+/** KYC is a Privy-verified email plus a staff decision here. Every change is logged with who, when, and the note. */
+function Kyc({ me }: { me: MeResponse }) {
+  const call = useCall();
+  const people = useQuery({
+    queryKey: ["kyc-people"],
+    enabled: me.staffRole === "underwriter" || me.staffRole === "admin",
+    queryFn: () => call<{ people: Person[] }>("kyc-manual"),
+  });
+  if (me.staffRole !== "underwriter" && me.staffRole !== "admin") {
+    return <ErrorNotice title="Underwriters only">Only underwriters and admins can set KYC status.</ErrorNotice>;
+  }
+  if (people.isPending) return <Skeleton className="h-48 w-full rounded-3xl" />;
+  if (people.isError) return <ErrorNotice>{friendlyError(people.error)}</ErrorNotice>;
+  const waiting = people.data.people.filter((p) => p.kycStatus === "pending" || p.kycStatus === "not_started");
+  const decided = people.data.people.filter((p) => p.kycStatus === "approved" || p.kycStatus === "rejected");
+  return (
+    <div className="flex max-w-3xl flex-col gap-5">
+      <Card>
+        <CardHeader>
+          <CardTitle>Waiting on a decision</CardTitle>
+          <CardDescription>
+            Approve someone once their email is verified and you&apos;ve checked who they are. Approval is what lets the app issue their XRPL credential.
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          {waiting.length === 0 ? <InfoNotice title="Nobody waiting" /> : null}
+          <ul className="divide-divider flex flex-col divide-y">
+            {waiting.map((p) => (
+              <PersonRow key={p.wallet} person={p} />
+            ))}
+          </ul>
+        </CardContent>
+      </Card>
+      <Card>
+        <CardHeader>
+          <CardTitle>Decided</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <ul className="divide-divider flex flex-col divide-y text-sm">
+            {decided.map((p) => (
+              <li key={p.wallet} className="flex items-center justify-between gap-3 py-2.5">
+                <span>
+                  {p.displayName ?? "No name"} <span className="text-muted-foreground">· {p.kycUpdatedAt ? dateTime(p.kycUpdatedAt) : ""}</span>
+                </span>
+                <StatusText tone={kycTone(p.kycStatus)}>{p.kycStatus}</StatusText>
+              </li>
+            ))}
+          </ul>
+        </CardContent>
+      </Card>
+    </div>
   );
 }
 
 export default function KycPage() {
-  return <AdminShell title="KYC status">{(me) => <ManualKyc me={me} />}</AdminShell>;
+  return <AdminShell title="KYC status">{(me) => <Kyc me={me} />}</AdminShell>;
 }

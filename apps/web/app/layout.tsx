@@ -14,8 +14,8 @@ import "./globals.css";
 
 
 export const metadata: Metadata = {
-  title: "Get reimbursed now | Frax x Blockchain at Berkeley",
-  description: "ASUC owes you money. Get it now instead of in six weeks. When ASUC pays you, send it to Frax.",
+  title: "Install",
+  description: "Expedite a transaction, transfer, or payment with an upfront loan. Pay it back with interest based on the loan horizon.",
 };
 
 export const viewport: Viewport = { width: "device-width", initialScale: 1 };

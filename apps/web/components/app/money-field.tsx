@@ -5,7 +5,7 @@ import { Label } from "@/components/ui/label";
 
 /**
  * The app's one dollar field: a label, then a tall box with a large `$` and number, and Max inside it when there's a
- * most you can send. Used by the reimbursement form, cash out, and sending to Frax so all three match (U-75).
+ * most you can send. Used by the loan form and the payment form so both match.
  */
 export function MoneyField({
   id,

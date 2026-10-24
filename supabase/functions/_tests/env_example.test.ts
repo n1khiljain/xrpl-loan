@@ -11,13 +11,13 @@ const entries = new Map(
 
 /** Values that are fine to commit: names, local URLs. Everything else must be empty. */
 const PUBLIC_DEFAULTS: Record<string, string> = {
-  NETWORK: "local",
-  NEXT_PUBLIC_NETWORK: "local",
+  NETWORK: "xrpl-devnet",
+  NEXT_PUBLIC_NETWORK: "xrpl-devnet",
   NEXT_PUBLIC_SUPABASE_URL: "http://127.0.0.1:54321",
   APP_BASE_URL: "http://localhost:3000",
 };
 
-/** SYSTEM_DESIGN section 9 plus what the functions read. */
+/** What the web app reads at build time. */
 const WEB = ["NEXT_PUBLIC_NETWORK", "NEXT_PUBLIC_PRIVY_APP_ID", "NEXT_PUBLIC_SUPABASE_URL", "NEXT_PUBLIC_SUPABASE_ANON_KEY"];
 
 Deno.test(".env.example lists every variable the functions and the web app read", () => {

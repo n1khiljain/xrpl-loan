@@ -6,12 +6,11 @@ node_modules/
 .DS_Store
 *.log
 
-# foundry
-contracts/out/
-contracts/cache/
-contracts/broadcast/*/31337/
-contracts/lcov.info
-contracts/report.md
+# deno (nodeModulesDir: auto)
+supabase/functions/node_modules/
+
+# local stack secrets and test keys (scripts/local-up.sh)
+apps/web/e2e/.cache/
 
 # next
 apps/web/.next/

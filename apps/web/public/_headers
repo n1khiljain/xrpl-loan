@@ -1,23 +1,11 @@
 # Cloudflare Pages, Cloudflare Workers static assets, and Netlify read this file. Other hosts need the same headers.
 #
-# Every page: a Content-Security-Policy (security campaign E-5a, U-89).
-# - frame-ancestors: only this app and the Safe UIs the admin pages run in as a Safe App (U-27), so no other site can
-#   frame a button. Keep it in step with `safeUi` in deployments/*.json and SAFE_ORIGINS in lib/safe.ts.
-# - connect-src: the network RPCs in deployments/*.json, Supabase (edge functions and receipt uploads), and what
-#   Privy and WalletConnect need for sign-in and wallets.
+# Every page: a Content-Security-Policy.
+# - frame-ancestors 'none': no other site can frame a button.
+# - connect-src: Supabase (edge functions and receipt uploads) and what Privy needs for sign-in. The browser never
+#   talks to the XRP Ledger: the edge functions submit every transaction.
 # - script-src needs 'unsafe-inline': a static export inlines Next's bootstrap scripts and can't carry a nonce.
 /*
-  Content-Security-Policy: default-src 'self'; script-src 'self' 'unsafe-inline' https://challenges.cloudflare.com; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https:; font-src 'self' data:; media-src 'self'; connect-src 'self' https://*.supabase.co https://rpc.frax.com https://rpc.testnet.frax.com https://ethereum-sepolia-rpc.publicnode.com https://auth.privy.io https://*.privy.io https://*.rpc.privy.systems https://*.walletconnect.com https://*.walletconnect.org wss://relay.walletconnect.com wss://relay.walletconnect.org https://api.web3modal.org wss://www.walletlink.org; frame-src https://auth.privy.io https://verify.walletconnect.com https://verify.walletconnect.org https://challenges.cloudflare.com; child-src https://auth.privy.io https://verify.walletconnect.com https://verify.walletconnect.org; worker-src 'self' blob:; manifest-src 'self'; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'self' https://app.safe.global https://safe.mainnet.frax.com https://safe.testnet.frax.com
+  Content-Security-Policy: default-src 'self'; script-src 'self' 'unsafe-inline' https://challenges.cloudflare.com; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https:; font-src 'self' data:; media-src 'self'; connect-src 'self' https://*.supabase.co https://auth.privy.io https://*.privy.io; frame-src https://auth.privy.io https://challenges.cloudflare.com; child-src https://auth.privy.io; worker-src 'self' blob:; manifest-src 'self'; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'
   X-Content-Type-Options: nosniff
   Referrer-Policy: strict-origin-when-cross-origin
-# Frax's Safe UI fetches the Safe App manifest and icon from another origin, so they need CORS (SYSTEM_DESIGN 6.4,
-# docs/RUNBOOK.md step 10).
-/manifest.json
-  Access-Control-Allow-Origin: *
-/admin/manifest.json
-  Access-Control-Allow-Origin: *
-/brand/*
-  Access-Control-Allow-Origin: *
-# the hero footage loops every 16 seconds; without a cache lifetime the browser re-checks it each loop and stutters
-/images/landing/earth*
-  Cache-Control: public, max-age=604800

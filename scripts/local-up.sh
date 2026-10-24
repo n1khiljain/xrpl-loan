@@ -1,16 +1,14 @@
 #!/usr/bin/env bash
 # Runs the whole app on this machine so you can sign in as a demo person and click through every screen:
 #   pnpm local
-# Starts anvil (and deploys, keeping the chain in apps/web/e2e/.cache/anvil-state.json across restarts), local
-# Supabase, and the edge functions, seeds the demo people and reimbursements (scripts/local-demo.ts), then runs the
-# web dev server on http://localhost:3000. The sign-in screen lists the demo people. Ctrl-C stops what this started.
-# Local anvil only (U-62).
+# Starts local Supabase and the edge functions, seeds the demo people and reimbursements (scripts/local-demo.ts),
+# then runs the web dev server on http://localhost:3000. The ledger is XRPL Devnet: each demo person gets a
+# custodial wallet funded by the Devnet faucet. Ctrl-C stops what this started.
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 CACHE="$ROOT/apps/web/e2e/.cache"
-RPC="http://127.0.0.1:8545"
-export PATH="$HOME/.foundry/bin:$HOME/.local/bin:/opt/homebrew/bin:$PATH"
+export PATH="$HOME/.local/bin:/opt/homebrew/bin:$HOME/.deno/bin:$PATH"
 mkdir -p "$CACHE"
 cd "$ROOT"
 
@@ -20,7 +18,6 @@ cleanup() {
 }
 trap cleanup EXIT INT TERM
 
-rpc() { curl -s -X POST -H 'content-type: application/json' --data "{\"jsonrpc\":\"2.0\",\"id\":1,\"method\":\"$1\",\"params\":$2}" "$RPC"; }
 wait_for() {
   local what="$1" tries="$2"; shift 2
   for _ in $(seq 1 "$tries"); do "$@" >/dev/null 2>&1 && return 0; sleep 1; done
@@ -28,42 +25,54 @@ wait_for() {
   exit 1
 }
 
-# 1. the chain
-if ! rpc eth_chainId '[]' | grep -q result; then
-  echo "starting anvil"
-  anvil --host 0.0.0.0 --port 8545 --silent --state "$CACHE/anvil-state.json" --state-interval 5 &
-  pids+=($!)
-  wait_for anvil 30 bash -c "curl -s -X POST -H 'content-type: application/json' --data '{\"jsonrpc\":\"2.0\",\"id\":1,\"method\":\"eth_chainId\",\"params\":[]}' $RPC | grep -q result"
-fi
-registry="$(node -e 'console.log(require("./deployments/local.json").deployed.claimRegistry)')"
-fresh_chain=0
-if rpc eth_getCode "[\"$registry\",\"latest\"]" | grep -q '"result":"0x"'; then
-  echo "deploying the contracts"
-  (cd contracts && NETWORK=local forge script script/Deploy.s.sol --rpc-url "$RPC" --broadcast >/dev/null)
-  fresh_chain=1
-fi
-
-# 2. Supabase; a new chain means the database's mirror of the old one is stale, so start it clean
-supabase status >/dev/null 2>&1 || supabase start
-if [ "$fresh_chain" = 1 ]; then
-  echo "new chain, so resetting the local database to match"
-  supabase db reset >/dev/null
-fi
+# 1. Supabase (a stack that's still booting answers "not ready", so wait for it rather than starting twice)
+supabase status >/dev/null 2>&1 || supabase start || true
+wait_for "Supabase" 120 supabase status
 eval "$(supabase status -o env 2>/dev/null | grep -E '^(API_URL|ANON_KEY)=')"
-export SUPABASE_ANON_KEY="$ANON_KEY"
 
-# 3. the edge functions, trusting a Privy test key kept in the cache (made once, outside git)
+# 2. the edge functions. By default they trust a Privy test key kept in the cache (made once, outside git), which the
+# demo people's tokens are signed with. With a real Privy app in .env (PRIVY_APP_ID and NEXT_PUBLIC_PRIVY_APP_ID, and
+# optionally PRIVY_VERIFICATION_KEY; without it the app's published keys are used), they trust that instead, so Google
+# and email sign-in work and the demo people don't.
 [ -f "$CACHE/functions.env" ] || deno run --allow-write --allow-run --config supabase/functions/deno.json supabase/functions/_tests/make-e2e-env.ts "$CACHE" >/dev/null
+envval() { [ -f .env ] && grep -E "^$1=" .env | tail -1 | cut -d= -f2- || true; }
+PRIVY_APP="$(envval PRIVY_APP_ID)"; PRIVY_KEY="$(envval PRIVY_VERIFICATION_KEY)"; WEB_PRIVY_APP="$(envval NEXT_PUBLIC_PRIVY_APP_ID)"
+FUNCTIONS_ENV="$CACHE/functions.env"
+# DEMO_PEOPLE=1 pnpm local forces the demo people even with a Privy app in .env
+if [ -n "$PRIVY_APP" ] && [ -n "$WEB_PRIVY_APP" ] && [ "${DEMO_PEOPLE:-}" != 1 ]; then
+  echo "using the Privy app from .env: Google and email sign-in on, demo people off"
+  FUNCTIONS_ENV="$CACHE/functions.privy.env"
+  {
+    grep -vE '^PRIVY_(APP_ID|VERIFICATION_KEY)=' "$CACHE/functions.env"
+    echo "PRIVY_APP_ID=$PRIVY_APP"
+    [ -n "$PRIVY_KEY" ] && echo "PRIVY_VERIFICATION_KEY=$PRIVY_KEY"
+  } >"$FUNCTIONS_ENV"
+  DEMO=false
+else
+  WEB_PRIVY_APP=""
+  DEMO=true
+fi
+# pnpm xrpl:setup writes these into .env. The loan and vault functions need them; the other functions don't.
+SERVE_ENV="$CACHE/functions.serve.env"
+grep -vE '^(BROKER_SEED|ISSUER_SEED)=' "$FUNCTIONS_ENV" > "$SERVE_ENV" || true
+for name in BROKER_SEED ISSUER_SEED; do
+  value="$(envval "$name")"
+  [ -n "$value" ] && echo "$name=$value" >> "$SERVE_ENV"
+done
+FUNCTIONS_ENV="$SERVE_ENV"
 pkill -f "supabase functions serve" 2>/dev/null || true
 echo "serving the edge functions"
-supabase functions serve --env-file "$CACHE/functions.env" >"$CACHE/functions.log" 2>&1 &
+supabase functions serve --env-file "$FUNCTIONS_ENV" >"$CACHE/functions.log" 2>&1 &
 pids+=($!)
 wait_for "the edge functions" 180 bash -c "curl -s -X POST $API_URL/functions/v1/me | grep -q unauthorized"
 
-# 4. demo people and reimbursements
-deno run --allow-all --config supabase/functions/deno.json scripts/local-demo.ts "$CACHE" | head -1
+# 3. demo people and reimbursements (each new person's wallet is funded on XRPL Devnet)
+if [ "$DEMO" = true ]; then
+  echo "seeding demo people on XRPL Devnet"
+  deno run --allow-all --config supabase/functions/deno.json scripts/local-demo.ts "$CACHE"
+fi
 
-# 5. the app
-echo "open http://localhost:3000/claims/ and pick someone to sign in as"
-NEXT_PUBLIC_NETWORK=local NEXT_PUBLIC_SUPABASE_URL="$API_URL" NEXT_PUBLIC_SUPABASE_ANON_KEY="$ANON_KEY" NEXT_PUBLIC_PRIVY_APP_ID= \
-  pnpm --filter web dev
+# 4. the app
+echo "open http://localhost:3000/receivables/"
+NEXT_PUBLIC_NETWORK=xrpl-devnet NEXT_PUBLIC_SUPABASE_URL="$API_URL" NEXT_PUBLIC_SUPABASE_ANON_KEY="$ANON_KEY" NEXT_PUBLIC_PRIVY_APP_ID="$WEB_PRIVY_APP" \
+  NEXT_PUBLIC_DEMO_SESSIONS="$DEMO" pnpm --filter web dev

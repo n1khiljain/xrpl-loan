@@ -6,12 +6,12 @@ import { useState } from "react";
 
 const FAQ = [
   {
-    q: "Is this a sale or a debt?",
-    a: "It's a sale. Frax buys your pending reimbursement and pays you now. When ASUC pays you, you send that payment to Frax.",
+    q: "What is Install?",
+    a: "Install lets a business expedite a transaction, transfer, or payment. You get an upfront loan from a lending vault on the XRP Ledger, and you pay it back with interest based on how long the loan runs.",
   },
-  { q: "What does it cost?", a: "Nothing during the pilot. The fee is 0%, and Frax covers network costs." },
-  { q: "What if ASUC rejects it?", a: "Report it in the app. The officer who signed off covers what ASUC didn't pay." },
-  { q: "Who holds my documents?", a: "Only you, your club's officers, and Blockchain at Berkeley's reviewers can see your receipts. The receipts themselves never go on the blockchain." },
+  { q: "What does it cost?", a: "Interest depends on the loan horizon. A shorter loan costs less. The app covers XRP Ledger network costs." },
+  { q: "What if the payment never arrives?", a: "Report it in the app. The person who signed off covers what was not paid." },
+  { q: "Who holds my documents?", a: "Only you, the people who sign off at your business, and Install's reviewers can see your documents. The documents themselves never go on the ledger." },
 ] as const;
 
 export function Faq() {
@@ -23,7 +23,7 @@ export function Faq() {
         <h2 className="display-type text-3xl sm:text-4xl lg:text-5xl xl:text-6xl">
           Frequently asked questions
         </h2>
-        <p className="text-muted-foreground max-w-md text-base leading-relaxed lg:text-right lg:text-lg">Common questions from club members.</p>
+        <p className="text-muted-foreground max-w-md text-base leading-relaxed lg:text-right lg:text-lg">Common questions from businesses.</p>
       </div>
 
       <div className="mt-10 flex flex-col gap-3 lg:mt-16 lg:gap-4">

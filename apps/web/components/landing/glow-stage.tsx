@@ -2,7 +2,7 @@ import type { ReactNode } from "react";
 
 /* eslint-disable @next/next/no-img-element */
 
-/** Project One's tagline glow behind a block of the dark features panel (U-72). */
+/** Project One's tagline glow behind a block of the dark features panel. */
 export function GlowStage({ children }: { children: ReactNode }) {
   return (
     <div className="relative flex w-full flex-col items-center py-16 sm:py-20 lg:py-28">
