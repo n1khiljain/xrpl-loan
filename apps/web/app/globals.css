@@ -3,7 +3,7 @@
 /*
  * Design tokens. The values started from the Blockchain at Berkeley design team's screens canvas and now follow the
  * landing page: near-black and neutral greys, Figtree, and blue kept for
- * the claim card. There is one theme, light; dark mode was taken out.
+ * the receivable card. There is one theme, light; dark mode was taken out.
  * This is the only file with raw color values. Components use the Tailwind names mapped below; Tailwind's own
  * palette and radii are switched off, so a color or radius that isn't a token produces no CSS at all.
  */
@@ -41,7 +41,7 @@
 
   /*
    * Panels are the landing's black glass: near-black with a faint light from the top. Gold and called keep a trace of
-   * their color so the state still reads; the claim card gradients below stay blue and gold.
+   * their color so the state still reads; the receivable card gradients below stay blue and gold.
    */
   --grad-panel:
     radial-gradient(120% 70% at 50% -20%, rgba(255, 255, 255, 0.1) 0%, rgba(255, 255, 255, 0) 60%),
@@ -260,7 +260,7 @@
   background: var(--grad-card-deep);
 }
 /*
- * Claim card finishes and moments. Frosted glass while it waits and brushed metal when closed out; the shine
+ * Receivable card finishes and moments. Frosted glass while it waits and brushed metal when closed out; the shine
  * plays once on approval, and the glare follows the pointer on a live card.
  */
 @utility card-frost-edge {

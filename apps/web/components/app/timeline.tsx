@@ -8,7 +8,7 @@ import { cn } from "@/lib/utils";
 export type TimelineStep = { label: string; detail?: string; status: "done" | "current" | "upcoming" | "failed" };
 
 /**
- * The claim's status timeline: dots on a connecting line. When a step finishes, its dot fills and the line to the next
+ * The receivable's status timeline: dots on a connecting line. When a step finishes, its dot fills and the line to the next
  * one draws down, so the move is visible if you're on the page when it happens.
  */
 export function Timeline({ steps }: { steps: TimelineStep[] }) {

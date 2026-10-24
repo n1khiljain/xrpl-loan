@@ -14,7 +14,7 @@ const days = (seconds: number) => `${Math.round(seconds / 86_400)} days`;
 const LIMITS: Row[] = [
   { label: "Advance rate", value: `${config.params.advanceRateBps / 100}%`, hint: "Share of face value that can be paid out" },
   { label: "Interest", value: `${config.params.feeBps / 100}% a year`, hint: "Yearly rate on the unpaid loan. A shorter horizon costs less." },
-  { label: "Per-loan cap", value: usd(config.params.perClaimCap), hint: "Largest single one" },
+  { label: "Per-loan cap", value: usd(config.params.perReceivableCap), hint: "Largest single one" },
   { label: "Per-business cap", value: usd(config.params.perOrgCap), hint: "Outstanding across one business" },
   { label: "Vault deposit cap", value: usd(config.params.poolDepositCap), hint: "Most the vault takes in" },
   { label: "Due window", value: days(config.params.overdueWindowSeconds), hint: "From payout to due date" },

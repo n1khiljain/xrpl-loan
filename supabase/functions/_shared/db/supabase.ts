@@ -1,16 +1,16 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Database, Json, Tables, TablesInsert, TablesUpdate } from "./database.types.ts";
 import {
-  type Claim,
-  type ClaimDocument,
-  type ClaimPatch,
-  type ClaimScope,
-  type ClaimStatus,
+  type Receivable,
+  type ReceivableDocument,
+  type ReceivablePatch,
+  type ReceivableScope,
+  type ReceivableStatus,
   type Db,
   type GuarantorInvite,
   type KycStatus,
   type LedgerTx,
-  type NewClaim,
+  type NewReceivable,
   type NotificationKey,
   type Officer,
   type Profile,
@@ -34,18 +34,19 @@ const numeric = (units: string) => units as unknown as number;
 const PROFILE =
   "wallet_address, privy_user_id, email, email_verified, display_name, kyc_status, kyc_source, kyc_updated_by, kyc_updated_at, created_at";
 const AMOUNTS = ["face_value", "requested_amount", "approved_amount", "purchase_price", "amount_due", "amount_paid", "written_off_principal"] as const;
-const CLAIM = [
-  "id, number, org_id, recipient_wallet, recipient_type, callink_pr_number, description, packet_json, packet_hash",
+const RECEIVABLE = [
+  "id, number, type, recipient_wallet, payer_name, payer_email, payer_wallet, due_date, org_id, reference, description",
+  "packet_json, packet_hash",
   "guarantor_wallet, guaranty_signed_at, status, submitted_at, approved_by, approval_expires_at, reject_reason, fee_bps",
   "purchased_at, due_at, loan_id, call_reason, guarantor_called_at, write_off_eligible_at, principal_written_off",
-  "asuc_outcome, asuc_outcome_note, asuc_outcome_at, created_at, updated_at",
+  "payer_outcome, payer_outcome_note, payer_outcome_at, created_at, updated_at",
   ...AMOUNTS.map((c) => `${c}::text`),
 ].join(", ");
-const DOCUMENT = "id, claim_id, storage_path, sha256, mime_type, size_bytes, uploaded_by, created_at";
-const INVITE = "id, claim_id, guarantor_wallet, token_hash, expires_at, used_at, created_at";
-const LEDGER_TX = "tx_hash, tx_type, account, claim_id, purpose, result, created_at";
+const DOCUMENT = "id, receivable_id, storage_path, sha256, mime_type, size_bytes, uploaded_by, created_at";
+const INVITE = "id, receivable_id, guarantor_wallet, token_hash, expires_at, used_at, created_at";
+const LEDGER_TX = "tx_hash, tx_type, account, receivable_id, purpose, result, created_at";
 
-type ClaimRow = Omit<Tables<"claims">, (typeof AMOUNTS)[number]> & Record<(typeof AMOUNTS)[number], string>;
+type ReceivableRow = Omit<Tables<"receivables">, (typeof AMOUNTS)[number]> & Record<(typeof AMOUNTS)[number], string>;
 
 function fail(error: PgError): never {
   if (error.code === "23505") {
@@ -102,17 +103,21 @@ function profileUpdate(p: ProfilePatch): TablesUpdate<"profiles"> {
   return u;
 }
 
-function toClaim(row: unknown): Claim {
-  const r = row as ClaimRow;
+function toReceivable(row: unknown): Receivable {
+  const r = row as ReceivableRow;
   return {
     id: r.id,
     number: r.number,
-    orgId: r.org_id,
+    type: r.type,
     recipientWallet: r.recipient_wallet as Wallet,
-    recipientType: r.recipient_type,
+    payerName: r.payer_name,
+    payerEmail: r.payer_email,
+    payerWallet: r.payer_wallet as Wallet | null,
+    dueDate: r.due_date,
+    orgId: r.org_id,
     faceValue: r.face_value,
     requestedAmount: r.requested_amount,
-    callinkPrNumber: r.callink_pr_number,
+    reference: r.reference,
     description: r.description,
     packetJson: r.packet_json,
     packetHash: r.packet_hash,
@@ -136,33 +141,42 @@ function toClaim(row: unknown): Claim {
     writeOffEligibleAt: r.write_off_eligible_at,
     principalWrittenOff: r.principal_written_off,
     writtenOffPrincipal: r.written_off_principal,
-    asucOutcome: r.asuc_outcome,
-    asucOutcomeNote: r.asuc_outcome_note,
-    asucOutcomeAt: r.asuc_outcome_at,
+    payerOutcome: r.payer_outcome,
+    payerOutcomeNote: r.payer_outcome_note,
+    payerOutcomeAt: r.payer_outcome_at,
     createdAt: r.created_at,
     updatedAt: r.updated_at,
   };
 }
 
-function claimInsert(c: NewClaim): TablesInsert<"claims"> {
+function receivableInsert(c: NewReceivable): TablesInsert<"receivables"> {
   return {
-    org_id: c.orgId,
+    type: c.type,
     recipient_wallet: c.recipientWallet,
-    recipient_type: c.recipientType,
+    payer_name: c.payerName,
+    payer_email: c.payerEmail,
+    payer_wallet: c.payerWallet,
+    due_date: c.dueDate,
+    org_id: c.orgId,
     face_value: numeric(c.faceValue),
     requested_amount: numeric(c.requestedAmount),
-    callink_pr_number: c.callinkPrNumber,
+    reference: c.reference,
     description: c.description,
     guarantor_wallet: c.guarantorWallet,
   };
 }
 
 /** camelCase patch keys to columns; amounts go through `numeric` so they stay exact. */
-const CLAIM_COLUMNS: Record<keyof ClaimPatch, keyof TablesUpdate<"claims">> = {
-  recipientType: "recipient_type",
+const RECEIVABLE_COLUMNS: Record<keyof ReceivablePatch, keyof TablesUpdate<"receivables">> = {
+  type: "type",
+  payerName: "payer_name",
+  payerEmail: "payer_email",
+  payerWallet: "payer_wallet",
+  dueDate: "due_date",
+  orgId: "org_id",
   faceValue: "face_value",
   requestedAmount: "requested_amount",
-  callinkPrNumber: "callink_pr_number",
+  reference: "reference",
   description: "description",
   packetJson: "packet_json",
   packetHash: "packet_hash",
@@ -186,25 +200,25 @@ const CLAIM_COLUMNS: Record<keyof ClaimPatch, keyof TablesUpdate<"claims">> = {
   writeOffEligibleAt: "write_off_eligible_at",
   principalWrittenOff: "principal_written_off",
   writtenOffPrincipal: "written_off_principal",
-  asucOutcome: "asuc_outcome",
-  asucOutcomeNote: "asuc_outcome_note",
-  asucOutcomeAt: "asuc_outcome_at",
+  payerOutcome: "payer_outcome",
+  payerOutcomeNote: "payer_outcome_note",
+  payerOutcomeAt: "payer_outcome_at",
 };
 
-function claimUpdate(p: ClaimPatch): TablesUpdate<"claims"> {
+function receivableUpdate(p: ReceivablePatch): TablesUpdate<"receivables"> {
   const u: Record<string, unknown> = {};
   for (const [key, value] of Object.entries(p)) {
     if (value === undefined) continue;
-    const column = CLAIM_COLUMNS[key as keyof ClaimPatch];
+    const column = RECEIVABLE_COLUMNS[key as keyof ReceivablePatch];
     u[column] = (AMOUNTS as readonly string[]).includes(column) ? numeric(value as string) : key === "packetJson" ? (value as Json) : value;
   }
-  return u as TablesUpdate<"claims">;
+  return u as TablesUpdate<"receivables">;
 }
 
-function toDocument(r: Tables<"claim_documents">): ClaimDocument {
+function toDocument(r: Tables<"receivable_documents">): ReceivableDocument {
   return {
     id: r.id,
-    claimId: r.claim_id,
+    receivableId: r.receivable_id,
     storagePath: r.storage_path,
     sha256: r.sha256,
     mimeType: r.mime_type,
@@ -217,7 +231,7 @@ function toDocument(r: Tables<"claim_documents">): ClaimDocument {
 function toInvite(r: Tables<"guarantor_invites">): GuarantorInvite {
   return {
     id: r.id,
-    claimId: r.claim_id,
+    receivableId: r.receivable_id,
     guarantorWallet: r.guarantor_wallet as Wallet,
     tokenHash: r.token_hash,
     expiresAt: r.expires_at,
@@ -231,7 +245,7 @@ function toLedgerTx(r: Omit<Tables<"ledger_txs">, "id">): LedgerTx {
     txHash: r.tx_hash,
     txType: r.tx_type,
     account: r.account as Wallet,
-    claimId: r.claim_id,
+    receivableId: r.receivable_id,
     purpose: r.purpose,
     result: r.result,
     createdAt: r.created_at,
@@ -242,8 +256,8 @@ function toLedgerTx(r: Omit<Tables<"ledger_txs">, "id">): LedgerTx {
 export class SupabaseDb implements Db {
   constructor(private readonly db: ServiceClient) {}
 
-  private claims() {
-    return this.db.from("claims").select(CLAIM);
+  private receivables() {
+    return this.db.from("receivables").select(RECEIVABLE);
   }
 
   async insertWallet(w: Pick<WalletRow, "address" | "encryptedSeed">) {
@@ -353,54 +367,54 @@ export class SupabaseDb implements Db {
     }));
   }
 
-  async insertClaim(c: NewClaim) {
-    const row = one(await this.db.from("claims").insert(claimInsert(c)).select(CLAIM).returns<ClaimRow[]>().single());
-    return toClaim(row);
+  async insertReceivable(c: NewReceivable) {
+    const row = one(await this.db.from("receivables").insert(receivableInsert(c)).select(RECEIVABLE).returns<ReceivableRow[]>().single());
+    return toReceivable(row);
   }
-  async getClaim(id: string) {
-    const row = maybe(await this.claims().eq("id", id).maybeSingle());
-    return row ? toClaim(row) : null;
+  async getReceivable(id: string) {
+    const row = maybe(await this.receivables().eq("id", id).maybeSingle());
+    return row ? toReceivable(row) : null;
   }
-  async updateClaim(id: string, patch: ClaimPatch) {
-    const row = one(await this.db.from("claims").update(claimUpdate(patch)).eq("id", id).select(CLAIM).returns<ClaimRow[]>().single());
-    return toClaim(row);
+  async updateReceivable(id: string, patch: ReceivablePatch) {
+    const row = one(await this.db.from("receivables").update(receivableUpdate(patch)).eq("id", id).select(RECEIVABLE).returns<ReceivableRow[]>().single());
+    return toReceivable(row);
   }
-  async transitionClaim(id: string, from: ClaimStatus[], patch: ClaimPatch) {
+  async transitionReceivable(id: string, from: ReceivableStatus[], patch: ReceivablePatch) {
     // one statement with the status in the filter, so a second request racing this one updates nothing
     const row = maybe(
       await this.db
-        .from("claims")
-        .update(claimUpdate(patch))
+        .from("receivables")
+        .update(receivableUpdate(patch))
         .eq("id", id)
         .in("status", from)
-        .select(CLAIM)
-        .returns<ClaimRow[]>()
+        .select(RECEIVABLE)
+        .returns<ReceivableRow[]>()
         .maybeSingle(),
     );
-    return row ? toClaim(row) : null;
+    return row ? toReceivable(row) : null;
   }
-  async listClaims(scope: ClaimScope) {
-    let query = this.claims().order("created_at", { ascending: false });
-    if (scope.kind === "reported") query = query.neq("asuc_outcome", "none");
+  async listReceivables(scope: ReceivableScope) {
+    let query = this.receivables().order("created_at", { ascending: false });
+    if (scope.kind === "reported") query = query.neq("payer_outcome", "none");
     if (scope.kind === "wallet") {
       const clauses = [`recipient_wallet.eq.${scope.wallet}`, `guarantor_wallet.eq.${scope.wallet}`];
       const orgIds = scope.officerOrgIds.filter((id) => Number.isSafeInteger(id));
       if (orgIds.length > 0) clauses.push(`org_id.in.(${orgIds.join(",")})`);
       query = query.or(clauses.join(","));
     }
-    return one(await query).map(toClaim);
+    return one(await query).map(toReceivable);
   }
-  async listClaimsByStatus(statuses: ClaimStatus[]) {
-    return one(await this.claims().in("status", statuses)).map(toClaim);
+  async listReceivablesByStatus(statuses: ReceivableStatus[]) {
+    return one(await this.receivables().in("status", statuses)).map(toReceivable);
   }
 
-  async insertDocument(d: Omit<ClaimDocument, "id" | "createdAt" | "sha256"> & { id?: string }) {
+  async insertDocument(d: Omit<ReceivableDocument, "id" | "createdAt" | "sha256"> & { id?: string }) {
     const row = one(
       await this.db
-        .from("claim_documents")
+        .from("receivable_documents")
         .insert({
           ...(d.id ? { id: d.id } : {}),
-          claim_id: d.claimId,
+          receivable_id: d.receivableId,
           storage_path: d.storagePath,
           mime_type: d.mimeType,
           size_bytes: d.sizeBytes,
@@ -412,15 +426,15 @@ export class SupabaseDb implements Db {
     return toDocument(row);
   }
   async getDocument(id: string) {
-    const row = maybe(await this.db.from("claim_documents").select(DOCUMENT).eq("id", id).maybeSingle());
+    const row = maybe(await this.db.from("receivable_documents").select(DOCUMENT).eq("id", id).maybeSingle());
     return row ? toDocument(row) : null;
   }
-  async listDocuments(claimId: string) {
-    const rows = one(await this.db.from("claim_documents").select(DOCUMENT).eq("claim_id", claimId).order("created_at"));
+  async listDocuments(receivableId: string) {
+    const rows = one(await this.db.from("receivable_documents").select(DOCUMENT).eq("receivable_id", receivableId).order("created_at"));
     return rows.map(toDocument);
   }
   async setDocumentHash(id: string, sha256: string) {
-    const row = one(await this.db.from("claim_documents").update({ sha256 }).eq("id", id).select(DOCUMENT).single());
+    const row = one(await this.db.from("receivable_documents").update({ sha256 }).eq("id", id).select(DOCUMENT).single());
     return toDocument(row);
   }
 
@@ -428,7 +442,7 @@ export class SupabaseDb implements Db {
     const row = one(
       await this.db
         .from("guarantor_invites")
-        .insert({ claim_id: i.claimId, guarantor_wallet: i.guarantorWallet, token_hash: i.tokenHash, expires_at: i.expiresAt })
+        .insert({ receivable_id: i.receivableId, guarantor_wallet: i.guarantorWallet, token_hash: i.tokenHash, expires_at: i.expiresAt })
         .select(INVITE)
         .single(),
     );
@@ -443,11 +457,11 @@ export class SupabaseDb implements Db {
       await this.db.from("guarantor_invites").update({ used_at: new Date().toISOString() }).eq("id", id).is("used_at", null),
     );
   }
-  async countInvitesSince(claimId: string, since: string) {
+  async countInvitesSince(receivableId: string, since: string) {
     const result = await this.db
       .from("guarantor_invites")
       .select("id", { count: "exact", head: true })
-      .eq("claim_id", claimId)
+      .eq("receivable_id", receivableId)
       .gte("created_at", since);
     if (result.error) fail(result.error);
     return result.count ?? 0;
@@ -456,14 +470,14 @@ export class SupabaseDb implements Db {
   async recordLedgerTx(tx: Omit<LedgerTx, "createdAt">) {
     done(
       await this.db.from("ledger_txs").upsert(
-        { tx_hash: tx.txHash, tx_type: tx.txType, account: tx.account, claim_id: tx.claimId, purpose: tx.purpose, result: tx.result },
+        { tx_hash: tx.txHash, tx_type: tx.txType, account: tx.account, receivable_id: tx.receivableId, purpose: tx.purpose, result: tx.result },
         { onConflict: "tx_hash", ignoreDuplicates: true },
       ),
     );
   }
-  async listLedgerTxs(filter: { claimId?: string; account?: Wallet; limit?: number }) {
+  async listLedgerTxs(filter: { receivableId?: string; account?: Wallet; limit?: number }) {
     let query = this.db.from("ledger_txs").select(LEDGER_TX).order("created_at").limit(filter.limit ?? 50);
-    if (filter.claimId !== undefined) query = query.eq("claim_id", filter.claimId);
+    if (filter.receivableId !== undefined) query = query.eq("receivable_id", filter.receivableId);
     if (filter.account !== undefined) query = query.eq("account", filter.account);
     return one(await query).map(toLedgerTx);
   }
@@ -477,7 +491,7 @@ export class SupabaseDb implements Db {
   }
 
   async recordNotification(n: NotificationKey) {
-    const result = await this.db.from("notifications").insert({ wallet_address: n.wallet, kind: n.kind, claim_id: n.claimId });
+    const result = await this.db.from("notifications").insert({ wallet_address: n.wallet, kind: n.kind, receivable_id: n.receivableId });
     if (result.error?.code === "23505") return false;
     done(result);
     return true;

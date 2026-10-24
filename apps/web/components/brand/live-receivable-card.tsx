@@ -4,7 +4,7 @@ import { motion, useMotionValue, useReducedMotion, useSpring } from "motion/reac
 import { type ComponentProps, type PointerEvent, useRef } from "react";
 import { CountUp, EASE } from "@/components/motion";
 import { cn } from "@/lib/utils";
-import { ClaimCard } from "./claim-card";
+import { ReceivableCard } from "./receivable-card";
 
 /** The moment a state plays when the card arrives in it. */
 export type CardMoment = "approved" | "paid" | "closed";
@@ -42,16 +42,16 @@ function Stamp() {
 }
 
 /**
- * The claim card, alive: it leans toward the pointer with a glare that follows it, and each state plays its moment
+ * The receivable card, alive: it leans toward the pointer with a glare that follows it, and each state plays its moment
  * when it arrives. Swap it with a new key when the state
  * changes so the moment plays again. Under reduced motion it's the still card with its finish.
  */
-export function LiveClaimCard({
+export function LiveReceivableCard({
   moment,
   amountValue,
   className,
   ...card
-}: ComponentProps<typeof ClaimCard> & { moment?: CardMoment | null; amountValue?: number }) {
+}: ComponentProps<typeof ReceivableCard> & { moment?: CardMoment | null; amountValue?: number }) {
   const reduced = useReducedMotion();
   const ref = useRef<HTMLDivElement>(null);
   const rx = useSpring(useMotionValue(0), { stiffness: 180, damping: 18 });
@@ -81,11 +81,11 @@ export function LiveClaimCard({
   return (
     <div className={cn("[perspective:900px]", className)} onPointerMove={move} onPointerLeave={leave}>
       <motion.div ref={ref} style={{ rotateX: rx, rotateY: ry }} className="rounded-[22px] [transform-style:preserve-3d]">
-        <ClaimCard {...card} amountNode={amountNode}>
+        <ReceivableCard {...card} amountNode={amountNode}>
           <span aria-hidden className="card-glare pointer-events-none absolute inset-0 rounded-[inherit]" />
           {!reduced && moment === "approved" ? <Shine /> : null}
           {moment === "closed" ? <Stamp /> : null}
-        </ClaimCard>
+        </ReceivableCard>
       </motion.div>
     </div>
   );

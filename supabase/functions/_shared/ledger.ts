@@ -16,7 +16,7 @@ export type Balances = {
 export type Submitted = { hash: string; result: string; ledgerIndex: number | null; createdId: string | null };
 
 /** Why a transaction was recorded, for ledger_txs and explorer links. */
-export type TxPurpose = { purpose: string; claimId?: string | null };
+export type TxPurpose = { purpose: string; receivableId?: string | null };
 
 /**
  * The XRPL operations the functions perform. `XrplLedger` talks to the network named in the config; tests use
@@ -71,7 +71,7 @@ export function xrplLedger(config: NetworkConfig, db: Db): Ledger {
       if (!res.ok) throw new LedgerError("faucet_failed", `the faucet answered ${res.status}`);
       const body = (await res.json()) as { transactionHash?: string };
       const txHash = body.transactionHash ?? null;
-      if (txHash) await db.recordLedgerTx({ txHash, txType: "Payment", account: address, claimId: null, purpose: "fund_wallet", result: "faucet" });
+      if (txHash) await db.recordLedgerTx({ txHash, txType: "Payment", account: address, receivableId: null, purpose: "fund_wallet", result: "faucet" });
       return { txHash };
     },
 
@@ -111,7 +111,7 @@ export function xrplLedger(config: NetworkConfig, db: Db): Ledger {
           txHash: signed.hash,
           txType: tx.TransactionType,
           account: tx.Account as Wallet,
-          claimId: why.claimId ?? null,
+          receivableId: why.receivableId ?? null,
           purpose: why.purpose,
           result,
         });
@@ -137,7 +137,7 @@ export function xrplLedger(config: NetworkConfig, db: Db): Ledger {
           txHash: combined.hash,
           txType: tx.TransactionType,
           account: tx.Account as Wallet,
-          claimId: why.claimId ?? null,
+          receivableId: why.receivableId ?? null,
           purpose: why.purpose,
           result,
         });

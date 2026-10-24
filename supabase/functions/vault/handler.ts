@@ -4,7 +4,7 @@ import type { Payment } from "xrpl";
 import { z } from "zod";
 import type { TokenVerifier } from "../_shared/auth.ts";
 import { requireCaller } from "../_shared/auth.ts";
-import { unitsString } from "../_shared/claims.ts";
+import { unitsString } from "../_shared/receivables.ts";
 import type { Db } from "../_shared/db/types.ts";
 import type { Env } from "../_shared/env.ts";
 import { type Handler, badRequest, conflict, forbidden, json, methodNotAllowed, readJson } from "../_shared/http.ts";

@@ -6,7 +6,7 @@
   "compatibility_date": "2026-09-01",
   "assets": {
     "directory": "./apps/web/out",
-    // the export writes claim/index.html for /claim/ and a 404.html (FR-F1)
+    // the export writes receivable/index.html for /receivable/ and a 404.html (FR-F1)
     "html_handling": "auto-trailing-slash",
     "not_found_handling": "404-page"
   }

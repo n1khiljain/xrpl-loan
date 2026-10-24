@@ -283,7 +283,7 @@ max_frequency = "5s"
 # enabled = true
 # uri = "pg-functions://postgres/auth/before-user-created-hook"
 
-# This hook runs before a token is issued and allows you to add additional claims based on the authentication method used.
+# This hook runs before a token is issued and allows you to add additional receivables based on the authentication method used.
 # [auth.hook.custom_access_token]
 # enabled = true
 # uri = "pg-functions://<database>/<schema>/<hook_name>"
@@ -396,11 +396,11 @@ verify_jwt = false
 import_map = "./functions/deno.json"
 entrypoint = "./functions/me/index.ts"
 
-[functions.claims]
+[functions.receivables]
 enabled = true
 verify_jwt = false
 import_map = "./functions/deno.json"
-entrypoint = "./functions/claims/index.ts"
+entrypoint = "./functions/receivables/index.ts"
 
 [functions.documents]
 enabled = true
@@ -432,11 +432,11 @@ verify_jwt = false
 import_map = "./functions/deno.json"
 entrypoint = "./functions/guaranty/index.ts"
 
-[functions.claim-actions]
+[functions.receivable-actions]
 enabled = true
 verify_jwt = false
 import_map = "./functions/deno.json"
-entrypoint = "./functions/claim-actions/index.ts"
+entrypoint = "./functions/receivable-actions/index.ts"
 
 [functions.kyc-manual]
 enabled = true

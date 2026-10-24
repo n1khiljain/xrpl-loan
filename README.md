@@ -10,13 +10,15 @@ Where things stand: [STATUS.md](STATUS.md). Repo rules: [CLAUDE.md](CLAUDE.md).
 
 - **Sign in** with an email code or Google (Privy). The app makes you a custodial XRPL wallet and funds it with test XRP from the Devnet faucet.
 - **Get verified.** Your Privy identity token proves your email; a reviewer approves you on the admin KYC page.
-- **Ask for a loan.** Name the payment you want to expedite, enter the amount and a payment reference, upload documents, and pick someone at your business to sign off. They agree to cover what's left if that payment never arrives.
+- **Ask for a loan.** Pick the kind of payment you want to expedite (an invoice, a card settlement, a reimbursement, or something else), name the payer, the amount, the payment reference, and the date the payment arrives, and upload documents. That date is the loan's term.
+- **Businesses** can have approvers: for a business's loan, one of them signs off and covers what's left if the payment never arrives. A personal loan goes straight to review.
 - **Review.** An underwriter approves or rejects it. Attesters handle the exceptions: a payer that rejected or short-paid, or an overdue loan.
-- **Get the loan and pay it back.** After `pnpm xrpl:setup`, an approved request becomes one loan from a private, credential-gated vault, and the borrower pays it back from their wallet. Interest follows the yearly rate in the deployment, prorated to the loan's length. Deposits are open for 90 days; loans start once that window closes. Automatic repayment when the original payment arrives is still to come.
+- **Get the loan and pay it back.** After `pnpm xrpl:setup`, an approved request becomes one loan from a private, credential-gated vault, and the borrower pays it back from their wallet. Interest follows the yearly rate in the deployment, prorated to the loan's length, which runs to the payment's due date. Deposits are open for 90 days; loans start once that window closes. Automatic repayment when the original payment arrives is still to come.
 
 | On screen | In the code |
 |---|---|
-| loan | claim |
+| loan | `receivables` row, `type` = `invoice`, `card_settlement`, `reimbursement`, or `other` |
+| payer, payment reference, due date | `payerName` (optional `payerWallet`), `reference`, `dueDate` |
 | approver sign-off | guaranty, by the guarantor |
 | You got the loan / Paid | `Funded` |
 | Closed out | `Settled`, `Recovered` |
@@ -31,7 +33,7 @@ pnpm install
 pnpm local
 ```
 
-`pnpm local` starts Supabase and the edge functions, signs up four demo people (a borrower, an approver, a lender, an admin) whose wallets are funded on Devnet, adds loans in several states, and serves the site at http://localhost:3000. The sign-in screen offers the demo people as one-click buttons, so you don't need a Privy app locally. The keys it uses (a Privy test key and a wallet encryption key) are generated into `apps/web/e2e/.cache/`, which git ignores.
+`pnpm local` starts Supabase and the edge functions, signs up four demo people (a borrower, an approver, a lender, an admin) whose wallets are funded on Devnet, adds loans of each kind in several states, and serves the site at http://localhost:3000. The sign-in screen offers the demo people as one-click buttons, so you don't need a Privy app locally. The keys it uses (a Privy test key and a wallet encryption key) are generated into `apps/web/e2e/.cache/`, which git ignores.
 
 ### Real Google and email sign-in locally
 
@@ -39,7 +41,7 @@ Without a Privy app the local build only offers the demo people. To sign in with
 
 1. In the [Privy dashboard](https://dashboard.privy.io), turn on **Google** and **Email** under login methods, add `http://localhost:3000` under Configuration > App settings > Domains (if you've listed any domains there), and turn on **Return user data in an identity token**.
 2. Put the app ID in `.env` (gitignored) as both `NEXT_PUBLIC_PRIVY_APP_ID` and `PRIVY_APP_ID`. The backend checks tokens against the app's published keys, so no secret or verification key is needed.
-3. Run `pnpm local` again. It uses that app, so Google and email work and the demo buttons go away.
+3. Run `pnpm local` again. It uses that app, so Google and email work and the demo buttons go away. `DEMO_PEOPLE=1 pnpm local` brings the demo people back even with a Privy app set.
 
 Tests:
 

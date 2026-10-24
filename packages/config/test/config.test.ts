@@ -112,6 +112,6 @@ describe("requireSetup", () => {
 describe("paramsAsBigInt", () => {
   it("turns base-unit strings into bigints", () => {
     const p = paramsAsBigInt(loadNetworkConfig("xrpl-devnet"));
-    expect(p.perClaimCap).toBe(2_500_000_000n);
+    expect(p.perReceivableCap).toBe(2_500_000_000n);
   });
 });

@@ -13,7 +13,7 @@
   },
   "params": {
     "advanceRateBps": 10000,
-    "perClaimCap": "2500000000",
+    "perReceivableCap": "2500000000",
     "perOrgCap": "10000000000",
     "poolDepositCap": "50000000000",
     "feeBps": 500,

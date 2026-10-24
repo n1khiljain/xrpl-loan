@@ -1,6 +1,6 @@
 "use client";
 
-import type { ClaimView } from "@app/adapters";
+import type { ReceivableView } from "@app/adapters";
 import { useQuery } from "@tanstack/react-query";
 import { ArrowRight } from "lucide-react";
 import { motion } from "motion/react";
@@ -14,51 +14,52 @@ import { Money } from "@/components/app/money";
 import { ErrorNotice } from "@/components/app/notice";
 import { CARD_TONE, STATE_LABEL, StateChip, type DisplayState } from "@/components/app/state-chip";
 import { Topbar } from "@/components/app/topbar";
-import { ClaimCard, cardNumber } from "@/components/brand/claim-card";
+import { ReceivableCard, cardNumber } from "@/components/brand/receivable-card";
 import { CountUp, EASE } from "@/components/motion";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useCall, useOrgs } from "@/hooks/use-api";
-import { ledgerOf } from "@/hooks/use-claim";
+import { ledgerOf } from "@/hooks/use-receivable";
 import { useNowSeconds } from "@/hooks/use-now";
-import { displayState } from "@/lib/claim-record";
+import { displayState } from "@/lib/receivable-record";
 import { friendlyError } from "@/lib/errors";
 import { dateFromSeconds, daysFrom, dollars, usd } from "@/lib/format";
-import type { DirectoryOrg, MeResponse, OffchainClaim } from "@/lib/types";
+import type { DirectoryOrg, MeResponse, OffchainReceivable } from "@/lib/types";
 import { cn } from "@/lib/utils";
+import { RECEIVABLE_TYPES } from "@/lib/receivable-types";
 
-type Role = "claimant" | "guarantor" | "org";
-type Row = { claim: OffchainClaim; onchain: ClaimView | null; state: DisplayState; role: Role };
+type Role = "seller" | "guarantor" | "org";
+type Row = { receivable: OffchainReceivable; onchain: ReceivableView | null; state: DisplayState; role: Role };
 
 const OPEN_STATES: DisplayState[] = ["Draft", "Submitted", "Approved", "Funded", "GuarantorCalled"];
 // the table needs about 670px; below that (a narrow window, or the laptop widths where the card aside takes room)
 // the section shows the phone rows instead. Keyed to the section's own width, not the window's.
 const TABLE_COLS = "@2xl:grid-cols-[40px_minmax(0,1fr)_104px_88px_120px_100px]";
 
-function useClaimRows(me: MeResponse) {
+function useReceivableRows(me: MeResponse) {
   const call = useCall();
   const wallet = me.profile?.wallet;
   return useQuery({
-    queryKey: ["claims", "mine"],
+    queryKey: ["receivables", "mine"],
     queryFn: async () => {
-      const { claims } = await call<{ claims: OffchainClaim[] }>("claims");
-      const rows = claims.map((claim): Row => {
-        const onchain = ledgerOf(claim);
-        const state = displayState(claim, onchain);
-        const role: Role = claim.recipientWallet === wallet ? "claimant" : claim.guarantorWallet === wallet ? "guarantor" : "org";
-        return { claim, onchain, state, role };
+      const { receivables } = await call<{ receivables: OffchainReceivable[] }>("receivables");
+      const rows = receivables.map((receivable): Row => {
+        const onchain = ledgerOf(receivable);
+        const state = displayState(receivable, onchain);
+        const role: Role = receivable.recipientWallet === wallet ? "seller" : receivable.guarantorWallet === wallet ? "guarantor" : "org";
+        return { receivable, onchain, state, role };
       });
-      return rows.sort((a, b) => new Date(b.claim.updatedAt).getTime() - new Date(a.claim.updatedAt).getTime());
+      return rows.sort((a, b) => new Date(b.receivable.updatedAt).getTime() - new Date(a.receivable.updatedAt).getTime());
     },
   });
 }
 
 function resolveOrgName(rows: Row[], orgs: DirectoryOrg[] | undefined): string | null {
   if (!orgs || orgs.length === 0) return null;
-  const mine = rows.find((r) => r.role === "claimant") ?? rows[0];
+  const mine = rows.find((r) => r.role === "seller") ?? rows[0];
   if (!mine) return null;
-  return orgs.find((o) => o.id === mine.claim.orgId)?.name ?? null;
+  return orgs.find((o) => o.id === mine.receivable.orgId)?.name ?? null;
 }
 
 function crumbFor(me: MeResponse, orgName: string | null): string {
@@ -67,11 +68,11 @@ function crumbFor(me: MeResponse, orgName: string | null): string {
 }
 
 function roleLabel(role: Role): string {
-  return role === "claimant" ? "Yours" : role === "guarantor" ? "You signed off" : "Your business";
+  return role === "seller" ? "Yours" : role === "guarantor" ? "You signed off" : "Your business";
 }
 
-function payerLabel(claim: OffchainClaim): string {
-  return claim.recipientType === "org_treasurer" ? "The business paid" : "You paid";
+function payerLabel(receivable: OffchainReceivable): string {
+  return RECEIVABLE_TYPES[receivable.type].short;
 }
 
 function dateOnly(iso: string): string {
@@ -79,26 +80,26 @@ function dateOnly(iso: string): string {
 }
 
 function idFor(row: Row): string {
-  if (row.claim.status !== "Draft") return `#${row.claim.number}`;
+  if (row.receivable.status !== "Draft") return `#${row.receivable.number}`;
   return "Draft";
 }
 
 /** The dollar figure that matters most for a row's current state. */
 function amountFor(row: Row): bigint {
-  const { claim, onchain, state } = row;
+  const { receivable, onchain, state } = row;
   if (onchain) {
     if (state === "Approved") return onchain.approvedAmount;
     if (state === "Funded" || state === "GuarantorCalled") return onchain.amountRemaining;
     if (state === "Settled" || state === "Recovered" || state === "WrittenOff") return onchain.amountDue;
   }
-  return BigInt(claim.requestedAmount);
+  return BigInt(receivable.requestedAmount);
 }
 
 function nextStepFor(row: Row, nowSeconds: number): string {
-  const { claim, onchain, state } = row;
+  const { receivable, onchain, state } = row;
   if (state === "Draft") {
-    if (!claim.packetHash) return "Add receipts to continue";
-    if (!claim.guarantySigned) return "Waiting for approver sign-off";
+    if (!receivable.packetHash) return "Add documents to continue";
+    if (!receivable.guarantySigned) return "Waiting for approver sign-off";
     return "Ready to submit";
   }
   if (state === "Submitted") return "Reviewed within a day";
@@ -108,16 +109,16 @@ function nextStepFor(row: Row, nowSeconds: number): string {
   }
   if (state === "Funded" && onchain) return `Pay back by ${dateFromSeconds(onchain.dueAt)}`;
   if (state === "GuarantorCalled") return "Payment needed";
-  if (state === "Settled") return `Closed out ${dateOnly(claim.updatedAt)}`;
-  if (state === "Recovered") return `Closed out ${dateOnly(claim.updatedAt)}`;
+  if (state === "Settled") return `Closed out ${dateOnly(receivable.updatedAt)}`;
+  if (state === "Recovered") return `Closed out ${dateOnly(receivable.updatedAt)}`;
   if (state === "WrittenOff") return "Written off";
   return "";
 }
 
-/** Get paid / Settle / View / Finish, from the design canvas; blank once a claim is closed out. */
+/** Get paid / Settle / View / Finish, from the design canvas; blank once a receivable is closed out. */
 function actionFor(row: Row): string {
   const { state, role } = row;
-  if (role === "claimant") {
+  if (role === "seller") {
     if (state === "Draft") return "Finish";
     if (state === "Submitted") return "View";
     if (state === "Approved") return "Get the loan";
@@ -140,18 +141,18 @@ function mobileStatusLine(row: Row, next: string): string {
   return `${label} · ${next.charAt(0).toLowerCase()}${next.slice(1)}`;
 }
 
-function ClaimRow({ row, now, index }: { row: Row; now: number; index: number }) {
-  const { claim, state, role } = row;
+function ReceivableRow({ row, now, index }: { row: Row; now: number; index: number }) {
+  const { receivable, state, role } = row;
   const id = idFor(row);
-  const title = claim.description ?? `Payment ${claim.callinkPrNumber}`;
-  const sub = `${roleLabel(role)}${role === "claimant" ? ` · ${payerLabel(claim)}` : ""} · ${dateOnly(claim.createdAt)}`;
+  const title = receivable.description ?? `${receivable.payerName} · ${receivable.reference}`;
+  const sub = `${roleLabel(role)}${role === "seller" ? ` · ${payerLabel(receivable)}` : ""} · ${dateOnly(receivable.createdAt)}`;
   const amount = amountFor(row);
   const next = nextStepFor(row, now);
   const action = actionFor(row);
 
   return (
     <motion.li initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.4, delay: Math.min(index, 8) * 0.04, ease: EASE }}>
-      <Link href={`/claim/?id=${claim.id}`} className="hover:bg-surface-muted -mx-1 block rounded-lg px-1 transition-colors">
+      <Link href={`/receivable/?id=${receivable.id}`} className="hover:bg-surface-muted -mx-1 block rounded-lg px-1 transition-colors">
         {/* phone */}
         <div className="flex items-center gap-3 py-3 @2xl:hidden">
           <span className="flex min-w-0 flex-1 flex-col gap-0.5">
@@ -186,13 +187,13 @@ function ClaimRow({ row, now, index }: { row: Row; now: number; index: number })
   );
 }
 
-function EmptyClaims({ text }: { text: string }) {
+function EmptyReceivables({ text }: { text: string }) {
   return (
     <Card>
       <CardContent className="space-y-4 py-10 text-center">
         <p className="text-muted-foreground text-sm">{text}</p>
         <Button asChild>
-          <Link href="/claims/new/">Expedite a payment</Link>
+          <Link href="/receivables/new/">Expedite a payment</Link>
         </Button>
       </CardContent>
     </Card>
@@ -205,17 +206,17 @@ const TABS = [
   { value: "all", label: "All" },
 ] as const;
 
-/** The claims table/list with the design's Open, Settled, and All tabs. Shared by Home, My claims, and Guaranties. */
-function ClaimsSection({ rows, emptyText }: { rows: Row[]; emptyText: string }) {
+/** The receivables table/list with the design's Open, Settled, and All tabs. Shared by Home, My receivables, and Guaranties. */
+function ReceivablesSection({ rows, emptyText }: { rows: Row[]; emptyText: string }) {
   const now = useNowSeconds();
   const [tab, setTab] = useState<"open" | "settled" | "all">("all");
-  if (rows.length === 0) return <EmptyClaims text={emptyText} />;
+  if (rows.length === 0) return <EmptyReceivables text={emptyText} />;
   const filtered = tab === "all" ? rows : rows.filter((r) => OPEN_STATES.includes(r.state) === (tab === "open"));
   return (
     <section className="bg-card @container flex flex-col rounded-2xl p-5 sm:p-6">
       <div className="mb-1 flex flex-wrap items-center justify-between gap-3">
         <h2 className="text-lg font-semibold">Loans</h2>
-        <Segmented id="claims" label="Show" options={TABS} value={tab} onChange={setTab} />
+        <Segmented id="receivables" label="Show" options={TABS} value={tab} onChange={setTab} />
       </div>
       <div className={cn("text-muted-foreground hidden gap-2 border-b border-divider px-1 py-2.5 text-xs font-medium @2xl:grid", TABLE_COLS)}>
         <span>ID</span>
@@ -225,10 +226,10 @@ function ClaimsSection({ rows, emptyText }: { rows: Row[]; emptyText: string }) 
         <span className="pl-4">Next</span>
         <span />
       </div>
-      <ul data-testid="claim-list" className="divide-divider divide-y">
+      <ul data-testid="receivable-list" className="divide-divider divide-y">
         {filtered.length === 0 ? <li className="text-muted-foreground py-8 text-center text-sm">Nothing here yet.</li> : null}
         {filtered.map((row, i) => (
-          <ClaimRow key={row.claim.id} row={row} now={now} index={i} />
+          <ReceivableRow key={row.receivable.id} row={row} now={now} index={i} />
         ))}
       </ul>
     </section>
@@ -257,16 +258,16 @@ type Figure = "due" | "ready" | "settled";
 const DOLLARS = new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" });
 const formatDollars = (n: number) => DOLLARS.format(n);
 
-const claimCount = (n: number) => `${n} ${n === 1 ? "loan" : "loans"}`;
+const receivableCount = (n: number) => `${n} ${n === 1 ? "loan" : "loans"}`;
 
 function GuarantyCard({ row, className }: { row: Row; className?: string }) {
-  const amount = usd(BigInt(row.claim.requestedAmount));
+  const amount = usd(BigInt(row.receivable.requestedAmount));
   return (
-    <Link href={`/claim/?id=${row.claim.id}`} className={cn("flex flex-col", className)}>
+    <Link href={`/receivable/?id=${row.receivable.id}`} className={cn("flex flex-col", className)}>
       <GradientPanel tone="gold" className="flex flex-1 flex-col justify-between gap-3 p-5">
         <span className="eyebrow text-highlight">Sign-off request</span>
         <span className="text-[15px] leading-snug font-semibold">
-          {row.claim.description ? `A guaranty for ${amount}: ${row.claim.description}` : `A guaranty for ${amount}`}
+          {row.receivable.description ? `A guaranty for ${amount}: ${row.receivable.description}` : `A guaranty for ${amount}`}
         </span>
         <span className="flex items-center gap-2 text-[13px] font-semibold">
           Review and sign <ArrowRight className="size-3.5" />
@@ -278,31 +279,31 @@ function GuarantyCard({ row, className }: { row: Row; className?: string }) {
 
 function HomeView({ rows, orgName }: { rows: Row[]; orgName: string | null }) {
   const [figure, setFigure] = useState<Figure>("due");
-  if (rows.length === 0) return <EmptyClaims text="No loans yet." />;
-  const mine = rows.filter((r) => r.role === "claimant");
+  if (rows.length === 0) return <EmptyReceivables text="No loans yet." />;
+  const mine = rows.filter((r) => r.role === "seller");
   const dueRows = mine.filter((r) => r.state === "Funded" || r.state === "GuarantorCalled");
   const due = dueRows.reduce((sum, r) => sum + amountFor(r), 0n);
   const readyRows = mine.filter((r) => r.state === "Approved");
   const ready = readyRows.reduce((sum, r) => sum + amountFor(r), 0n);
   const year = new Date().getFullYear();
-  const settledRows = mine.filter((r) => (r.state === "Settled" || r.state === "Recovered") && new Date(r.claim.updatedAt).getFullYear() === year);
+  const settledRows = mine.filter((r) => (r.state === "Settled" || r.state === "Recovered") && new Date(r.receivable.updatedAt).getFullYear() === year);
   const settledThisYear = settledRows.reduce((sum, r) => sum + amountFor(r), 0n);
   const shown = {
-    due: { value: due, caption: `From ${claimCount(dueRows.length)}. Pay it back, with interest, when the payment arrives.` },
-    ready: { value: ready, caption: `From ${claimCount(readyRows.length)}, approved and ready to collect.` },
-    settled: { value: settledThisYear, caption: `From ${claimCount(settledRows.length)} closed out in ${year}.` },
+    due: { value: due, caption: `From ${receivableCount(dueRows.length)}. Pay it back, with interest, when the payment arrives.` },
+    ready: { value: ready, caption: `From ${receivableCount(readyRows.length)}, approved and ready to collect.` },
+    settled: { value: settledThisYear, caption: `From ${receivableCount(settledRows.length)} closed out in ${year}.` },
   }[figure];
   const funded = mine.find((r) => r.state === "Funded");
-  const settleHref = funded ? `/claim/?id=${funded.claim.id}` : null;
+  const settleHref = funded ? `/receivable/?id=${funded.receivable.id}` : null;
   const cardRow = mine.find((r) => r.state === "Funded") ?? mine.find((r) => r.state === "Approved") ?? mine.find((r) => r.state === "Submitted") ?? mine.find((r) => r.state === "Draft");
-  const guarantyRow = rows.find((r) => r.role === "guarantor" && r.claim.packetHash && !r.claim.guarantySigned);
+  const guarantyRow = rows.find((r) => r.role === "guarantor" && r.receivable.packetHash && !r.receivable.guarantySigned);
 
   return (
     <div className="flex flex-col gap-5 lg:flex-row lg:items-start">
       <div className="flex min-w-0 flex-1 flex-col gap-5">
         <GradientPanel tone="panel" className="flex flex-col gap-5 p-6 lg:h-[300px]">
           <div className="flex gap-6 border-b border-on-ink/15">
-            <TabFigure label="To send back" value={due} active={figure === "due"} onSelect={() => setFigure("due")} />
+            <TabFigure label="To pay back" value={due} active={figure === "due"} onSelect={() => setFigure("due")} />
             <TabFigure label="Ready to collect" value={ready} active={figure === "ready"} onSelect={() => setFigure("ready")} />
             <TabFigure label="Closed out this year" value={settledThisYear} active={figure === "settled"} onSelect={() => setFigure("settled")} />
           </div>
@@ -312,28 +313,29 @@ function HomeView({ rows, orgName }: { rows: Row[]; orgName: string | null }) {
             </span>
             <p className="text-on-ink/80 text-sm">{shown.caption}</p>
           </div>
-          {/* only what applies right now; "Expedite a payment" is already top right, and reporting a payer problem lives on the loan */}
+          {/* only what applies right now; "Expedite a payment" is already top right, and reporting a payer problem lives on the receivable */}
           <div className="mt-auto flex flex-wrap gap-2">
             {settleHref ? (
               <Button asChild variant="light" size="sm">
-                <Link href={settleHref}>Send it back</Link>
+                <Link href={settleHref}>Pay it back</Link>
               </Button>
             ) : null}
           </div>
         </GradientPanel>
         {guarantyRow ? <GuarantyCard row={guarantyRow} className="lg:hidden" /> : null}
-        <ClaimsSection rows={rows} emptyText="No loans yet." />
+        <ReceivablesSection rows={rows} emptyText="No loans yet." />
       </div>
       {cardRow || guarantyRow ? (
         <aside className="hidden w-[364px] shrink-0 flex-col gap-5 lg:flex">
           {cardRow ? (
             <section className="flex flex-col items-center gap-3.5">
               <h2 className="text-muted-foreground w-full text-sm font-medium">Latest loan</h2>
-              <ClaimCard
-                claimId={cardNumber(cardRow.claim.status === "Draft" ? null : cardRow.claim.number)}
+              <ReceivableCard
+                receivableId={cardNumber(cardRow.receivable.status === "Draft" ? null : cardRow.receivable.number)}
                 amount={usd(amountFor(cardRow))}
                 state={STATE_LABEL[cardRow.state]}
-                org={orgName ?? "Your business"}
+                org={cardRow.receivable.payerName}
+                kind={RECEIVABLE_TYPES[cardRow.receivable.type].short}
                 tone={CARD_TONE[cardRow.state]}
               />
             </section>
@@ -345,13 +347,13 @@ function HomeView({ rows, orgName }: { rows: Row[]; orgName: string | null }) {
   );
 }
 
-function ClaimsView({ me }: { me: MeResponse }) {
+function ReceivablesView({ me }: { me: MeResponse }) {
   const view = useSearchParams().get("view");
-  const rows = useClaimRows(me);
+  const rows = useReceivableRows(me);
   const orgs = useOrgs();
   const firstName = (me.profile?.displayName ?? "").trim().split(/\s+/)[0] || "there";
   const orgName = resolveOrgName(rows.data ?? [], orgs.data);
-  const title = view === "claims" ? "My loans" : view === "guaranties" ? "Sign-offs" : `Hi, ${firstName}`;
+  const title = view === "receivables" ? "My loans" : view === "guaranties" ? "Sign-offs" : `Hi, ${firstName}`;
   const crumb = view ? undefined : crumbFor(me, orgName);
 
   return (
@@ -363,9 +365,9 @@ function ClaimsView({ me }: { me: MeResponse }) {
         <ErrorNotice>{friendlyError(rows.error)}</ErrorNotice>
 
       ) : view === "guaranties" ? (
-        <ClaimsSection rows={rows.data.filter((r) => r.role === "guarantor")} emptyText="No sign-offs yet." />
-      ) : view === "claims" ? (
-        <ClaimsSection rows={rows.data} emptyText="No loans yet." />
+        <ReceivablesSection rows={rows.data.filter((r) => r.role === "guarantor")} emptyText="No sign-offs yet." />
+      ) : view === "receivables" ? (
+        <ReceivablesSection rows={rows.data} emptyText="No loans yet." />
       ) : (
         <HomeView rows={rows.data} orgName={orgName} />
       )}
@@ -373,12 +375,12 @@ function ClaimsView({ me }: { me: MeResponse }) {
   );
 }
 
-export default function ClaimsPage() {
+export default function ReceivablesPage() {
   return (
     <AccountGate reason="Sign in to see your loans and sign-offs.">
       {(me) => (
         <Suspense fallback={<Skeleton className="h-96 w-full rounded-3xl" />}>
-          <ClaimsView me={me} />
+          <ReceivablesView me={me} />
         </Suspense>
       )}
     </AccountGate>

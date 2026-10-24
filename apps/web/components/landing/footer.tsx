@@ -8,7 +8,7 @@ const LINKS = [
   { label: "Home", href: "#top" },
   { label: "How it works", href: "#how" },
   { label: "For lenders", href: "/lend/" },
-  { label: "Launch app", href: "/claims/" },
+  { label: "Launch app", href: "/receivables/" },
 ] as const;
 
 export function LandingFooter() {

@@ -1,20 +1,21 @@
--- Offchain state for receivables financing on the XRP Ledger. Postgres holds profiles, drafts, documents, KYC, and
--- each claim's lifecycle; money moves on XRPL and every transaction hash is kept in ledger_txs. The browser never
+-- Offchain state for receivables financing on the XRP Ledger. A receivable is money someone is owed by a payer (a card
+-- settlement, a reimbursement, an invoice); its seller gets paid now from the lending vault. Postgres holds profiles,
+-- drafts, documents, KYC, and each receivable's lifecycle; money moves on XRPL and every transaction hash is kept in ledger_txs. The browser never
 -- reads these tables: row level security is on with no policies, and anon and authenticated hold no privileges.
 -- Edge functions use the service role after checking the caller's Privy token.
 
 create type public.kyc_status as enum ('not_started', 'pending', 'approved', 'rejected');
 create type public.kyc_source as enum ('manual');
 create type public.staff_role as enum ('underwriter', 'attester', 'admin');
-create type public.recipient_type as enum ('member', 'org_treasurer');
-create type public.asuc_outcome as enum ('none', 'rejected', 'short_paid');
-create type public.call_reason as enum ('none', 'asuc_rejected', 'partial_shortfall', 'overdue');
-create type public.claim_status as enum (
+create type public.receivable_type as enum ('card_settlement', 'reimbursement', 'invoice', 'other');
+create type public.payer_outcome as enum ('none', 'rejected', 'short_paid');
+create type public.call_reason as enum ('none', 'payer_rejected', 'partial_shortfall', 'overdue');
+create type public.receivable_status as enum (
   'Draft', 'Submitted', 'Approved', 'Funded', 'GuarantorCalled', 'Settled', 'Recovered', 'WrittenOff', 'Rejected',
   'Cancelled'
 );
 create type public.notification_kind as enum (
-  'guaranty_requested', 'claim_approved', 'claim_funded', 'due_soon', 'guarantor_called'
+  'guaranty_requested', 'receivable_approved', 'receivable_funded', 'due_soon', 'guarantor_called'
 );
 
 -- classic XRPL addresses; amounts are integer base units of the loan asset (6 decimals)
@@ -70,23 +71,32 @@ create table public.org_officers (
 );
 create index org_officers_wallet on public.org_officers (wallet_address) where active;
 
-create table public.claims (
+create table public.receivables (
   id uuid primary key default gen_random_uuid(),
-  -- the short number on the claim card
+  -- the short number on the receivable card
   number bigint generated always as identity unique,
-  org_id bigint not null references public.orgs (id),
+  type public.receivable_type not null,
   recipient_wallet public.xrpl_address not null references public.profiles (wallet_address),
-  recipient_type public.recipient_type not null default 'member',
+  -- who owes the money: a card processor, ASUC, a customer
+  payer_name text not null check (length(payer_name) between 1 and 120),
+  payer_email text check (payer_email is null or payer_email ~* '^[^@\s]+@[^@\s]+\.[^@\s]+$'),
+  -- the payer's XRPL account, when they have one: underwriting reads its history, repayment watches it
+  payer_wallet public.xrpl_address,
+  -- when the payer is expected to pay; the loan's term runs to here
+  due_date date not null,
+  -- only for an org's receivables (a club reimbursement): the org, and its officer as guarantor
+  org_id bigint references public.orgs (id),
   face_value public.units not null check (face_value > 0),
   requested_amount public.units not null check (requested_amount > 0),
-  callink_pr_number text not null check (length(callink_pr_number) between 1 and 64),
+  -- the payer's own reference: invoice number, settlement batch, purchase request
+  reference text not null check (length(reference) between 1 and 64),
   description text check (description is null or length(description) <= 2000),
   -- set once by the packet function; the draft can't be edited after that
   packet_json jsonb,
   packet_hash public.sha256_hex unique,
   guarantor_wallet public.xrpl_address,
   guaranty_signed_at timestamptz,
-  status public.claim_status not null default 'Draft',
+  status public.receivable_status not null default 'Draft',
   submitted_at timestamptz,
   approved_amount public.units not null default 0,
   approved_by public.xrpl_address,
@@ -98,34 +108,36 @@ create table public.claims (
   amount_paid public.units not null default 0,
   purchased_at timestamptz,
   due_at timestamptz,
-  -- the XRPL Loan ledger object that funded this claim
+  -- the XRPL Loan ledger object that funded this receivable
   loan_id text check (loan_id is null or loan_id ~ '^[0-9A-F]{64}$'),
   call_reason public.call_reason not null default 'none',
   guarantor_called_at timestamptz,
   write_off_eligible_at timestamptz,
   principal_written_off boolean not null default false,
   written_off_principal public.units not null default 0,
-  asuc_outcome public.asuc_outcome not null default 'none',
-  asuc_outcome_note text check (asuc_outcome_note is null or length(asuc_outcome_note) <= 2000),
-  asuc_outcome_at timestamptz,
+  payer_outcome public.payer_outcome not null default 'none',
+  payer_outcome_note text check (payer_outcome_note is null or length(payer_outcome_note) <= 2000),
+  payer_outcome_at timestamptz,
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now(),
-  -- one sale per CalLink purchase request
-  unique (org_id, callink_pr_number),
+  -- one sale per payer reference for each seller
+  unique (recipient_wallet, reference),
+  constraint guarantor_needs_org check (guarantor_wallet is null or org_id is not null),
   constraint requested_within_face check (requested_amount <= face_value),
   constraint approved_within_requested check (approved_amount <= requested_amount),
   constraint guarantor_not_recipient check (guarantor_wallet is distinct from recipient_wallet),
   constraint packet_complete check ((packet_json is null) = (packet_hash is null)),
   constraint paid_within_due check (amount_paid <= amount_due)
 );
-create index claims_recipient on public.claims (recipient_wallet);
-create index claims_guarantor on public.claims (guarantor_wallet);
-create index claims_status on public.claims (status);
-create index claims_reported on public.claims (asuc_outcome) where asuc_outcome <> 'none';
+create index receivables_recipient on public.receivables (recipient_wallet);
+create index receivables_guarantor on public.receivables (guarantor_wallet);
+create index receivables_status on public.receivables (status);
+create index receivables_reported on public.receivables (payer_outcome) where payer_outcome <> 'none';
+create index receivables_payer_wallet on public.receivables (payer_wallet) where payer_wallet is not null;
 
-create table public.claim_documents (
+create table public.receivable_documents (
   id uuid primary key default gen_random_uuid(),
-  claim_id uuid not null references public.claims (id) on delete cascade,
+  receivable_id uuid not null references public.receivables (id) on delete cascade,
   storage_path text not null unique,
   -- null until the upload is confirmed and hashed
   sha256 public.sha256_hex,
@@ -134,11 +146,11 @@ create table public.claim_documents (
   uploaded_by public.xrpl_address not null,
   created_at timestamptz not null default now()
 );
-create index claim_documents_claim on public.claim_documents (claim_id);
+create index receivable_documents_receivable on public.receivable_documents (receivable_id);
 
 create table public.guarantor_invites (
   id uuid primary key default gen_random_uuid(),
-  claim_id uuid not null references public.claims (id) on delete cascade,
+  receivable_id uuid not null references public.receivables (id) on delete cascade,
   guarantor_wallet public.xrpl_address not null,
   -- sha256 of the random token in the link; the token itself is never stored
   token_hash public.sha256_hex not null unique,
@@ -146,21 +158,21 @@ create table public.guarantor_invites (
   used_at timestamptz,
   created_at timestamptz not null default now()
 );
-create index guarantor_invites_claim on public.guarantor_invites (claim_id);
+create index guarantor_invites_receivable on public.guarantor_invites (receivable_id);
 
--- Every XRPL transaction the app submitted or saw for a claim or account, for explorer links and the audit trail.
+-- Every XRPL transaction the app submitted or saw for a receivable or account, for explorer links and the audit trail.
 create table public.ledger_txs (
   id bigint generated always as identity primary key,
   tx_hash text not null unique check (tx_hash ~ '^[0-9A-F]{64}$'),
   tx_type text not null check (length(tx_type) between 1 and 64),
   account public.xrpl_address not null,
-  claim_id uuid references public.claims (id) on delete set null,
+  receivable_id uuid references public.receivables (id) on delete set null,
   -- what the app was doing, e.g. 'fund_wallet', 'loan_set'
   purpose text not null check (length(purpose) between 1 and 64),
   result text not null check (length(result) between 1 and 64),
   created_at timestamptz not null default now()
 );
-create index ledger_txs_claim on public.ledger_txs (claim_id, created_at);
+create index ledger_txs_receivable on public.ledger_txs (receivable_id, created_at);
 create index ledger_txs_account on public.ledger_txs (account, created_at desc);
 
 create table public.admin_actions (
@@ -177,12 +189,12 @@ create table public.notifications (
   id bigint generated always as identity primary key,
   wallet_address public.xrpl_address not null,
   kind public.notification_kind not null,
-  claim_id uuid not null references public.claims (id) on delete cascade,
+  receivable_id uuid not null references public.receivables (id) on delete cascade,
   sent_at timestamptz not null default now(),
-  unique (wallet_address, kind, claim_id)
+  unique (wallet_address, kind, receivable_id)
 );
 
--- Keys for things that may happen only once, such as one simulated payer payment per claim.
+-- Keys for things that may happen only once, such as one simulated payer payment per receivable.
 create table public.once_keys (
   key text primary key check (length(key) between 1 and 200),
   created_at timestamptz not null default now()
@@ -205,7 +217,7 @@ begin
 end;
 $$;
 
-create trigger claims_touch before update on public.claims
+create trigger receivables_touch before update on public.receivables
 for each row execute function public.touch_updated_at();
 
 -- deny by default: RLS on, no policies
@@ -214,8 +226,8 @@ alter table public.profiles enable row level security;
 alter table public.staff enable row level security;
 alter table public.orgs enable row level security;
 alter table public.org_officers enable row level security;
-alter table public.claims enable row level security;
-alter table public.claim_documents enable row level security;
+alter table public.receivables enable row level security;
+alter table public.receivable_documents enable row level security;
 alter table public.guarantor_invites enable row level security;
 alter table public.ledger_txs enable row level security;
 alter table public.admin_actions enable row level security;

@@ -1,14 +1,14 @@
 import {
-  type Claim,
-  type ClaimDocument,
-  type ClaimPatch,
-  type ClaimScope,
-  type ClaimStatus,
+  type Receivable,
+  type ReceivableDocument,
+  type ReceivablePatch,
+  type ReceivableScope,
+  type ReceivableStatus,
   type Db,
   type GuarantorInvite,
   type KycStatus,
   type LedgerTx,
-  type NewClaim,
+  type NewReceivable,
   type NotificationKey,
   type Officer,
   type Org,
@@ -27,8 +27,8 @@ export class MemoryDb implements Db {
   readonly staff = new Map<Wallet, StaffRole>();
   readonly orgs = new Map<number, Org>();
   readonly officers = new Map<string, Officer>();
-  readonly claims = new Map<string, Claim>();
-  readonly documents = new Map<string, ClaimDocument>();
+  readonly receivables = new Map<string, Receivable>();
+  readonly documents = new Map<string, ReceivableDocument>();
   readonly invites = new Map<string, GuarantorInvite>();
   readonly ledgerTxs: LedgerTx[] = [];
   readonly adminActions: Array<{ actorWallet: Wallet; action: string; target: string; payload: Record<string, unknown> }> = [];
@@ -36,7 +36,7 @@ export class MemoryDb implements Db {
   readonly sync = new Map<string, number>();
   readonly onceKeys = new Set<string>();
   private orgSeq = 0;
-  private claimSeq = 0;
+  private receivableSeq = 0;
 
   constructor(private readonly now: () => Date = () => new Date()) {}
 
@@ -135,19 +135,20 @@ export class MemoryDb implements Db {
       }));
   }
 
-  async insertClaim(c: NewClaim) {
-    if (!this.orgs.has(c.orgId)) throw new Error("claims_org_id_fkey");
-    if (!this.profiles.has(c.recipientWallet)) throw new Error("claims_recipient_wallet_fkey");
-    for (const other of this.claims.values()) {
-      if (other.orgId === c.orgId && other.callinkPrNumber === c.callinkPrNumber) {
-        throw new UniqueViolation("claims_org_id_callink_pr_number_key");
+  async insertReceivable(c: NewReceivable) {
+    if (c.orgId !== null && !this.orgs.has(c.orgId)) throw new Error("receivables_org_id_fkey");
+    if (!this.profiles.has(c.recipientWallet)) throw new Error("receivables_recipient_wallet_fkey");
+    if (c.guarantorWallet !== null && c.orgId === null) throw new Error("guarantor_needs_org");
+    for (const other of this.receivables.values()) {
+      if (other.recipientWallet === c.recipientWallet && other.reference === c.reference) {
+        throw new UniqueViolation("receivables_recipient_wallet_reference_key");
       }
     }
     const at = this.stamp();
-    const row: Claim = {
+    const row: Receivable = {
       ...c,
       id: crypto.randomUUID(),
-      number: ++this.claimSeq,
+      number: ++this.receivableSeq,
       packetJson: null,
       packetHash: null,
       guarantySignedAt: null,
@@ -169,60 +170,65 @@ export class MemoryDb implements Db {
       writeOffEligibleAt: null,
       principalWrittenOff: false,
       writtenOffPrincipal: "0",
-      asucOutcome: "none",
-      asucOutcomeNote: null,
-      asucOutcomeAt: null,
+      payerOutcome: "none",
+      payerOutcomeNote: null,
+      payerOutcomeAt: null,
       createdAt: at,
       updatedAt: at,
     };
-    this.claims.set(row.id, row);
+    this.receivables.set(row.id, row);
     return row;
   }
-  async getClaim(id: string) {
-    return this.claims.get(id) ?? null;
+  async getReceivable(id: string) {
+    return this.receivables.get(id) ?? null;
   }
-  async updateClaim(id: string, patch: ClaimPatch) {
-    const row = this.claims.get(id);
-    if (!row) throw new Error(`no claim ${id}`);
-    if (patch.packetHash && [...this.claims.values()].some((c) => c.id !== id && c.packetHash === patch.packetHash)) {
-      throw new UniqueViolation("claims_packet_hash_key");
+  async updateReceivable(id: string, patch: ReceivablePatch) {
+    const row = this.receivables.get(id);
+    if (!row) throw new Error(`no receivable ${id}`);
+    if (patch.packetHash && [...this.receivables.values()].some((c) => c.id !== id && c.packetHash === patch.packetHash)) {
+      throw new UniqueViolation("receivables_packet_hash_key");
     }
     const next = { ...row, ...patch, updatedAt: this.stamp() };
+    if (next.guarantorWallet !== null && next.orgId === null) throw new Error("guarantor_needs_org");
+    if ([...this.receivables.values()].some((c) => c.id !== id && c.recipientWallet === next.recipientWallet && c.reference === next.reference)) {
+      throw new UniqueViolation("receivables_recipient_wallet_reference_key");
+    }
     if (BigInt(next.approvedAmount) > BigInt(next.requestedAmount)) throw new Error("approved_within_requested");
     if (BigInt(next.amountPaid) > BigInt(next.amountDue)) throw new Error("paid_within_due");
-    this.claims.set(id, next);
+    this.receivables.set(id, next);
     return next;
   }
-  async transitionClaim(id: string, from: ClaimStatus[], patch: ClaimPatch) {
-    const row = this.claims.get(id);
+  async transitionReceivable(id: string, from: ReceivableStatus[], patch: ReceivablePatch) {
+    const row = this.receivables.get(id);
     if (!row || !from.includes(row.status)) return null;
-    return this.updateClaim(id, patch);
+    return this.updateReceivable(id, patch);
   }
-  async listClaims(scope: ClaimScope) {
-    const all = [...this.claims.values()].sort((a, b) => b.createdAt.localeCompare(a.createdAt) || b.number - a.number);
+  async listReceivables(scope: ReceivableScope) {
+    const all = [...this.receivables.values()].sort((a, b) => b.createdAt.localeCompare(a.createdAt) || b.number - a.number);
     if (scope.kind === "all") return all;
-    if (scope.kind === "reported") return all.filter((c) => c.asucOutcome !== "none");
+    if (scope.kind === "reported") return all.filter((c) => c.payerOutcome !== "none");
     return all.filter(
-      (c) => c.recipientWallet === scope.wallet || c.guarantorWallet === scope.wallet || scope.officerOrgIds.includes(c.orgId),
+      (c) =>
+        c.recipientWallet === scope.wallet || c.guarantorWallet === scope.wallet || (c.orgId !== null && scope.officerOrgIds.includes(c.orgId)),
     );
   }
-  async listClaimsByStatus(statuses: ClaimStatus[]) {
-    return [...this.claims.values()].filter((c) => statuses.includes(c.status));
+  async listReceivablesByStatus(statuses: ReceivableStatus[]) {
+    return [...this.receivables.values()].filter((c) => statuses.includes(c.status));
   }
 
-  async insertDocument(d: Omit<ClaimDocument, "id" | "createdAt" | "sha256"> & { id?: string }) {
+  async insertDocument(d: Omit<ReceivableDocument, "id" | "createdAt" | "sha256"> & { id?: string }) {
     if ([...this.documents.values()].some((x) => x.storagePath === d.storagePath)) {
-      throw new UniqueViolation("claim_documents_storage_path_key");
+      throw new UniqueViolation("receivable_documents_storage_path_key");
     }
-    const row: ClaimDocument = { ...d, id: d.id ?? crypto.randomUUID(), sha256: null, createdAt: this.stamp() };
+    const row: ReceivableDocument = { ...d, id: d.id ?? crypto.randomUUID(), sha256: null, createdAt: this.stamp() };
     this.documents.set(row.id, row);
     return row;
   }
   async getDocument(id: string) {
     return this.documents.get(id) ?? null;
   }
-  async listDocuments(claimId: string) {
-    return [...this.documents.values()].filter((d) => d.claimId === claimId).sort((a, b) => a.createdAt.localeCompare(b.createdAt));
+  async listDocuments(receivableId: string) {
+    return [...this.documents.values()].filter((d) => d.receivableId === receivableId).sort((a, b) => a.createdAt.localeCompare(b.createdAt));
   }
   async setDocumentHash(id: string, sha256: string) {
     const row = this.documents.get(id);
@@ -244,17 +250,17 @@ export class MemoryDb implements Db {
     const row = this.invites.get(id);
     if (row && !row.usedAt) this.invites.set(id, { ...row, usedAt: this.stamp() });
   }
-  async countInvitesSince(claimId: string, since: string) {
-    return [...this.invites.values()].filter((i) => i.claimId === claimId && Date.parse(i.createdAt) >= Date.parse(since)).length;
+  async countInvitesSince(receivableId: string, since: string) {
+    return [...this.invites.values()].filter((i) => i.receivableId === receivableId && Date.parse(i.createdAt) >= Date.parse(since)).length;
   }
 
   async recordLedgerTx(tx: Omit<LedgerTx, "createdAt">) {
     if (this.ledgerTxs.some((t) => t.txHash === tx.txHash)) return;
     this.ledgerTxs.push({ ...tx, createdAt: this.stamp() });
   }
-  async listLedgerTxs(filter: { claimId?: string; account?: Wallet; limit?: number }) {
+  async listLedgerTxs(filter: { receivableId?: string; account?: Wallet; limit?: number }) {
     return this.ledgerTxs
-      .filter((t) => (filter.claimId === undefined || t.claimId === filter.claimId) && (filter.account === undefined || t.account === filter.account))
+      .filter((t) => (filter.receivableId === undefined || t.receivableId === filter.receivableId) && (filter.account === undefined || t.account === filter.account))
       .slice(-(filter.limit ?? 50));
   }
 
@@ -263,7 +269,7 @@ export class MemoryDb implements Db {
   }
 
   async recordNotification(n: NotificationKey) {
-    const key = `${n.wallet}:${n.kind}:${n.claimId}`;
+    const key = `${n.wallet}:${n.kind}:${n.receivableId}`;
     if (this.notifications.has(key)) return false;
     this.notifications.add(key);
     return true;

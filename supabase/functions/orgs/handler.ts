@@ -1,6 +1,6 @@
 import { z } from "zod";
 import { type TokenVerifier, requireCaller, requireStaff } from "../_shared/auth.ts";
-import { xrplAddress } from "../_shared/claims.ts";
+import { xrplAddress } from "../_shared/receivables.ts";
 import { type Db, UniqueViolation } from "../_shared/db/types.ts";
 import { type Handler, conflict, json, methodNotAllowed, notFound, readJson } from "../_shared/http.ts";
 

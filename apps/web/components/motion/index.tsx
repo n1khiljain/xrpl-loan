@@ -33,7 +33,7 @@ export function RiseIn({ children, delay = 0, className }: { children: ReactNode
 
 /**
  * Swaps one thing for the next when `id` changes: the old one tips up and out, the new one rises in. This is the
- * landing's claim card move, for anything that changes state in place.
+ * landing's receivable card move, for anything that changes state in place.
  */
 export function Swap({ id, children, className }: { id: string; children: ReactNode; className?: string }) {
   return (

@@ -1,5 +1,5 @@
-import type { ClaimCardTone } from "@/components/brand/claim-card";
-import type { CardMoment } from "@/components/brand/live-claim-card";
+import type { ReceivableCardTone } from "@/components/brand/receivable-card";
+import type { CardMoment } from "@/components/brand/live-receivable-card";
 import { cn } from "@/lib/utils";
 
 export type DisplayState =
@@ -29,10 +29,10 @@ export const STATE_LABEL: Record<DisplayState, string> = {
 };
 
 /**
- * The claim card's color for each state, so the card itself shows how far along it is: frosted silver while it's
+ * The receivable card's color for each state, so the card itself shows how far along it is: frosted silver while it's
  * waiting, sky blue once approved, deep blue once paid, gold when it's closed out.
  */
-export const CARD_TONE: Record<DisplayState, ClaimCardTone> = {
+export const CARD_TONE: Record<DisplayState, ReceivableCardTone> = {
   Draft: "frost",
   Submitted: "frost",
   Approved: "sky",

@@ -45,7 +45,7 @@ export function Hero() {
               </p>
               <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
                 <Button asChild size="lg" variant="light" className="pr-2">
-                  <Link href="/claims/new/">
+                  <Link href="/receivables/new/">
                     <CtaLabel invert>Expedite a payment</CtaLabel>
                   </Link>
                 </Button>

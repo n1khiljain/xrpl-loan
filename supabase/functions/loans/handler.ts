@@ -4,8 +4,8 @@ import { paramsAsBigInt } from "@app/config";
 import { LoanPayFlags, type LoanPay, type LoanSet } from "xrpl";
 import type { TokenVerifier } from "../_shared/auth.ts";
 import { requireCaller } from "../_shared/auth.ts";
-import { amountRemaining, claimView, loadClaim, requireClaimant } from "../_shared/claims.ts";
-import type { ClaimStatus, Db } from "../_shared/db/types.ts";
+import { amountRemaining, receivableView, loadReceivable, requireSeller } from "../_shared/receivables.ts";
+import type { ReceivableStatus, Db } from "../_shared/db/types.ts";
 import type { Env } from "../_shared/env.ts";
 import { type Handler, conflict, json, methodNotAllowed, readJson } from "../_shared/http.ts";
 import type { Ledger } from "../_shared/ledger.ts";
@@ -35,14 +35,14 @@ export type LoansDeps = {
 
 const Body = z.strictObject({
   action: z.enum(["fund", "pay"]),
-  claimId: z.uuid(),
+  receivableId: z.uuid(),
 });
 
-const PAYABLE: ClaimStatus[] = ["Funded", "GuarantorCalled", "WrittenOff"];
+const PAYABLE: ReceivableStatus[] = ["Funded", "GuarantorCalled", "WrittenOff"];
 
 /**
- * Funding and repayment. An approved claim becomes one loan from the vault; the borrower pays that loan back
- * from their custodial wallet. Both keys stay on the server, so each is one button.
+ * Funding and repayment. An approved receivable becomes one loan from the vault, running to the payer's due date; the
+ * borrower pays that loan back from their custodial wallet. Both keys stay on the server, so each is one button.
  */
 export function createLoansHandler(deps: LoansDeps): Handler {
   const now = deps.now ?? (() => new Date());
@@ -50,45 +50,49 @@ export function createLoansHandler(deps: LoansDeps): Handler {
     if (req.method !== "POST") throw methodNotAllowed(["POST"]);
     const caller = await requireCaller(req, deps);
     const body = await readJson(req, Body);
-    const claim = await loadClaim(deps.db, body.claimId);
-    requireClaimant(caller, claim);
-    if (body.action === "fund") return fund(deps, claim.id, now());
-    return pay(deps, claim.id, now());
+    const receivable = await loadReceivable(deps.db, body.receivableId);
+    requireSeller(caller, receivable);
+    if (body.action === "fund") return fund(deps, receivable.id, now());
+    return pay(deps, receivable.id, now());
   };
 }
 
-async function fund(deps: LoansDeps, claimId: string, now: Date): Promise<Response> {
-  const claim = await loadClaim(deps.db, claimId);
-  if (claim.status !== "Approved") throw conflict("this isn't waiting to be funded", "invalid_state");
-  if (!claim.approvalExpiresAt || Date.parse(claim.approvalExpiresAt) <= now.getTime()) {
+async function fund(deps: LoansDeps, receivableId: string, now: Date): Promise<Response> {
+  const receivable = await loadReceivable(deps.db, receivableId);
+  if (receivable.status !== "Approved") throw conflict("this isn't waiting to be funded", "invalid_state");
+  if (!receivable.approvalExpiresAt || Date.parse(receivable.approvalExpiresAt) <= now.getTime()) {
     throw conflict("this approval has expired", "approval_expired");
   }
-  const profile = await deps.db.getProfile(claim.recipientWallet);
+  const profile = await deps.db.getProfile(receivable.recipientWallet);
   if (profile?.kycStatus !== "approved") throw conflict("finish verification before you take this loan", "kyc_required");
   const setup = readySetup(deps.config);
-  if (deps.config.params.writeOffGraceSeconds > deps.config.params.overdueWindowSeconds) {
-    throw conflict("the grace period is longer than the loan term, which the ledger refuses", "terms");
-  }
+  // the loan runs to the receivable's due date: the end of that day, UTC
+  const term = loanTermSeconds(receivable.dueDate, now);
+  if (term < MIN_TERM_SECONDS) throw conflict("the payer's due date is too close to start a loan now", "due_too_soon");
+  // the ledger refuses a grace period longer than the payment interval, so a short loan gets a shorter grace
+  const grace = Math.min(deps.config.params.writeOffGraceSeconds, term);
 
   const params = paramsAsBigInt(deps.config);
-  const principal = principalUnits(BigInt(claim.approvedAmount), deps.config.params.advanceRateBps);
+  const principal = principalUnits(BigInt(receivable.approvedAmount), deps.config.params.advanceRateBps);
   if (principal <= 0n) throw conflict("this approval is for nothing", "zero");
-  if (principal > params.perClaimCap) throw conflict("this is above the largest loan", "over_cap");
-  const open = await deps.db.listClaimsByStatus(["Funded", "GuarantorCalled", "WrittenOff"]);
-  const used = open.filter((other) => other.orgId === claim.orgId).reduce((sum, other) => sum + BigInt(other.purchasePrice), 0n);
-  if (used + principal > params.perOrgCap) throw conflict("this business is at its loan limit", "over_org_cap");
+  if (principal > params.perReceivableCap) throw conflict("this is above the largest loan", "over_cap");
+  if (receivable.orgId !== null) {
+    const open = await deps.db.listReceivablesByStatus(["Funded", "GuarantorCalled", "WrittenOff"]);
+    const used = open.filter((other) => other.orgId === receivable.orgId).reduce((sum, other) => sum + BigInt(other.purchasePrice), 0n);
+    if (used + principal > params.perOrgCap) throw conflict("this business is at its loan limit", "over_org_cap");
+  }
 
   const snapshot = await vaultSnapshot(deps.ledger, deps.config, Math.floor(now.getTime() / 1000));
   if (snapshot.phase === "subscription") throw conflict("loans start once the deposit window closes", "vault_phase");
   if (snapshot.phase === "closed") throw conflict("a loan of this length would end after the vault's redemption date", "vault_phase");
 
-  const key = `fund:${claim.id}`;
+  const key = `fund:${receivable.id}`;
   if (!(await deps.db.claimOnce(key))) throw conflict("this loan is already being created", "in_progress");
   let sent = false;
   try {
     const seed = signingSeed(deps.env, "BROKER_SEED");
-    await ensureAccess({ ledger: deps.ledger, custody: deps.custody, config: deps.config, brokerSeed: seed, holder: claim.recipientWallet });
-    const borrower = await deps.custody.signer(claim.recipientWallet);
+    await ensureAccess({ ledger: deps.ledger, custody: deps.custody, config: deps.config, brokerSeed: seed, holder: receivable.recipientWallet });
+    const borrower = await deps.custody.signer(receivable.recipientWallet);
     const broker = brokerWallet(deps.config, seed);
     const tx: LoanSet = {
       TransactionType: "LoanSet",
@@ -96,23 +100,23 @@ async function fund(deps: LoansDeps, claimId: string, now: Date): Promise<Respon
       Counterparty: broker.classicAddress,
       LoanBrokerID: setup.loanBrokerId,
       PrincipalRequested: issuedAmount(deps.config, principal).value,
-      InterestRate: interestRateTenths(claim.feeBps),
+      InterestRate: interestRateTenths(receivable.feeBps),
       LateInterestRate: 0,
       CloseInterestRate: 0,
       OverpaymentInterestRate: 0,
       PaymentTotal: 1,
-      PaymentInterval: deps.config.params.overdueWindowSeconds,
-      GracePeriod: deps.config.params.writeOffGraceSeconds,
+      PaymentInterval: term,
+      GracePeriod: grace,
     };
-    const submitted = await deps.ledger.submitCoSigned(borrower, broker, tx, { purpose: "fund_loan", claimId: claim.id });
+    const submitted = await deps.ledger.submitCoSigned(borrower, broker, tx, { purpose: "fund_loan", receivableId: receivable.id });
     sent = true;
     const loanId = loanIndex(submitted.createdId);
     const entry = await deps.ledger.readEntry(loanId);
-    const formula = amountDue(principal, BigInt(claim.feeBps), deps.config.params.overdueWindowSeconds);
+    const formula = amountDue(principal, BigInt(receivable.feeBps), term);
     const priced = paymentDueUnits(entry);
     const due = priced !== null && priced > formula ? priced : formula;
-    const dueAt = dueAtFromLoan(entry, new Date(now.getTime() + deps.config.params.overdueWindowSeconds * 1000));
-    const moved = await deps.db.transitionClaim(claim.id, ["Approved"], {
+    const dueAt = dueAtFromLoan(entry, new Date(now.getTime() + term * 1000));
+    const moved = await deps.db.transitionReceivable(receivable.id, ["Approved"], {
       status: "Funded",
       purchasePrice: principal.toString(),
       amountDue: due.toString(),
@@ -122,43 +126,52 @@ async function fund(deps: LoansDeps, claimId: string, now: Date): Promise<Respon
       loanId,
     });
     if (!moved) throw conflict("this changed since the page loaded", "invalid_state");
-    return json({ claim: claimView(moved) });
+    return json({ receivable: receivableView(moved) });
   } catch (error) {
     if (!sent) await deps.db.releaseOnce(key);
     rethrowLedger(error);
   }
 }
 
-async function pay(deps: LoansDeps, claimId: string, now: Date): Promise<Response> {
-  const claim = await loadClaim(deps.db, claimId);
-  if (!PAYABLE.includes(claim.status)) throw conflict("this loan isn't waiting on a payment", "invalid_state");
-  if (!claim.loanId) throw conflict("this loan isn't on the ledger", "no_loan");
-  const remaining = amountRemaining(claim);
+async function pay(deps: LoansDeps, receivableId: string, now: Date): Promise<Response> {
+  const receivable = await loadReceivable(deps.db, receivableId);
+  if (!PAYABLE.includes(receivable.status)) throw conflict("this loan isn't waiting on a payment", "invalid_state");
+  if (!receivable.loanId) throw conflict("this loan isn't on the ledger", "no_loan");
+  const remaining = amountRemaining(receivable);
   if (remaining <= 0n) throw conflict("this loan is already paid", "paid");
 
-  const key = `pay:${claim.id}`;
+  const key = `pay:${receivable.id}`;
   if (!(await deps.db.claimOnce(key))) throw conflict("this payment is already being sent", "in_progress");
   let sent = false;
   try {
-    const borrower = await deps.custody.signer(claim.recipientWallet);
-    const late = claim.dueAt !== null && Date.parse(claim.dueAt) < now.getTime();
+    const borrower = await deps.custody.signer(receivable.recipientWallet);
+    const late = receivable.dueAt !== null && Date.parse(receivable.dueAt) < now.getTime();
     const tx: LoanPay = {
       TransactionType: "LoanPay",
       Account: borrower.classicAddress,
-      LoanID: claim.loanId,
+      LoanID: receivable.loanId,
       Amount: issuedAmount(deps.config, remaining),
       ...(late ? { Flags: LoanPayFlags.tfLoanLatePayment } : {}),
     };
-    await deps.ledger.submit(borrower, tx, { purpose: "pay_loan", claimId: claim.id });
+    await deps.ledger.submit(borrower, tx, { purpose: "pay_loan", receivableId: receivable.id });
     sent = true;
-    const patch = { status: "Settled" as const, amountPaid: claim.amountDue };
+    const patch = { status: "Settled" as const, amountPaid: receivable.amountDue };
     const moved =
-      (await deps.db.transitionClaim(claim.id, PAYABLE, patch)) ?? (await deps.db.updateClaim(claim.id, patch));
-    return json({ claim: claimView(moved) });
+      (await deps.db.transitionReceivable(receivable.id, PAYABLE, patch)) ?? (await deps.db.updateReceivable(receivable.id, patch));
+    return json({ receivable: receivableView(moved) });
   } catch (error) {
     if (!sent) await deps.db.releaseOnce(key);
     rethrowLedger(error);
   }
+}
+
+/** A loan shorter than a day isn't worth opening; the receivable form already asks for a date after today. */
+export const MIN_TERM_SECONDS = 86_400;
+
+/** Seconds from `now` to the end of the receivable's due date (YYYY-MM-DD, UTC). The receivables function caps how far out that is. */
+export function loanTermSeconds(dueDate: string, now: Date): number {
+  const end = Date.parse(`${dueDate}T23:59:59Z`);
+  return Math.max(0, Math.floor((end - now.getTime()) / 1000));
 }
 
 function loanIndex(id: string | null): string {

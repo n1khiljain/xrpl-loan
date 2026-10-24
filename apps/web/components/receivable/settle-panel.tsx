@@ -1,6 +1,6 @@
 "use client";
 
-import type { ClaimView } from "@app/adapters";
+import type { ReceivableView } from "@app/adapters";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { ErrorNotice, InfoNotice } from "@/components/app/notice";
 import { Button } from "@/components/ui/button";
@@ -14,20 +14,20 @@ import { usd } from "@/lib/format";
  * An approver sees the same numbers; the payment itself has to come from the borrower.
  */
 export function SettlePanel({
-  claimId,
+  receivableId,
   onchain,
   who,
   live,
 }: {
-  claimId: string;
-  onchain: ClaimView;
+  receivableId: string;
+  onchain: ReceivableView;
   who: "borrower" | "approver";
   live: boolean;
 }) {
   const call = useCall();
   const queryClient = useQueryClient();
   const pay = useMutation({
-    mutationFn: () => call("loans", { method: "POST", body: { action: "pay", claimId } }),
+    mutationFn: () => call("loans", { method: "POST", body: { action: "pay", receivableId } }),
     onSuccess: () => queryClient.invalidateQueries(),
   });
   const remaining = onchain.amountRemaining;

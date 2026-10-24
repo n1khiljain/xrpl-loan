@@ -14,7 +14,7 @@ function AreaAction() {
   if (area === "member") {
     return (
       <Button asChild>
-        <Link href="/claims/new/">
+        <Link href="/receivables/new/">
           <Plus strokeWidth={2.2} /> Expedite a payment
         </Link>
       </Button>
@@ -33,7 +33,7 @@ function AreaAction() {
 /**
  * The page header from the design: a crumb, a title, and the area's main action. On phones it adds the lockup row
  * the sidebar carries on desktop. Pass `action={null}` to hide the action, or your own node to replace it, and `back`
- * for a page one level down (a single reimbursement) so there's a way back to its list.
+ * for a page one level down (a single loan) so there's a way back to its list.
  */
 export function Topbar({
   title,

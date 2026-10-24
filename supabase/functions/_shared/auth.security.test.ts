@@ -13,7 +13,7 @@ function base() {
   return new SignJWT({ sid: "session" }).setProtectedHeader({ alg: "ES256", typ: "JWT" }).setIssuer("privy.io").setAudience(APP_ID).setSubject("did:privy:someone");
 }
 
-// E-6b (fixed): exp is a required claim
+// E-6b (fixed): exp is a required receivable
 Deno.test({
   name: "E6: a Privy token without exp is rejected",
   async fn() {

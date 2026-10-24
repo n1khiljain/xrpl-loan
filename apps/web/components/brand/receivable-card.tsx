@@ -2,15 +2,15 @@ import type { ReactNode } from "react";
 import { ASSET } from "@/lib/config";
 import { cn } from "@/lib/utils";
 
-export type ClaimCardTone = "frost" | "sky" | "deep" | "gold";
+export type ReceivableCardTone = "frost" | "sky" | "deep" | "gold";
 
 /** Each tone's surface on top of its gradient: glass while waiting, brushed gold when done. */
-const FINISH: Partial<Record<ClaimCardTone, string>> = {
+const FINISH: Partial<Record<ReceivableCardTone, string>> = {
   frost: "card-frost-edge",
   gold: "card-brushed",
 };
 
-const TONE: Record<ClaimCardTone, string> = {
+const TONE: Record<ReceivableCardTone, string> = {
   frost: "bg-grad-card-frost",
   deep: "bg-grad-card-deep",
   sky: "bg-grad-card-sky",
@@ -18,28 +18,32 @@ const TONE: Record<ClaimCardTone, string> = {
 };
 
 /**
- * The loan as a card: its number, state, and amount. The asset is named in text; nothing is drawn in code.
- * `size` scales the whole card (1 = 280x400). The number and
+ * The loan as a card: its number, state, and amount, with the payer and the kind of payment it expedites. The asset is
+ * named in text; nothing is drawn in code. `size` scales the whole card (1 = 280x400). The number and
  * state are quiet text in the surrounding font, as on the landing page, not a monospace number and a pill.
  * `amountNode` replaces the printed amount (a count-up), and `children` sit over the card for a state's moment
- * (see LiveClaimCard).
+ * (see LiveReceivableCard).
  */
-export function ClaimCard({
-  claimId,
+export function ReceivableCard({
+  receivableId,
   amount,
   state,
   org,
+  kind = "Loan",
   tone = "deep",
   scale = 1,
   amountNode,
   children,
   className,
 }: {
-  claimId: string;
+  receivableId: string;
   amount: string;
   state: string;
+  /** The payer or org shown on the card. */
   org: string;
-  tone?: ClaimCardTone;
+  /** The kind of payment it expedites, shown bottom right. */
+  kind?: string;
+  tone?: ReceivableCardTone;
   scale?: number;
   amountNode?: ReactNode;
   children?: ReactNode;
@@ -49,14 +53,14 @@ export function ClaimCard({
   return (
     <div
       role="img"
-      aria-label={`Loan ${claimId}, ${amount}, ${state.toLowerCase()}`}
+      aria-label={`${kind} ${receivableId}, ${amount}, ${state.toLowerCase()}`}
       className={cn("grain text-on-ink shadow-card relative shrink-0 overflow-hidden rounded-[22px] font-sans", TONE[tone], className)}
       style={{ width: 280 * scale, height: 400 * scale, fontSize: 16 * scale }}
     >
       {finish ? <span aria-hidden className={cn("pointer-events-none absolute inset-0 rounded-[inherit]", finish)} /> : null}
       {/* every tone starts pale at the top, so the top labels are ink; the canvas's white failed contrast there */}
       <span className="text-ink/80 absolute top-[1em] left-[1.125em] text-[0.75em] font-semibold tracking-[0.02em]">
-        {claimId === "DRAFT" ? "Draft" : `No. ${claimId}`}
+        {receivableId === "DRAFT" ? "Draft" : `No. ${receivableId}`}
       </span>
       <span className="text-ink/80 absolute top-[1em] right-[1.125em] text-[0.75em] font-semibold tracking-[0.02em]">{sentenceCase(state)}</span>
       <span className="money-type absolute right-[0.64em] bottom-[1.8em] left-[0.64em] text-[1.75em]">{amountNode ?? amount}</span>
@@ -66,7 +70,7 @@ export function ClaimCard({
           <span className="shrink-0 font-semibold">{ASSET}</span>
           <span className="truncate">{org}</span>
         </span>
-        <span className="shrink-0 text-[0.8em] font-semibold">Loan</span>
+        <span className="shrink-0 text-[0.8em] font-semibold">{kind}</span>
       </span>
       {children}
     </div>
@@ -78,7 +82,7 @@ function sentenceCase(label: string): string {
   return label.charAt(0) + label.slice(1).toLowerCase();
 }
 
-/** "0012" from 12, the way claim cards number claims. */
+/** "0012" from 12, the way receivable cards number receivables. */
 export function cardNumber(id: bigint | number | string | null | undefined): string {
   if (id === null || id === undefined || id === "") return "DRAFT";
   return String(id).padStart(4, "0");

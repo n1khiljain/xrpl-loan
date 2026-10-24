@@ -11,11 +11,11 @@ const ENDPOINT = "http://localhost/guaranty";
 async function frozenWorld() {
   const w = await draftWorld();
   const packet = await call(createPacketHandler({ auth: verifier, db: w.db }), "POST", "http://localhost/packet", {
-    token: w.claimant.token,
-    body: { claimId: w.claim.id },
+    token: w.seller.token,
+    body: { receivableId: w.receivable.id },
   });
   const handler = createGuarantyHandler({ auth: verifier, db: w.db, now: () => FIXED_NOW });
-  return { ...w, handler, body: { claimId: w.claim.id, packetHash: String(packet.body.packetHash) } };
+  return { ...w, handler, body: { receivableId: w.receivable.id, packetHash: String(packet.body.packetHash) } };
 }
 
 Deno.test("guaranty rejects requests without a valid Privy token", async () => {
@@ -26,25 +26,25 @@ Deno.test("the guarantor's sign-off is stored with its time and logged against t
   const w = await frozenWorld();
   const res = await call(w.handler, "POST", ENDPOINT, { token: w.guarantor.token, body: w.body });
   assertStatus(res, 200);
-  assertEquals((await w.db.getClaim(w.claim.id))?.guarantySignedAt, FIXED_NOW.toISOString());
+  assertEquals((await w.db.getReceivable(w.receivable.id))?.guarantySignedAt, FIXED_NOW.toISOString());
   assertEquals(w.db.adminActions.at(-1), {
     actorWallet: w.guarantor.wallet,
     action: "guaranty_signed",
-    target: w.claim.id,
+    target: w.receivable.id,
     payload: { packetHash: w.body.packetHash, at: FIXED_NOW.toISOString() },
   });
 });
 
-Deno.test("guaranty refuses anyone but the guarantor, a stale packet, a draft that isn't frozen, and a submitted claim", async () => {
+Deno.test("guaranty refuses anyone but the guarantor, a stale packet, a draft that isn't frozen, and a submitted receivable", async () => {
   const w = await frozenWorld();
-  assertStatus(await call(w.handler, "POST", ENDPOINT, { token: w.claimant.token, body: w.body }), 403);
+  assertStatus(await call(w.handler, "POST", ENDPOINT, { token: w.seller.token, body: w.body }), 403);
   assertStatus(await call(w.handler, "POST", ENDPOINT, { token: w.guarantor.token, body: { ...w.body, packetHash: "e".repeat(64) } }), 409, "stale_packet");
-  await w.db.updateClaim(w.claim.id, { status: "Submitted" });
+  await w.db.updateReceivable(w.receivable.id, { status: "Submitted" });
   assertStatus(await call(w.handler, "POST", ENDPOINT, { token: w.guarantor.token, body: w.body }), 409, "not_draft");
 
   const d = await draftWorld();
   const handler = createGuarantyHandler({ auth: verifier, db: d.db });
-  assertStatus(await call(handler, "POST", ENDPOINT, { token: d.guarantor.token, body: { claimId: d.claim.id, packetHash: "a".repeat(64) } }), 409, "not_frozen");
+  assertStatus(await call(handler, "POST", ENDPOINT, { token: d.guarantor.token, body: { receivableId: d.receivable.id, packetHash: "a".repeat(64) } }), 409, "not_frozen");
 });
 
 Deno.test("an officer who isn't verified, or isn't an officer anymore, can't sign off", async () => {
@@ -54,13 +54,13 @@ Deno.test("an officer who isn't verified, or isn't an officer anymore, can't sig
   await w.db.updateProfile(w.guarantor.wallet, { kycStatus: "approved" });
   w.db.officers.set(`1:${w.guarantor.wallet}`, { orgId: 1, wallet: w.guarantor.wallet, title: null, active: false });
   assertStatus(await call(w.handler, "POST", ENDPOINT, { token: w.guarantor.token, body: w.body }), 409, "not_officer");
-  assertEquals((await w.db.getClaim(w.claim.id))?.guarantySignedAt, null);
+  assertEquals((await w.db.getReceivable(w.receivable.id))?.guarantySignedAt, null);
 });
 
 Deno.test("signing through an invite marks the invite used", async () => {
   const w = await frozenWorld();
   const invites = createInviteHandler({ auth: verifier, db: w.db, mailer: new MemoryMailer(), appBaseUrl: "http://x", now: () => FIXED_NOW });
-  const created = await call(invites, "POST", "http://localhost/guarantor-invite", { token: w.claimant.token, body: { claimId: w.claim.id } });
+  const created = await call(invites, "POST", "http://localhost/guarantor-invite", { token: w.seller.token, body: { receivableId: w.receivable.id } });
   const invite = new URL(String(created.body.inviteUrl)).searchParams.get("invite") as string;
   assertStatus(await call(w.handler, "POST", ENDPOINT, { token: w.guarantor.token, body: { ...w.body, invite } }), 200);
   const [row] = [...w.db.invites.values()];

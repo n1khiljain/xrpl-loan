@@ -91,7 +91,7 @@ export default function LendPage() {
             </div>
             <div className="flex flex-col gap-0.5">
               <span className="text-muted-foreground">Largest single loan</span>
-              <span className="tabular font-semibold">{usd(config.params.perClaimCap)}</span>
+              <span className="tabular font-semibold">{usd(config.params.perReceivableCap)}</span>
             </div>
             <div className="flex flex-col gap-0.5">
               <span className="text-muted-foreground">Interest</span>

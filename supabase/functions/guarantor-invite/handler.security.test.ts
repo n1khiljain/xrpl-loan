@@ -13,27 +13,27 @@ const ENDPOINT = "http://localhost/guarantor-invite";
 async function frozenWorld() {
   const w = await draftWorld();
   const packet = createPacketHandler({ auth: verifier, db: w.db });
-  await call(packet, "POST", "http://localhost/packet", { token: w.claimant.token, body: { claimId: w.claim.id } });
+  await call(packet, "POST", "http://localhost/packet", { token: w.seller.token, body: { receivableId: w.receivable.id } });
   const mailer = new MemoryMailer();
   const handler = createInviteHandler({ auth: verifier, db: w.db, mailer, appBaseUrl: "https://receivables.example.test/", now: () => FIXED_NOW });
   return { ...w, mailer, handler };
 }
 
-Deno.test("the claim an invite shows comes from the frozen claim, not from the request", async () => {
+Deno.test("the receivable an invite shows comes from the frozen receivable, not from the request", async () => {
   const w = await frozenWorld();
-  const created = await call(w.handler, "POST", ENDPOINT, { token: w.claimant.token, body: { claimId: w.claim.id } });
+  const created = await call(w.handler, "POST", ENDPOINT, { token: w.seller.token, body: { receivableId: w.receivable.id } });
   const token = new URL(String(created.body.inviteUrl)).searchParams.get("invite");
   const res = await call(w.handler, "GET", `${ENDPOINT}?invite=${token}&requestedAmount=1`, { token: w.guarantor.token });
   assertStatus(res, 200);
-  const claim = res.body.claim as Record<string, unknown>;
-  assertEquals([claim.requestedAmount, claim.recipientWallet, claim.packetHash], [w.claim.requestedAmount, w.claimant.wallet, (await w.db.getClaim(w.claim.id))?.packetHash]);
+  const receivable = res.body.receivable as Record<string, unknown>;
+  assertEquals([receivable.requestedAmount, receivable.recipientWallet, receivable.packetHash], [w.receivable.requestedAmount, w.seller.wallet, (await w.db.getReceivable(w.receivable.id))?.packetHash]);
 });
 
 Deno.test({
   name: "an invite that was used to sign can't be opened again",
   async fn() {
     const w = await frozenWorld();
-    const created = await call(w.handler, "POST", ENDPOINT, { token: w.claimant.token, body: { claimId: w.claim.id } });
+    const created = await call(w.handler, "POST", ENDPOINT, { token: w.seller.token, body: { receivableId: w.receivable.id } });
     const token = new URL(String(created.body.inviteUrl)).searchParams.get("invite");
     const [invite] = [...w.db.invites.values()];
     assert(invite);
@@ -45,11 +45,11 @@ Deno.test({
 });
 
 Deno.test({
-  name: "a claimant can't send the guarantor an unlimited number of invite emails",
+  name: "a seller can't send the guarantor an unlimited number of invite emails",
   async fn() {
     const w = await frozenWorld();
-    for (let i = 0; i < 20; i++) await call(w.handler, "POST", ENDPOINT, { token: w.claimant.token, body: { claimId: w.claim.id } });
-    assert(w.mailer.sent.length <= 3, `${w.mailer.sent.length} emails sent to one guarantor for one claim`);
-    assert(w.db.invites.size <= 3, `${w.db.invites.size} live invite links for one claim`);
+    for (let i = 0; i < 20; i++) await call(w.handler, "POST", ENDPOINT, { token: w.seller.token, body: { receivableId: w.receivable.id } });
+    assert(w.mailer.sent.length <= 3, `${w.mailer.sent.length} emails sent to one guarantor for one receivable`);
+    assert(w.db.invites.size <= 3, `${w.db.invites.size} live invite links for one receivable`);
   },
 });

@@ -9,8 +9,6 @@ import { LOCAL_STACK } from "../_shared/local-stack.ts";
 
 const EXPECTED_TABLES = [
   "admin_actions",
-  "claim_documents",
-  "claims",
   "guarantor_invites",
   "ledger_txs",
   "notifications",
@@ -18,6 +16,8 @@ const EXPECTED_TABLES = [
   "org_officers",
   "orgs",
   "profiles",
+  "receivable_documents",
+  "receivables",
   "staff",
   "sync_state",
   "wallets",

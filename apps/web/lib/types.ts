@@ -1,4 +1,4 @@
-import type { ClaimViewJson } from "@app/adapters";
+import type { ReceivableViewJson } from "@app/adapters";
 
 /** Response shapes of the edge functions in supabase/functions. Amounts arrive as decimal strings of base units. */
 export type KycStatus = "not_started" | "pending" | "approved" | "rejected";
@@ -36,15 +36,23 @@ export type MeResponse = {
   wallet: { address: Address; funded: boolean; fundedTx: string | null } | null;
 };
 
-export type OffchainClaim = {
+export type ReceivableType = "card_settlement" | "reimbursement" | "invoice" | "other";
+
+export type OffchainReceivable = {
   id: string;
   number: number;
-  orgId: number;
+  type: ReceivableType;
+  payerName: string;
+  payerEmail: string | null;
+  payerWallet: Address | null;
+  /** YYYY-MM-DD */
+  dueDate: string;
+  /** Only for an org's receivable (e.g. a club reimbursement). */
+  orgId: number | null;
   recipientWallet: Address;
-  recipientType: "member" | "org_treasurer";
   faceValue: string;
   requestedAmount: string;
-  callinkPrNumber: string;
+  reference: string;
   description: string | null;
   packetHash: string | null;
   guarantorWallet: Address | null;
@@ -53,32 +61,35 @@ export type OffchainClaim = {
   status: OffchainStatus;
   rejectReason: string | null;
   loanId: string | null;
-  asucOutcome: "none" | "rejected" | "short_paid";
-  asucOutcomeNote: string | null;
+  payerOutcome: "none" | "rejected" | "short_paid";
+  payerOutcomeNote: string | null;
   createdAt: string;
   updatedAt: string;
   /** Money and dates once it's past a draft. */
-  ledger: ClaimViewJson | null;
+  ledger: ReceivableViewJson | null;
 };
 
 export type DocumentView = { id: string; sha256: string | null; mimeType: string; sizeBytes: number; createdAt: string };
 
-export type ClaimWithDocuments = { claim: OffchainClaim; documents: DocumentView[] };
+export type ReceivableWithDocuments = { receivable: OffchainReceivable; documents: DocumentView[] };
 
 export type PacketResponse = { packetHash: string };
 
 export type InviteCreated = { inviteUrl: string; expiresAt: string; emailed: boolean };
 
 export type InviteView = {
-  claim: {
+  receivable: {
     id: string;
-    orgId: number;
+    orgId: number | null;
     orgName: string | null;
-    claimantName: string | null;
+    sellerName: string | null;
     recipientWallet: Address;
     faceValue: string;
     requestedAmount: string;
-    callinkPrNumber: string;
+    type: ReceivableType;
+    payerName: string;
+    dueDate: string;
+    reference: string;
     description: string | null;
     documentCount: number;
     packetHash: string | null;

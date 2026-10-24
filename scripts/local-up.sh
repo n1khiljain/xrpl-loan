@@ -38,7 +38,8 @@ eval "$(supabase status -o env 2>/dev/null | grep -E '^(API_URL|ANON_KEY)=')"
 envval() { [ -f .env ] && grep -E "^$1=" .env | tail -1 | cut -d= -f2- || true; }
 PRIVY_APP="$(envval PRIVY_APP_ID)"; PRIVY_KEY="$(envval PRIVY_VERIFICATION_KEY)"; WEB_PRIVY_APP="$(envval NEXT_PUBLIC_PRIVY_APP_ID)"
 FUNCTIONS_ENV="$CACHE/functions.env"
-if [ -n "$PRIVY_APP" ] && [ -n "$WEB_PRIVY_APP" ]; then
+# DEMO_PEOPLE=1 pnpm local forces the demo people even with a Privy app in .env
+if [ -n "$PRIVY_APP" ] && [ -n "$WEB_PRIVY_APP" ] && [ "${DEMO_PEOPLE:-}" != 1 ]; then
   echo "using the Privy app from .env: Google and email sign-in on, demo people off"
   FUNCTIONS_ENV="$CACHE/functions.privy.env"
   {
@@ -72,6 +73,6 @@ if [ "$DEMO" = true ]; then
 fi
 
 # 4. the app
-echo "open http://localhost:3000/claims/"
+echo "open http://localhost:3000/receivables/"
 NEXT_PUBLIC_NETWORK=xrpl-devnet NEXT_PUBLIC_SUPABASE_URL="$API_URL" NEXT_PUBLIC_SUPABASE_ANON_KEY="$ANON_KEY" NEXT_PUBLIC_PRIVY_APP_ID="$WEB_PRIVY_APP" \
   NEXT_PUBLIC_DEMO_SESSIONS="$DEMO" pnpm --filter web dev

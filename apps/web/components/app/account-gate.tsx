@@ -4,7 +4,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import { ArrowLeft } from "lucide-react";
 import Link from "next/link";
 import { type ReactNode, useState } from "react";
-import { ClaimCard } from "@/components/brand/claim-card";
+import { ReceivableCard } from "@/components/brand/receivable-card";
 import { ClientLockup } from "@/components/brand/logos-context";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -118,14 +118,14 @@ function SignIn({ reason }: { reason: string }) {
         <div className="flex flex-1 items-center justify-center pb-10 lg:pb-0">
           <div className="-rotate-6">
             <span className="lg:hidden">
-              <ClaimCard claimId="0001" amount="$0.00" state="YOURS NEXT" org="Your business" scale={0.5} />
+              <ReceivableCard receivableId="0001" amount="$0.00" state="YOURS NEXT" org="Your customer" kind="Invoice" scale={0.5} />
             </span>
             <span className="hidden lg:block">
-              <ClaimCard claimId="0001" amount="$0.00" state="YOURS NEXT" org="Your business" />
+              <ReceivableCard receivableId="0001" amount="$0.00" state="YOURS NEXT" org="Your customer" kind="Invoice" />
             </span>
           </div>
         </div>
-        <h2 className="display-type hidden max-w-md text-[38px] lg:block">Expedite the payments you choose</h2>
+        <h2 className="display-type hidden max-w-md text-[38px] lg:block">Stop waiting on payments</h2>
       </section>
       <section className="signin-ink bg-surface text-foreground relative -mt-8 flex flex-1 flex-col justify-center gap-5 rounded-t-3xl px-[18px] pt-6 pb-10 lg:mt-0 lg:rounded-none lg:px-[120px]">
         <span aria-hidden className="bg-border -mt-2 h-1 w-9 self-center rounded-full lg:hidden" />

@@ -17,7 +17,7 @@ export const accountUrl = (address: string) => explorerAccount(config, address);
 
 export const params = {
   advanceRateBps: BigInt(config.params.advanceRateBps),
-  perClaimCap: BigInt(config.params.perClaimCap),
+  perReceivableCap: BigInt(config.params.perReceivableCap),
   feeBps: BigInt(config.params.feeBps),
   overdueWindowSeconds: config.params.overdueWindowSeconds,
   approvalExpirySeconds: config.params.approvalExpirySeconds,

@@ -80,7 +80,7 @@ export function paramsAsBigInt(config: NetworkConfig) {
   const p = config.params;
   return {
     advanceRateBps: BigInt(p.advanceRateBps),
-    perClaimCap: BigInt(p.perClaimCap),
+    perReceivableCap: BigInt(p.perReceivableCap),
     perOrgCap: BigInt(p.perOrgCap),
     poolDepositCap: BigInt(p.poolDepositCap),
     feeBps: BigInt(p.feeBps),

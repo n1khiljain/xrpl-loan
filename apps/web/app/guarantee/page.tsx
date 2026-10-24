@@ -11,8 +11,8 @@ import { VerifyFirst } from "@/components/app/verify-first";
 import { GradientPanel } from "@/components/app/gradient-panel";
 import { ErrorNotice } from "@/components/app/notice";
 import { Topbar } from "@/components/app/topbar";
-import { cardNumber } from "@/components/brand/claim-card";
-import { LiveClaimCard } from "@/components/brand/live-claim-card";
+import { cardNumber } from "@/components/brand/receivable-card";
+import { LiveReceivableCard } from "@/components/brand/live-receivable-card";
 import { EASE, Swap } from "@/components/motion";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -22,8 +22,9 @@ import { ASSET } from "@/lib/config";
 import { friendlyError } from "@/lib/errors";
 import { dateTime, shortAddress, usd } from "@/lib/format";
 import type { InviteView } from "@/lib/types";
+import { RECEIVABLE_TYPES } from "@/lib/receivable-types";
 
-const BACK = { href: "/claims/?view=guaranties", label: "Sign-offs" };
+const BACK = { href: "/receivables/?view=guaranties", label: "Sign-offs" };
 
 function Guarantee() {
   const invite = useSearchParams().get("invite");
@@ -41,12 +42,12 @@ function Guarantee() {
   const sign = useMutation({
     mutationFn: async () => {
       const data = view.data;
-      if (!data?.signable || !data.claim.packetHash) throw new Error("This can't be signed off right now.");
-      // the sign-off names the packet hash shown here, so it can't land on a claim that changed since
-      await call("guaranty", { method: "POST", body: { claimId: data.claim.id, packetHash: data.claim.packetHash, invite } });
+      if (!data?.signable || !data.receivable.packetHash) throw new Error("This can't be signed off right now.");
+      // the sign-off names the packet hash shown here, so it can't land on a receivable that changed since
+      await call("guaranty", { method: "POST", body: { receivableId: data.receivable.id, packetHash: data.receivable.packetHash, invite } });
     },
-    // the claim lists behind the sidebar's sign-off count, which drops by one. Not the invite: it's used now.
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["claims"] }),
+    // the receivable lists behind the sidebar's sign-off count, which drops by one. Not the invite: it's used now.
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["receivables"] }),
   });
 
   if (!invite) {
@@ -83,16 +84,17 @@ function Guarantee() {
     );
   }
 
-  const { claim } = view.data;
-  const name = claim.claimantName ?? "Someone at your business";
-  const org = claim.orgName ?? "Your business";
+  const { receivable } = view.data;
+  const name = receivable.sellerName ?? "Someone at your business";
+  const payer = receivable.payerName;
+  const org = receivable.orgName ?? "Your business";
   const signed = view.data.signed || sign.isSuccess;
 
   return (
     <div className="space-y-6 lg:space-y-8">
-      <Topbar title="Sign-off request" crumb={claim.orgName ?? undefined} back={BACK} />
+      <Topbar title="Sign-off request" crumb={receivable.orgName ?? undefined} back={BACK} />
       <div className="flex flex-col gap-5 lg:flex-row lg:items-stretch lg:gap-6">
-        {/* The ask, and the claim as a card. Once signed, the words and the card swap to say so. */}
+        {/* The ask, and the receivable as a card. Once signed, the words and the card swap to say so. */}
         <GradientPanel
           tone="gold"
           className="-mx-4 flex shrink-0 flex-col gap-6 p-6 sm:-mx-6 sm:p-7 lg:mx-0 lg:w-[380px] lg:p-8"
@@ -102,12 +104,12 @@ function Guarantee() {
           </span>
           <Swap id={signed ? "signed" : "ask"} className="flex flex-col gap-3">
             <h1 className="display-type max-w-xs text-[28px] lg:text-[36px]">
-              {signed ? `You signed off on ${usd(claim.requestedAmount)}` : `${name} is asking you to sign off on ${usd(claim.requestedAmount)}`}
+              {signed ? `You signed off on ${usd(receivable.requestedAmount)}` : `${name} is asking you to sign off on ${usd(receivable.requestedAmount)}`}
             </h1>
             <p className="text-on-ink/80 max-w-sm text-[15px] leading-relaxed">
               {signed
-                ? `${name} can send it for review now. You'll only hear from us if the payment never arrives.`
-                : `The lending vault pays ${name} now instead of waiting on the payment. You confirm it will arrive. If it never does, you cover what's left.`}
+                ? `${name} can send it for review now. You'll only hear from us if ${payer} never pays.`
+                : `The lending vault pays ${name} now instead of waiting on ${payer}. You vouch that ${payer} will pay. If it never does, you cover what's left.`}
             </p>
           </Swap>
           <div className="flex justify-center pt-2 lg:mt-auto lg:pt-0">
@@ -116,12 +118,13 @@ function Guarantee() {
                 { scale: 0.62, className: "lg:hidden" },
                 { scale: 0.82, className: "hidden lg:block" },
               ].map((size) => (
-                <LiveClaimCard
+                <LiveReceivableCard
                   key={size.scale}
-                  claimId={cardNumber(null)}
-                  amount={usd(claim.requestedAmount)}
+                  receivableId={cardNumber(null)}
+                  amount={usd(receivable.requestedAmount)}
                   state={signed ? "SIGNED OFF" : "NEEDS YOU"}
-                  org={org}
+                  org={receivable.payerName}
+                  kind={RECEIVABLE_TYPES[receivable.type].short}
                   tone="frost"
                   moment={signed ? "approved" : null}
                   scale={size.scale}
@@ -132,7 +135,7 @@ function Guarantee() {
           </div>
         </GradientPanel>
 
-        {/* The claim, the obligation, and the sign action */}
+        {/* The receivable, the obligation, and the sign action */}
         <section className="bg-card flex flex-1 flex-col gap-6 rounded-2xl p-5 sm:p-6">
           <div className="space-y-3">
             <h2 className="text-lg font-semibold">The loan</h2>
@@ -140,24 +143,26 @@ function Guarantee() {
               <span className="text-muted-foreground">Requested by</span>
               <span className="text-right font-semibold">{name}</span>
               <span className="text-muted-foreground">Paid to wallet</span>
-              <span className="tabular text-right font-semibold" title={claim.recipientWallet}>
-                {shortAddress(claim.recipientWallet)}
+              <span className="tabular text-right font-semibold" title={receivable.recipientWallet}>
+                {shortAddress(receivable.recipientWallet)}
               </span>
               <span className="text-muted-foreground">Purchase request amount</span>
-              <span className="tabular text-right font-semibold">{usd(claim.faceValue)}</span>
-              <span className="text-muted-foreground">Payment reference</span>
-              <span className="text-right font-semibold">{claim.callinkPrNumber}</span>
-              <span className="text-muted-foreground">Receipts</span>
-              <span className="text-right font-semibold">{claim.documentCount}</span>
-              <span className="text-muted-foreground">What it was for</span>
-              <span className="text-right font-semibold">{claim.description ?? "No description"}</span>
+              <span className="tabular text-right font-semibold">{usd(receivable.faceValue)}</span>
+              <span className="text-muted-foreground">Owed by</span>
+              <span className="text-right font-semibold">{receivable.payerName}</span>
+              <span className="text-muted-foreground">{RECEIVABLE_TYPES[receivable.type].referenceLabel}</span>
+              <span className="text-right font-semibold">{receivable.reference}</span>
+              <span className="text-muted-foreground">Documents</span>
+              <span className="text-right font-semibold">{receivable.documentCount}</span>
+              <span className="text-muted-foreground">What it&apos;s for</span>
+              <span className="text-right font-semibold">{receivable.description ?? "No description"}</span>
             </div>
           </div>
 
           <div className="border-border flex flex-col gap-2 rounded-xl border p-4 sm:p-5">
             <span className="text-muted-foreground text-xs font-medium">What you&apos;re agreeing to</span>
             <p className="text-[15px] leading-relaxed font-semibold" data-testid="obligation">
-              If the payment never arrives, you pay the vault whatever is left, including interest.
+              If {receivable.payerName} never pays, you pay the vault whatever is left, including interest.
             </p>
             <p className="text-muted-foreground text-sm leading-relaxed">
               Signing off costs nothing and isn&apos;t a payment. We&apos;ll email you if you&apos;re ever asked to cover it, and you&apos;d pay in {ASSET}.
@@ -185,7 +190,7 @@ function Guarantee() {
                   <p className="font-semibold">Signed off. {name} can now send it for review.</p>
                 </div>
                 <Button variant="secondary" size="lg" asChild>
-                  <Link href={`/claim/?id=${claim.id}`}>See the loan</Link>
+                  <Link href={`/receivable/?id=${receivable.id}`}>See the loan</Link>
                 </Button>
               </motion.div>
             ) : (
@@ -196,10 +201,10 @@ function Guarantee() {
                     {sign.isPending ? "Signing..." : "Sign off"}
                   </Button>
                   <Button variant="secondary" size="lg" asChild>
-                    <Link href="/claims/">Decline</Link>
+                    <Link href="/receivables/">Decline</Link>
                   </Button>
                 </div>
-                <span className="text-muted-foreground text-center text-xs">A sign-off, not a payment. Nothing moves unless the payment never arrives.</span>
+                <span className="text-muted-foreground text-center text-xs">A sign-off, not a payment. Nothing moves unless the payer doesn&apos;t pay.</span>
               </>
             )}
             {sign.isError ? <ErrorNotice>{friendlyError(sign.error)}</ErrorNotice> : null}

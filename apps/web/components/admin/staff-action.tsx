@@ -7,8 +7,8 @@ import { useCall } from "@/hooks/use-api";
 import { friendlyError } from "@/lib/errors";
 
 /**
- * One staff step on a claim (approve, reject, call the guarantor, write off), sent to `claim-actions`. The backend
- * checks the role and the claim's state; this only shows the button, the wait, and any refusal.
+ * One staff step on a receivable (approve, reject, call the guarantor, write off), sent to `receivable-actions`. The backend
+ * checks the role and the receivable's state; this only shows the button, the wait, and any refusal.
  */
 export function StaffAction({
   label,
@@ -26,7 +26,7 @@ export function StaffAction({
   const call = useCall();
   const queryClient = useQueryClient();
   const action = useMutation({
-    mutationFn: () => call("claim-actions", { method: "POST", body }),
+    mutationFn: () => call("receivable-actions", { method: "POST", body }),
     onSuccess: () => queryClient.invalidateQueries(),
   });
   return (
