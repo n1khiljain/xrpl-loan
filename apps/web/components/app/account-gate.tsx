@@ -216,11 +216,8 @@ function SignIn({ reason }: { reason: string }) {
           )}
           {error || session.loginError ? <ErrorNotice>{error ?? signInError(new Error(session.loginError ?? ""), mode)}</ErrorNotice> : null}
         </fieldset>
-        {PUBLIC_ENV.demoSessions ? (
-          <LocalDemoPicker />
-        ) : session.unavailableReason ? (
-          <ErrorNotice title="Sign-in isn't available">{session.unavailableReason}</ErrorNotice>
-        ) : null}
+        {session.unavailableReason ? <ErrorNotice title="Sign-in isn't available">{session.unavailableReason}</ErrorNotice> : null}
+        {PUBLIC_ENV.demoSessions ? <LocalDemoPicker /> : null}
         <p className="text-muted-foreground text-center text-[11px] leading-normal lg:text-left lg:text-xs">
           Test network only: no real money moves. You stay signed in on this device for 30 days.
         </p>

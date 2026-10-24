@@ -9,10 +9,10 @@ import { DEV_SESSION_KEY, type DevSessionSeed } from "@/lib/session/types";
 type DemoPerson = { role: string; name: string; seed: DevSessionSeed };
 
 const ROLE: Record<string, string> = {
-  claimant: "Member with five reimbursements",
+  claimant: "Member with reimbursements in each state",
   guarantor: "Officer who signs off",
   lender: "Lender",
-  staff: "Underwriter and admin",
+  staff: "Admin (approves and reviews)",
 };
 
 /** Where each person lands, so one click shows their main screen. */

@@ -30,19 +30,35 @@ supabase status >/dev/null 2>&1 || supabase start || true
 wait_for "Supabase" 120 supabase status
 eval "$(supabase status -o env 2>/dev/null | grep -E '^(API_URL|ANON_KEY)=')"
 
-# 2. the edge functions, trusting a Privy test key and a wallet key kept in the cache (made once, outside git)
+# 2. the edge functions. By default they trust a Privy test key kept in the cache (made once, outside git), which the
+# demo people's tokens are signed with. With a real Privy app in .env (PRIVY_APP_ID, PRIVY_VERIFICATION_KEY, and
+# NEXT_PUBLIC_PRIVY_APP_ID), they trust that instead, so Google and email sign-in work and the demo people don't.
 [ -f "$CACHE/functions.env" ] || deno run --allow-write --allow-run --config supabase/functions/deno.json supabase/functions/_tests/make-e2e-env.ts "$CACHE" >/dev/null
+envval() { [ -f .env ] && grep -E "^$1=" .env | tail -1 | cut -d= -f2- || true; }
+PRIVY_APP="$(envval PRIVY_APP_ID)"; PRIVY_KEY="$(envval PRIVY_VERIFICATION_KEY)"; WEB_PRIVY_APP="$(envval NEXT_PUBLIC_PRIVY_APP_ID)"
+FUNCTIONS_ENV="$CACHE/functions.env"
+if [ -n "$PRIVY_APP" ] && [ -n "$PRIVY_KEY" ] && [ -n "$WEB_PRIVY_APP" ]; then
+  echo "using the Privy app from .env: Google and email sign-in on, demo people off"
+  FUNCTIONS_ENV="$CACHE/functions.privy.env"
+  { grep -vE '^PRIVY_(APP_ID|VERIFICATION_KEY)=' "$CACHE/functions.env"; echo "PRIVY_APP_ID=$PRIVY_APP"; echo "PRIVY_VERIFICATION_KEY=$PRIVY_KEY"; } >"$FUNCTIONS_ENV"
+  DEMO=false
+else
+  WEB_PRIVY_APP=""
+  DEMO=true
+fi
 pkill -f "supabase functions serve" 2>/dev/null || true
 echo "serving the edge functions"
-supabase functions serve --env-file "$CACHE/functions.env" >"$CACHE/functions.log" 2>&1 &
+supabase functions serve --env-file "$FUNCTIONS_ENV" >"$CACHE/functions.log" 2>&1 &
 pids+=($!)
 wait_for "the edge functions" 180 bash -c "curl -s -X POST $API_URL/functions/v1/me | grep -q unauthorized"
 
 # 3. demo people and reimbursements (each new person's wallet is funded on XRPL Devnet)
-echo "seeding demo people on XRPL Devnet"
-deno run --allow-all --config supabase/functions/deno.json scripts/local-demo.ts "$CACHE"
+if [ "$DEMO" = true ]; then
+  echo "seeding demo people on XRPL Devnet"
+  deno run --allow-all --config supabase/functions/deno.json scripts/local-demo.ts "$CACHE"
+fi
 
 # 4. the app
-echo "open http://localhost:3000/claims/ and pick someone to sign in as"
-NEXT_PUBLIC_NETWORK=xrpl-devnet NEXT_PUBLIC_SUPABASE_URL="$API_URL" NEXT_PUBLIC_SUPABASE_ANON_KEY="$ANON_KEY" NEXT_PUBLIC_PRIVY_APP_ID= \
-  NEXT_PUBLIC_DEMO_SESSIONS=true pnpm --filter web dev
+echo "open http://localhost:3000/claims/"
+NEXT_PUBLIC_NETWORK=xrpl-devnet NEXT_PUBLIC_SUPABASE_URL="$API_URL" NEXT_PUBLIC_SUPABASE_ANON_KEY="$ANON_KEY" NEXT_PUBLIC_PRIVY_APP_ID="$WEB_PRIVY_APP" \
+  NEXT_PUBLIC_DEMO_SESSIONS="$DEMO" pnpm --filter web dev

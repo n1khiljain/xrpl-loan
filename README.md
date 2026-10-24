@@ -33,6 +33,14 @@ pnpm local
 
 `pnpm local` starts Supabase and the edge functions, signs up four demo people (a member, an officer, a lender, an admin) whose wallets are funded on Devnet, adds reimbursements in several states, and serves the site at http://localhost:3000. The sign-in screen offers the demo people as one-click buttons, so you don't need a Privy app locally. The keys it uses (a Privy test key and a wallet encryption key) are generated into `apps/web/e2e/.cache/`, which git ignores.
 
+### Real Google and email sign-in locally
+
+Without a Privy app the local build only offers the demo people. To sign in with Google or an emailed code:
+
+1. In the [Privy dashboard](https://dashboard.privy.io), create an app (or use yours), turn on **Google** and **Email** under login methods, add `http://localhost:3000` to the allowed origins, and turn on **Return user data in an identity token**.
+2. Put its values in `.env` (gitignored): `NEXT_PUBLIC_PRIVY_APP_ID` and `PRIVY_APP_ID` (the app ID), and `PRIVY_VERIFICATION_KEY` (the verification key from the dashboard).
+3. Run `pnpm local` again. It uses that app, so Google and email work and the demo buttons go away.
+
 Tests:
 
 ```bash

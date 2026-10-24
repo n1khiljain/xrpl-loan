@@ -48,7 +48,9 @@ export function AppProviders({ children }: { children: ReactNode }) {
         ? {
             ...SIGNED_OUT,
             status: "signed-out" as const,
-            unavailableReason: PUBLIC_ENV.demoSessions ? null : "Sign-in isn't set up in this build (NEXT_PUBLIC_PRIVY_APP_ID).",
+            unavailableReason: PUBLIC_ENV.demoSessions
+              ? "Google and email sign-in need a Privy app, and this local build has none. Sign in as a demo person below, or set NEXT_PUBLIC_PRIVY_APP_ID (see README)."
+              : "Sign-in isn't set up in this build (NEXT_PUBLIC_PRIVY_APP_ID).",
           }
         : SIGNED_OUT;
     inner = <SessionContext.Provider value={session}>{children}</SessionContext.Provider>;
