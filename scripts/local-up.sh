@@ -31,16 +31,21 @@ wait_for "Supabase" 120 supabase status
 eval "$(supabase status -o env 2>/dev/null | grep -E '^(API_URL|ANON_KEY)=')"
 
 # 2. the edge functions. By default they trust a Privy test key kept in the cache (made once, outside git), which the
-# demo people's tokens are signed with. With a real Privy app in .env (PRIVY_APP_ID, PRIVY_VERIFICATION_KEY, and
-# NEXT_PUBLIC_PRIVY_APP_ID), they trust that instead, so Google and email sign-in work and the demo people don't.
+# demo people's tokens are signed with. With a real Privy app in .env (PRIVY_APP_ID and NEXT_PUBLIC_PRIVY_APP_ID, and
+# optionally PRIVY_VERIFICATION_KEY; without it the app's published keys are used), they trust that instead, so Google
+# and email sign-in work and the demo people don't.
 [ -f "$CACHE/functions.env" ] || deno run --allow-write --allow-run --config supabase/functions/deno.json supabase/functions/_tests/make-e2e-env.ts "$CACHE" >/dev/null
 envval() { [ -f .env ] && grep -E "^$1=" .env | tail -1 | cut -d= -f2- || true; }
 PRIVY_APP="$(envval PRIVY_APP_ID)"; PRIVY_KEY="$(envval PRIVY_VERIFICATION_KEY)"; WEB_PRIVY_APP="$(envval NEXT_PUBLIC_PRIVY_APP_ID)"
 FUNCTIONS_ENV="$CACHE/functions.env"
-if [ -n "$PRIVY_APP" ] && [ -n "$PRIVY_KEY" ] && [ -n "$WEB_PRIVY_APP" ]; then
+if [ -n "$PRIVY_APP" ] && [ -n "$WEB_PRIVY_APP" ]; then
   echo "using the Privy app from .env: Google and email sign-in on, demo people off"
   FUNCTIONS_ENV="$CACHE/functions.privy.env"
-  { grep -vE '^PRIVY_(APP_ID|VERIFICATION_KEY)=' "$CACHE/functions.env"; echo "PRIVY_APP_ID=$PRIVY_APP"; echo "PRIVY_VERIFICATION_KEY=$PRIVY_KEY"; } >"$FUNCTIONS_ENV"
+  {
+    grep -vE '^PRIVY_(APP_ID|VERIFICATION_KEY)=' "$CACHE/functions.env"
+    echo "PRIVY_APP_ID=$PRIVY_APP"
+    [ -n "$PRIVY_KEY" ] && echo "PRIVY_VERIFICATION_KEY=$PRIVY_KEY"
+  } >"$FUNCTIONS_ENV"
   DEMO=false
 else
   WEB_PRIVY_APP=""

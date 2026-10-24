@@ -44,7 +44,8 @@ export class Context {
   auth(): TokenVerifier {
     return createPrivyVerifier({
       appId: requireEnv(this.env, "PRIVY_APP_ID"),
-      verificationKey: requireEnv(this.env, "PRIVY_VERIFICATION_KEY"),
+      // optional: without it the app's published JWKS is used
+      verificationKey: this.env.get("PRIVY_VERIFICATION_KEY"),
     });
   }
 

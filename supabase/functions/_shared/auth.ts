@@ -1,4 +1,4 @@
-import { type JWTPayload, importSPKI, jwtVerify } from "jose";
+import { type JWTPayload, createRemoteJWKSet, importSPKI, jwtVerify } from "jose";
 import type { Db, Profile, StaffRole, Wallet } from "./db/types.ts";
 import { HttpError, forbidden, unauthorized } from "./http.ts";
 
@@ -38,16 +38,23 @@ export function emailsFrom(payload: JWTPayload): string[] {
   return out;
 }
 
+/** Privy publishes each app's signing keys here, so the backend needs no key copied from the dashboard. */
+export const privyJwksUrl = (appId: string) => new URL(`https://auth.privy.io/api/v1/apps/${encodeURIComponent(appId)}/jwks.json`);
+
 /**
  * Verifies Privy tokens: ES256, issuer `privy.io`, audience our Privy app ID, subject a `did:privy:` ID, an `exp`,
- * and an `iat` no older than `MAX_TOKEN_AGE`. Access tokens and identity tokens are signed by the same app key.
- * `verificationKey` is the SPKI PEM from the Privy dashboard; escaped `\n` from env files is accepted.
+ * and an `iat` no older than `MAX_TOKEN_AGE`. Access tokens and identity tokens are signed by the same app keys.
+ * With `verificationKey` (an SPKI PEM; escaped `\n` from env files is accepted) only that key is trusted, which the
+ * tests and the local demo use. Without it, the app's published JWKS is fetched and cached, so key rotation just works.
  */
-export function createPrivyVerifier(options: { appId: string; verificationKey: string }): TokenVerifier {
-  const pem = options.verificationKey.replace(/\\n/g, "\n").trim();
-  const key = importSPKI(pem, "ES256");
+export function createPrivyVerifier(options: { appId: string; verificationKey?: string }): TokenVerifier {
+  const pem = options.verificationKey?.replace(/\\n/g, "\n").trim();
+  const key = pem ? importSPKI(pem, "ES256") : null;
+  const jwks = pem ? null : createRemoteJWKSet(privyJwksUrl(options.appId));
+  const verify = async (token: string, opts: Parameters<typeof jwtVerify>[2]) =>
+    key ? jwtVerify(token, await key, opts) : jwtVerify(token, jwks!, opts);
   async function check(token: string): Promise<JWTPayload & { sub: string }> {
-    const { payload } = await jwtVerify(token, await key, {
+    const { payload } = await verify(token, {
       issuer: "privy.io",
       audience: options.appId,
       algorithms: ["ES256"],

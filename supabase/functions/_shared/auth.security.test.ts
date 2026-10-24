@@ -3,7 +3,7 @@
  */
 import { assertRejects } from "@std/assert";
 import { SignJWT, exportSPKI, generateKeyPair } from "jose";
-import { createPrivyVerifier } from "./auth.ts";
+import { createPrivyVerifier, privyJwksUrl } from "./auth.ts";
 
 const APP_ID = "security-test-app";
 const keys = await generateKeyPair("ES256", { extractable: true });
@@ -81,4 +81,8 @@ Deno.test("identity tokens give the email and Google addresses, lowercased", asy
     .sign(keys.privateKey);
   const identity = await verifier.verifyIdentity(token);
   if (identity.verifiedEmails.join() !== "ada@example.test,ada@gmail.test") throw new Error(identity.verifiedEmails.join());
+});
+
+Deno.test("without a pinned key, tokens are checked against the app's published Privy JWKS", () => {
+  if (privyJwksUrl("cm-app").href !== "https://auth.privy.io/api/v1/apps/cm-app/jwks.json") throw new Error(privyJwksUrl("cm-app").href);
 });

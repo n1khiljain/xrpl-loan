@@ -37,8 +37,8 @@ pnpm local
 
 Without a Privy app the local build only offers the demo people. To sign in with Google or an emailed code:
 
-1. In the [Privy dashboard](https://dashboard.privy.io), create an app (or use yours), turn on **Google** and **Email** under login methods, add `http://localhost:3000` to the allowed origins, and turn on **Return user data in an identity token**.
-2. Put its values in `.env` (gitignored): `NEXT_PUBLIC_PRIVY_APP_ID` and `PRIVY_APP_ID` (the app ID), and `PRIVY_VERIFICATION_KEY` (the verification key from the dashboard).
+1. In the [Privy dashboard](https://dashboard.privy.io), turn on **Google** and **Email** under login methods, add `http://localhost:3000` under Configuration > App settings > Domains (if you've listed any domains there), and turn on **Return user data in an identity token**.
+2. Put the app ID in `.env` (gitignored) as both `NEXT_PUBLIC_PRIVY_APP_ID` and `PRIVY_APP_ID`. The backend checks tokens against the app's published keys, so no secret or verification key is needed.
 3. Run `pnpm local` again. It uses that app, so Google and email work and the demo buttons go away.
 
 Tests:
@@ -56,7 +56,7 @@ Every variable is listed, empty, in [.env.example](.env.example). The ones that 
 | Variable | Where | What |
 |---|---|---|
 | `NETWORK`, `NEXT_PUBLIC_NETWORK` | functions, web | `xrpl-devnet` |
-| `PRIVY_APP_ID`, `PRIVY_VERIFICATION_KEY` | functions | Privy app and its verification key. Turn on "Return user data in an identity token" in the Privy dashboard. |
+| `PRIVY_APP_ID` | functions | Privy app ID; tokens are checked against its published keys (`PRIVY_VERIFICATION_KEY` optionally pins one key). Turn on "Return user data in an identity token" in the Privy dashboard. |
 | `NEXT_PUBLIC_PRIVY_APP_ID` | web | The same Privy app |
 | `WALLET_ENCRYPTION_KEY` | functions | 32 random bytes, base64 (`openssl rand -base64 32`). Encrypts every custodial seed. |
 | `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY` | web | Supabase project; the anon key only reaches functions |
