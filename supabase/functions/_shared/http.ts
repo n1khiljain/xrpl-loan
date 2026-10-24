@@ -67,8 +67,11 @@ export function methodNotAllowed(allowed: readonly string[]): HttpError {
 export type Handler = (req: Request) => Promise<Response>;
 
 export type ServeOptions = {
-  /** The web app's origin (`APP_BASE_URL`). Browsers from any other origin get no CORS headers. */
-  allowedOrigin?: string;
+  /**
+   * The web app's origins: `APP_BASE_URL` plus any in `EXTRA_ALLOWED_ORIGINS`. Browsers from any other origin get no
+   * CORS headers.
+   */
+  allowedOrigins?: string[];
   /** Extra request headers to allow in CORS preflight. */
   allowHeaders?: string[];
 };
@@ -76,8 +79,8 @@ export type ServeOptions = {
 function corsHeaders(req: Request, options: ServeOptions): Headers {
   const headers = new Headers();
   const origin = req.headers.get("origin");
-  const allowed = options.allowedOrigin ? new URL(options.allowedOrigin).origin : null;
-  if (origin && allowed && origin === allowed) {
+  const allowed = (options.allowedOrigins ?? []).map((o) => new URL(o).origin);
+  if (origin && allowed.includes(origin)) {
     headers.set("access-control-allow-origin", origin);
     headers.set("vary", "origin");
     headers.set("access-control-allow-headers", ["authorization", "content-type", "apikey", "x-client-info", ...(options.allowHeaders ?? [])].join(", "));

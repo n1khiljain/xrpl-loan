@@ -69,10 +69,10 @@ export class Context {
  */
 export function serve(build: (ctx: Context) => Handler): void {
   let handler: Handler;
-  let origin: string | undefined;
+  let origins: string[] = [];
   try {
     const ctx = new Context();
-    origin = ctx.env.get("APP_BASE_URL");
+    origins = allowedOrigins(ctx.env);
     handler = build(ctx);
   } catch (error) {
     const variable = error instanceof MissingEnvError ? error.variable : null;
@@ -85,5 +85,15 @@ export function serve(build: (ctx: Context) => Handler): void {
         ),
       );
   }
-  Deno.serve(withErrors((req) => handler(req), { allowedOrigin: origin }));
+  Deno.serve(withErrors((req) => handler(req), { allowedOrigins: origins }));
+}
+
+/**
+ * Where browsers may call the functions from: the app's own origin (`APP_BASE_URL`, also used in email links) and any
+ * comma-separated `EXTRA_ALLOWED_ORIGINS`, e.g. localhost while a hosted backend also serves a deployed site. Entries
+ * that aren't URLs are skipped.
+ */
+export function allowedOrigins(env: Env): string[] {
+  const raw = [env.get("APP_BASE_URL") ?? "", ...(env.get("EXTRA_ALLOWED_ORIGINS") ?? "").split(",")];
+  return raw.map((o) => o.trim()).filter((o) => URL.canParse(o));
 }

@@ -86,3 +86,17 @@ Deno.test("identity tokens give the email and Google addresses, lowercased", asy
 Deno.test("without a pinned key, tokens are checked against the app's published Privy JWKS", () => {
   if (privyJwksUrl("cm-app").href !== "https://auth.privy.io/api/v1/apps/cm-app/jwks.json") throw new Error(privyJwksUrl("cm-app").href);
 });
+
+Deno.test("CORS: only APP_BASE_URL and EXTRA_ALLOWED_ORIGINS get allow-origin headers", async () => {
+  const { allowedOrigins } = await import("./serve.ts");
+  const { withErrors, json } = await import("./http.ts");
+  const env = { get: (n: string) => ({ APP_BASE_URL: "https://site.example/", EXTRA_ALLOWED_ORIGINS: "http://localhost:3000, nope" } as Record<string, string>)[n] };
+  const origins = allowedOrigins(env as never);
+  if (origins.join() !== "https://site.example/,http://localhost:3000") throw new Error(origins.join());
+  const handler = withErrors(async () => json({ ok: true }), { allowedOrigins: origins });
+  const ask = async (origin: string) =>
+    (await handler(new Request("http://x/me", { method: "OPTIONS", headers: { origin } }))).headers.get("access-control-allow-origin");
+  if ((await ask("https://site.example")) !== "https://site.example") throw new Error("site refused");
+  if ((await ask("http://localhost:3000")) !== "http://localhost:3000") throw new Error("localhost refused");
+  if ((await ask("https://evil.example")) !== null) throw new Error("evil allowed");
+});
