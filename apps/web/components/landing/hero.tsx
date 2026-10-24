@@ -3,12 +3,11 @@
 import { motion } from "motion/react";
 import Link from "next/link";
 import { CtaLabel } from "@/components/app/cta";
-import { ClubLogoStrip } from "@/components/landing/club-logo-strip";
 import { Button } from "@/components/ui/button";
 import { EASE } from "@/components/motion";
 
 /*
- * The landing hero: centred copy over the panel gradient and a soft glow, with the clubs' logos along the bottom.
+ * The landing hero: centred copy over the panel gradient and a soft glow.
  */
 
 const HEADLINE = "Get reimbursed for club expenses today";
@@ -56,7 +55,6 @@ export function Hero() {
               </div>
             </motion.div>
         </div>
-        <ClubLogoStrip />
     </section>
   );
 }
