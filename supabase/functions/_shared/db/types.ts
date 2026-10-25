@@ -76,6 +76,12 @@ export type Receivable = {
   purchasedAt: string | null;
   dueAt: string | null;
   loanId: string | null;
+  /** The vault series and its loan broker that funded the loan. */
+  vaultId: string | null;
+  loanBrokerId: string | null;
+  /** When staff marked the loan impaired (a missed payment) or defaulted it on the ledger. */
+  impairedAt: string | null;
+  defaultedAt: string | null;
   callReason: CallReason;
   guarantorCalledAt: string | null;
   writeOffEligibleAt: string | null;

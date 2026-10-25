@@ -18,6 +18,7 @@ Install. Businesses selectively expedite a transaction, transfer, or payment wit
 | Wallets | Custodial: the `me` function makes an XRPL wallet per person, encrypts the seed with `WALLET_ENCRYPTION_KEY` (AES-GCM, bound to the address), and funds it from the Devnet faucet. The browser never holds a key and never talks to the ledger. |
 | Sign-in | Privy (email code or Google), sign-in only. No Privy wallets. |
 | KYC | A Privy identity token proves the email, then staff approve on `/admin/kyc`. Approval issues an XRPL Credential when the vault is set up. |
+| Vaults | Rolling series of closed-ended vaults (a V1_1 loan broker can't lend from an open one), discovered from what the broker owns. |
 | Branding | The product name is Install, set in type. No third-party logos; name the network and asset in text. |
 | Git | Commit each phase on `xrpl-migration`. Never push; the user pushes. |
 
@@ -35,7 +36,7 @@ Install. Businesses selectively expedite a transaction, transfer, or payment wit
 ├── apps/web/                       # Next.js static export; talks only to the edge functions
 ├── scripts/local-up.sh             # pnpm local: Supabase + functions + demo seed + web
 ├── scripts/local-demo.ts           # pnpm demo: demo people with funded Devnet wallets and loans of each kind
-└── scripts/xrpl-setup.ts           # pnpm xrpl:setup: issuer, private vault, loan broker, and first-loss cover on Devnet
+└── scripts/xrpl-setup.ts           # pnpm xrpl:setup: issuer, broker, domain; `series` opens a vault series with its loan broker and cover
 ```
 
 ## Commands
@@ -43,7 +44,7 @@ Install. Businesses selectively expedite a transaction, transfer, or payment wit
 ```bash
 pnpm install
 pnpm local                                   # everything, then http://localhost:3000 with one-click demo people
-pnpm xrpl:setup                              # Devnet issuer, private vault, loan broker, first-loss cover; seeds stay in .env
+pnpm xrpl:setup [series ...]                 # Devnet issuer, broker, domain, and rolling vault series; seeds stay in .env
 supabase start && supabase db reset && supabase test db
 cd supabase/functions && deno test --allow-all   # unit tests use FakeLedger; DB tests need the local stack
 pnpm test && pnpm lint && pnpm typecheck

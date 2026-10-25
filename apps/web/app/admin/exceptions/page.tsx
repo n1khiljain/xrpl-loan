@@ -1,7 +1,7 @@
 "use client";
 
 import { type ReceivableView, receivableViewFromJson } from "@app/adapters";
-import { useQuery } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { AdminShell } from "@/components/admin/admin-shell";
 import { StaffAction } from "@/components/admin/staff-action";
@@ -9,12 +9,14 @@ import { ErrorNotice, InfoNotice } from "@/components/app/notice";
 import { Money } from "@/components/app/money";
 import { StateChip } from "@/components/app/state-chip";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useCall } from "@/hooks/use-api";
 import { useNowSeconds } from "@/hooks/use-now";
 import { CALL_REASONS, type CallReasonValue } from "@/lib/admin";
+import { friendlyError } from "@/lib/errors";
 import { dateFromSeconds, shortAddress } from "@/lib/format";
 import type { OffchainReceivable } from "@/lib/types";
 
@@ -49,8 +51,48 @@ function useExceptions() {
     refetchInterval: 10_000,
   });
 }
+/**
+ * Missed payments on the ledger. Past the due date, mark the loan impaired (and clear that if the borrower catches
+ * up); past the grace period too, default it, which writes it off and draws on the series's first-loss cover. The
+ * ledger checks the timing again, so a button pressed too early just says when it can be done.
+ */
+function MissedPayment({ item, now }: { item: Exception; now: number }) {
+  const call = useCall();
+  const queryClient = useQueryClient();
+  const manage = useMutation({
+    mutationFn: (action: "impair" | "unimpair" | "default") => call("loans", { method: "POST", body: { action, receivableId: item.offchain.id } }),
+    onSuccess: () => queryClient.invalidateQueries(),
+  });
+  if (!item.offchain.loanId) return null;
+  const late = item.onchain.dueAt > 0 && now > item.onchain.dueAt;
+  const impaired = Boolean(item.offchain.impairedAt);
+  return (
+    <div className="border-divider flex flex-col gap-2 border-t pt-3" data-testid="missed-payment">
+      <span className="text-muted-foreground text-xs font-medium">
+        Missed payment on the ledger{impaired ? " · marked impaired" : late ? " · payment is late" : ` · due ${dateFromSeconds(item.onchain.dueAt)}`}
+      </span>
+      <div className="flex flex-wrap gap-2">
+        {impaired ? (
+          <Button size="sm" variant="outline" disabled={manage.isPending} onClick={() => manage.mutate("unimpair")}>
+            Clear impairment
+          </Button>
+        ) : (
+          <Button size="sm" variant="outline" disabled={manage.isPending || !late} onClick={() => manage.mutate("impair")} data-testid="impair-loan">
+            Mark payment missed
+          </Button>
+        )}
+        <Button size="sm" variant="destructive" disabled={manage.isPending || !late} onClick={() => manage.mutate("default")} data-testid="default-loan">
+          Default the loan
+        </Button>
+      </div>
+      {manage.isError ? <ErrorNotice>{friendlyError(manage.error)}</ErrorNotice> : null}
+    </div>
+  );
+}
+
 /** A quick-scan reason chip, derived from the same fields `why` is built from. */
 function tagFor(item: Exception): { label: string; variant: "danger" | "warning" } {
+  if (item.offchain.impairedAt) return { label: "Payment missed", variant: "danger" };
   if (item.onchain.state === "GuarantorCalled") return { label: "Approver asked to cover", variant: "danger" };
   if (item.offchain?.payerOutcome === "rejected") return { label: "Payer rejected", variant: "danger" };
   if (item.offchain?.payerOutcome === "short_paid") return { label: "Paid less", variant: "warning" };
@@ -83,9 +125,6 @@ function ExceptionCard({ item }: { item: Exception }) {
         <p className="text-sm">{item.why}</p>
         {item.offchain.payerOutcomeNote ? <p className="text-muted-foreground text-sm">&ldquo;{item.offchain.payerOutcomeNote}&rdquo;</p> : null}
         <div className="flex flex-wrap items-center gap-3">
-          {!onchain.guarantor ? (
-            <p className="text-muted-foreground text-sm">No approver. Marking the loan impaired or defaulted on the ledger comes with XRPL lending.</p>
-          ) : null}
           {!called && onchain.guarantor ? (
             <Select value={reason} onValueChange={(v) => setReason(v as CallReasonValue)}>
               <SelectTrigger aria-label="Call reason" className="w-64">
@@ -106,6 +145,7 @@ function ExceptionCard({ item }: { item: Exception }) {
             disabled={called && now < onchain.writeOffEligibleAt}
           /> : null}
         </div>
+        <MissedPayment item={item} now={now} />
       </CardContent>
     </Card>
   );
@@ -119,7 +159,7 @@ function Exceptions() {
   return (
     <div className="flex flex-col gap-5">
       <div className="bg-info-soft text-info rounded-md px-4 py-3 text-[13px] font-semibold">
-        The payer rejected it or paid less: call the approver any time. Overdue: only after the loan passes its due date. Write off: once the approver&apos;s grace period ends.
+        The payer rejected it or paid less: call the approver any time. Overdue: only after the loan passes its due date. Write off: once the approver&apos;s grace period ends. Mark a payment missed once the due date passes; default the loan after the ledger&apos;s grace period too.
       </div>
       <div className="flex flex-col gap-4">
         {list.data.map((item) => (

@@ -14,13 +14,13 @@ import { usd } from "@/lib/format";
 const STEPS = [
   { title: "Get verified", body: "A reviewer approves you, then the app issues you an XRPL credential." },
   { title: "Join the vault's domain", body: "The vault is private: only accounts holding that credential can deposit." },
-  { title: `Deposit ${ASSET}`, body: "Deposits are open during the subscription window. After it closes, the vault lends, and withdrawals wait until the ledger allows them." },
+  { title: `Deposit ${ASSET}`, body: "The vault runs in rolling series. Deposit into the series taking deposits; it lends after that and pays out on its date, when you withdraw." },
   { title: "Earn the interest", body: "Each funded payment is an upfront loan from the vault. Borrowers pay it back with interest, and that interest flows back to the vault." },
 ];
 
 /**
- * The lender's view of the XRPL single asset vault. Until `pnpm xrpl:setup` creates the vault, it shows the terms
- * and how lending works; deposits, withdrawals, and live vault stats switch on with the vault.
+ * The lender's view of the XRPL single asset vaults, which run as rolling series. Until `pnpm xrpl:setup` has run, it
+ * shows the terms and how lending works.
  */
 export default function LendPage() {
   return (
@@ -34,7 +34,7 @@ export default function LendPage() {
             Lenders deposit {ASSET} into a private vault on the XRP Ledger. Verified businesses get an upfront loan from it,
             and pay it back with interest based on the loan horizon. A first-loss cushion from the loan broker sits in front of lenders.
           </p>
-          {config.ledger.vaultId ? (
+          {config.ledger.broker ? (
             <div>
               <Button asChild variant="light" size="sm">
                 <a href={accountUrl(config.ledger.broker ?? "")} target="_blank" rel="noopener noreferrer">
@@ -48,7 +48,7 @@ export default function LendPage() {
         {ledgerReady ? (
           <Card>
             <CardHeader>
-              <CardTitle>Your deposit</CardTitle>
+              <CardTitle>Vault series</CardTitle>
             </CardHeader>
             <CardContent>
               <VaultActions />

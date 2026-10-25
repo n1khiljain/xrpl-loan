@@ -20,9 +20,11 @@ Last updated 2026-10-24. Branch `xrpl-migration`.
 - Each person gets a custodial XRPL wallet on first sign-in, encrypted with `WALLET_ENCRYPTION_KEY` and funded by the Devnet faucet. The wallet card on Verification shows the address, balances, and explorer links.
 - KYC: Privy identity token proves the email, staff approve on `/admin/kyc`.
 - The loan request lifecycle (draft, sign-off, submit, approve, reject, cancel, report, call the approver, write off) runs in Postgres through `receivable-actions`. Funding and borrower repayment go through `loans` once `pnpm xrpl:setup` has created the vault. Automatic repayment when the original payment arrives is still Phase 4.
-- The vault is closed-ended: deposits for 90 days, then loans, until a 180-day loan would run past the one-year redemption. `pnpm xrpl:setup` creates the issuer, credential domain, private vault, loan broker, and 5,000 RLUSD of first-loss cover. Interest is 5% a year.
-- The lender page takes deposits and withdrawals, and can draw stand-in RLUSD on Devnet. Withdrawals follow the vault's phase.
-- Devnet resets now and then, wiping accounts. Re-run `pnpm local` and `pnpm xrpl:setup` after a reset. The setup script keeps going from whatever it already wrote down.
+- Vaults run as **rolling series**. Since LendingProtocolV1_1 (on Devnet) a loan broker can only lend from a closed-ended vault, which takes deposits first, then lends, then pays out; an open-ended vault can't be given a loan broker. So each series is its own closed vault with its own loan broker and 5,000 RLUSD of first-loss cover, and new series open on a schedule. The functions find every series by reading what the broker account owns, so opening one needs no config change or redeploy. Funding picks the series that's lending, has the principal, and pays out soonest after the loan is due.
+- The lender page shows one card per series: deposit into the one taking deposits, withdraw from one that's paying out. `/lend/stats/` shows deposits, outstanding debt, first-loss cover, unrealized loss, interest earned and still due, and late or defaulted loans, per series and in total.
+- Missed payments: on the admin exceptions screen, staff mark a loan impaired once its due date passes (LoanManage `tfLoanImpair`; clear it with `tfLoanUnimpair`) and default it after the grace period too (`tfLoanDefault`), which writes it off and draws on first-loss cover. The ledger re-checks the timing.
+- Devnet demo series (2026-10-25): series A took 25,000 RLUSD from the house lender and lends until 2027-05-13; series B takes deposits until 2026-11-01, then lends until 2027-05-20.
+- Devnet resets now and then, wiping accounts. Re-run `pnpm local` and `pnpm xrpl:setup --fresh` after a reset, then open series again (see README). The setup script keeps going from whatever it already wrote down.
 
 ## Where Phase 2 left things
 

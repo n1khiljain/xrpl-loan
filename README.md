@@ -13,7 +13,7 @@ Where things stand: [STATUS.md](STATUS.md). Repo rules: [CLAUDE.md](CLAUDE.md).
 - **Ask for a loan.** Pick the kind of payment you want to expedite (an invoice, a card settlement, a reimbursement, or something else), name the payer, the amount, the payment reference, and the date the payment arrives, and upload documents. That date is the loan's term.
 - **Businesses** can have approvers: for a business's loan, one of them signs off and covers what's left if the payment never arrives. A personal loan goes straight to review.
 - **Review.** An underwriter approves or rejects it. Attesters handle the exceptions: a payer that rejected or short-paid, or an overdue loan.
-- **Get the loan and pay it back.** After `pnpm xrpl:setup`, an approved request becomes one loan from a private, credential-gated vault, and the borrower pays it back from their wallet. Interest follows the yearly rate in the deployment, prorated to the loan's length, which runs to the payment's due date. Deposits are open for 90 days; loans start once that window closes. Automatic repayment when the original payment arrives is still to come.
+- **Get the loan and pay it back.** After `pnpm xrpl:setup`, an approved request becomes one loan from a private, credential-gated vault series, and the borrower pays it back from their wallet. Interest follows the yearly rate in the deployment, prorated to the loan's length, which runs to the payment's due date. Automatic repayment when the original payment arrives is still to come.
 
 | On screen | In the code |
 |---|---|
@@ -42,6 +42,19 @@ Without a Privy app the local build only offers the demo people. To sign in with
 1. In the [Privy dashboard](https://dashboard.privy.io), turn on **Google** and **Email** under login methods, add `http://localhost:3000` under Configuration > App settings > Domains (if you've listed any domains there), and turn on **Return user data in an identity token**.
 2. Put the app ID in `.env` (gitignored) as both `NEXT_PUBLIC_PRIVY_APP_ID` and `PRIVY_APP_ID`. The backend checks tokens against the app's published keys, so no secret or verification key is needed.
 3. Run `pnpm local` again. It uses that app, so Google and email work and the demo buttons go away. `DEMO_PEOPLE=1 pnpm local` brings the demo people back even with a Privy app set.
+
+### Vaults: rolling series
+
+On XRPL (LendingProtocolV1_1) only a closed-ended vault can lend: it takes deposits, then lends, then pays out. So lending runs in rolling series, each its own vault with a loan broker and first-loss cover. Lenders deposit into the series taking deposits and withdraw when theirs pays out; loans come from a series that's lending.
+
+```bash
+pnpm xrpl:setup                     # issuer, broker, credential domain, and a first series (seeds go in .env)
+pnpm xrpl:setup series --deposit-minutes 3 --lend-days 200 --seed 25000 --wait   # a series pre-filled by the house lender, lending in ~3 minutes
+pnpm xrpl:setup series --deposit-minutes 10080 --lend-days 200                   # a series taking deposits for a week
+pnpm xrpl:setup --fresh             # new accounts, e.g. after a Devnet reset
+```
+
+The hosted functions need `BROKER_SEED` and `ISSUER_SEED` from `.env` as Supabase secrets.
 
 Tests:
 

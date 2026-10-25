@@ -31,8 +31,6 @@ const ACCOUNTS: Array<{ label: string; address: string | null | undefined }> = [
 ];
 const OBJECTS: Array<{ label: string; id: string | undefined }> = [
   { label: "Permissioned domain", id: config.ledger.domainId },
-  { label: "Single asset vault", id: config.ledger.vaultId },
-  { label: "Loan broker object", id: config.ledger.loanBrokerId },
 ];
 
 /** Product terms and ledger setup, read from deployments/<network>.json. Changing them is a config change and a redeploy. */
@@ -67,7 +65,7 @@ function Params() {
         </CardHeader>
         <CardContent className="flex flex-col gap-4">
           {!ledgerReady ? (
-            <InfoNotice title="Run the setup script">pnpm xrpl:setup creates the issuer, domain, vault, and loan broker, and posts the first-loss cover.</InfoNotice>
+            <InfoNotice title="Run the setup script">pnpm xrpl:setup creates the issuer, broker, and credential domain, then a first vault series with its loan broker and first-loss cover.</InfoNotice>
           ) : null}
           <dl className="divide-divider divide-y text-sm">
             {ACCOUNTS.map((a) => (

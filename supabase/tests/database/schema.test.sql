@@ -1,6 +1,6 @@
 -- Constraints that back product rules.
 begin;
-select plan(10);
+select plan(12);
 
 insert into public.wallets (address, encrypted_seed) values ('rPEPPER7kfTD9w2To4CQk6UCfuHM9c6GDY', repeat('x', 40));
 insert into public.profiles (wallet_address, privy_user_id) values ('rPEPPER7kfTD9w2To4CQk6UCfuHM9c6GDY', 'did:privy:a');
@@ -55,6 +55,15 @@ select throws_ok(
 select throws_ok(
   $$insert into public.profiles (wallet_address, privy_user_id) values ('rLHzPsX6oXkzU2qL12kHCH8G8cnZv1rBJh', 'did:privy:b')$$,
   '23503', null, 'a profile needs a custodial wallet'
+);
+
+select throws_ok(
+  $$update public.receivables set vault_id = repeat('A', 64)$$,
+  '23514', null, 'a loan names its vault series and its loan broker together'
+);
+select lives_ok(
+  $$update public.receivables set vault_id = repeat('A', 64), loan_broker_id = repeat('B', 64), impaired_at = now(), defaulted_at = now()$$,
+  'a loan can record its series and when it was impaired or defaulted'
 );
 
 select * from finish();

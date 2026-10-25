@@ -53,7 +53,11 @@ export function timeline(receivable: OffchainReceivable, onchain: ReceivableView
   if (state === "GuarantorCalled" || state === "WrittenOff" || state === "Recovered" && (onchain?.guarantorCalledAt ?? 0) > 0) {
     steps.push({ label: "Approver asked to cover", detail: at(onchain?.guarantorCalledAt), status: state === "Recovered" ? "done" : "failed" });
   }
-  if (state === "WrittenOff") steps.push({ label: "Written off", status: "failed" });
+  if (receivable.impairedAt && !receivable.defaultedAt && state !== "Settled") {
+    steps.push({ label: "Payment missed", detail: dateTime(receivable.impairedAt), status: "failed" });
+  }
+  if (receivable.defaultedAt) steps.push({ label: "Defaulted on the ledger", detail: dateTime(receivable.defaultedAt), status: "failed" });
+  else if (state === "WrittenOff") steps.push({ label: "Written off", status: "failed" });
   steps.push({
     label: "Paid back, closed out",
     detail: state === "Funded" && onchain ? `Due ${dateFromSeconds(onchain.dueAt)}` : undefined,
