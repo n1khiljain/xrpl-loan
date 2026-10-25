@@ -14,10 +14,10 @@ import { Money } from "@/components/app/money";
 import { ErrorNotice } from "@/components/app/notice";
 import { CARD_TONE, STATE_LABEL, StateChip, type DisplayState } from "@/components/app/state-chip";
 import { Topbar } from "@/components/app/topbar";
+import { GlyphField } from "@/components/landing/glyph-field";
 import { ReceivableCard, cardNumber } from "@/components/brand/receivable-card";
 import { CountUp, EASE } from "@/components/motion";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useCall, useOrgs } from "@/hooks/use-api";
 import { ledgerOf } from "@/hooks/use-receivable";
@@ -194,18 +194,35 @@ function ReceivableRow({ row, now, index }: { row: Row; now: number; index: numb
   );
 }
 
-function EmptyReceivables({ text }: { text: string }) {
+/**
+ * Nothing here yet, set like the landing's wide lenders card but in a warm grey a step darker than the page, with Night glyphs: the title
+ * top left, the bank rising out of the bottom right corner, and a line and the call to action along the bottom.
+ */
+function EmptyReceivables({ title, detail }: { title: string; detail: string }) {
   return (
-    <Card>
-      <CardContent className="space-y-4 py-10 text-center">
-        <p className="text-muted-foreground text-sm">{text}</p>
-        <Button asChild>
+    <section className="bg-border text-ink relative isolate flex min-h-[420px] flex-col overflow-hidden rounded-3xl p-6 sm:min-h-[460px] sm:p-8">
+      <GlyphField
+        tone="on-light"
+        shape="bank"
+        seed={8}
+        cell={13}
+        anchor={1}
+        fit={1}
+        className="absolute -right-[6%] bottom-[48%] -z-10 h-[30%] w-[72%] sm:-right-[4%] sm:-bottom-[10%] sm:h-[92%] sm:w-[52%]"
+      />
+      <h2 className="card-title max-w-[14ch]">{title}</h2>
+      <div className="mt-auto flex flex-col items-start gap-5 sm:max-w-[44%]">
+        <p className="text-muted-foreground max-w-[34ch] text-lg leading-snug sm:text-xl">{detail}</p>
+        <Button asChild size="lg">
           <Link href="/receivables/new/">Expedite a payment</Link>
         </Button>
-      </CardContent>
-    </Card>
+      </div>
+    </section>
   );
 }
+
+const EMPTY_LOANS = { title: "No loans yet", detail: "Name a payment you're waiting on, and the vault pays you up front once a reviewer approves it." };
+const EMPTY_SIGNOFFS = { title: "No sign-offs yet", detail: "When a teammate asks you to approve a loan for your business, it shows up here." };
 
 const TABS = [
   { value: "open", label: "Open" },
@@ -214,10 +231,10 @@ const TABS = [
 ] as const;
 
 /** The receivables table/list with the design's Open, Settled, and All tabs. Shared by Home, My receivables, and Guaranties. */
-function ReceivablesSection({ rows, emptyText }: { rows: Row[]; emptyText: string }) {
+function ReceivablesSection({ rows, empty }: { rows: Row[]; empty: { title: string; detail: string } }) {
   const now = useNowSeconds();
   const [tab, setTab] = useState<"open" | "settled" | "all">("all");
-  if (rows.length === 0) return <EmptyReceivables text={emptyText} />;
+  if (rows.length === 0) return <EmptyReceivables {...empty} />;
   const filtered = tab === "all" ? rows : rows.filter((r) => OPEN_STATES.includes(r.state) === (tab === "open"));
   return (
     <section className="bg-card @container flex flex-col rounded-2xl p-5 sm:p-6">
@@ -304,7 +321,7 @@ function FinanceCard({ row }: { row: Row }) {
 
 function HomeView({ rows }: { rows: Row[] }) {
   const [figure, setFigure] = useState<Figure>("due");
-  if (rows.length === 0) return <EmptyReceivables text="No loans yet." />;
+  if (rows.length === 0) return <EmptyReceivables {...EMPTY_LOANS} />;
   const mine = rows.filter((r) => r.role === "seller");
   const dueRows = mine.filter((r) => r.state === "Funded" || r.state === "GuarantorCalled");
   const due = dueRows.reduce((sum, r) => sum + amountFor(r), 0n);
@@ -356,7 +373,7 @@ function HomeView({ rows }: { rows: Row[] }) {
           </div>
         </GradientPanel>
         {guarantyRow ? <GuarantyCard row={guarantyRow} className="lg:hidden" /> : null}
-        <ReceivablesSection rows={rows} emptyText="No loans yet." />
+        <ReceivablesSection rows={rows} empty={EMPTY_LOANS} />
       </div>
       {cardRow || guarantyRow ? (
         <aside className="hidden w-[364px] shrink-0 flex-col gap-5 lg:flex">
@@ -398,9 +415,9 @@ function ReceivablesView({ me }: { me: MeResponse }) {
         <ErrorNotice>{friendlyError(rows.error)}</ErrorNotice>
 
       ) : view === "guaranties" ? (
-        <ReceivablesSection rows={rows.data.filter((r) => r.role === "guarantor")} emptyText="No sign-offs yet." />
+        <ReceivablesSection rows={rows.data.filter((r) => r.role === "guarantor")} empty={EMPTY_SIGNOFFS} />
       ) : view === "receivables" ? (
-        <ReceivablesSection rows={rows.data} emptyText="No loans yet." />
+        <ReceivablesSection rows={rows.data} empty={EMPTY_LOANS} />
       ) : (
         <HomeView rows={rows.data} />
       )}
