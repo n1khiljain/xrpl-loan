@@ -69,10 +69,10 @@ export const networkConfigShape = z.strictObject({
   }),
   params: z.strictObject({
     advanceRateBps: bps,
-    perClaimCap: units,
+    perReceivableCap: units,
     perOrgCap: units,
     poolDepositCap: units,
-    /** Yearly fee on unpaid principal, in basis points. */
+    /** Yearly interest on unpaid principal, in basis points. On the ledger this is ten times as many tenths of a basis point. */
     feeBps: bps,
     overdueWindowSeconds: seconds,
     approvalExpirySeconds: seconds,
@@ -91,6 +91,10 @@ export const networkConfigShape = z.strictObject({
     /** Hex of the credential type the app issues after KYC. */
     credentialType: z.string().regex(/^[0-9A-F]{2,128}$/).optional(),
     domainId: ledgerId.optional(),
+    /**
+     * Unused: vaults are rolling series the broker account owns, which the functions read from the ledger.
+     * Kept so an older deployment file still parses.
+     */
     vaultId: ledgerId.optional(),
     loanBrokerId: ledgerId.optional(),
     repaymentAccount: xrplAddress.optional(),

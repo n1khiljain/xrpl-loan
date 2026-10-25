@@ -2,15 +2,15 @@
 
 import { motion, useInView, useReducedMotion } from "motion/react";
 import { useEffect, useRef, useState } from "react";
-import type { ClaimCardTone } from "@/components/brand/claim-card";
-import { type CardMoment, LiveClaimCard } from "@/components/brand/live-claim-card";
+import type { ReceivableCardTone } from "@/components/brand/receivable-card";
+import { type CardMoment, LiveReceivableCard } from "@/components/brand/live-receivable-card";
 import { EASE } from "@/components/motion";
 import { cn } from "@/lib/utils";
 
 const STEP_MS = 2600;
 
-// the app's own claim card, walked through the states a member sees (labels and colors match state-chip.tsx)
-const STAGES: { state: string; label: string; tone: ClaimCardTone; moment?: CardMoment; caption: string }[] = [
+// the app's own loan card, walked through the states a borrower sees (labels and colors match state-chip.tsx)
+const STAGES: { state: string; label: string; tone: ReceivableCardTone; moment?: CardMoment; caption: string }[] = [
   { state: "IN REVIEW", label: "In review", tone: "frost", caption: "Your approver signed off. A reviewer checks the payment." },
   { state: "APPROVED", label: "Approved", tone: "sky", moment: "approved", caption: "The vault is ready to pay you." },
   { state: "PAID", label: "Paid", tone: "deep", moment: "paid", caption: "The vault pays you within a day." },
@@ -62,8 +62,8 @@ function DeckCard({ stage, depth, reduced }: { stage: Stage; depth: number; redu
         reduced ? { duration: 0 } : dealt ? { duration: 0.9, times: [0, 0.4, 0.45, 1], ease: EASE } : { type: "spring", stiffness: 240, damping: 28, mass: 0.9 }
       }
     >
-      <LiveClaimCard
-        claimId="0014"
+      <LiveReceivableCard
+        receivableId="0014"
         amount="$240.00"
         amountValue={240}
         state={stage.state}

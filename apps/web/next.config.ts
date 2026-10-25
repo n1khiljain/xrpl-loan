@@ -1,6 +1,6 @@
 import type { NextConfig } from "next";
 
-// Static export so any host can serve it (FR-F1, U-21). Record pages read query params, e.g. /claim?id=12.
+// Static export so any host can serve it (FR-F1, U-21). Record pages read query params, e.g. /receivable?id=12.
 const config: NextConfig = {
   output: "export",
   trailingSlash: true,

@@ -12,13 +12,13 @@ import { WalletCopy } from "@/components/app/wallet-copy";
 import { Swap } from "@/components/motion";
 import { Button } from "@/components/ui/button";
 import { useCall } from "@/hooks/use-api";
-import { dropsToXrp } from "@app/adapters";
+import { dropsToXrp, formatJoinCode } from "@app/adapters";
 import { ASSET } from "@/lib/config";
 import { friendlyError } from "@/lib/errors";
 import { usd } from "@/lib/format";
 import { useSession } from "@/lib/session/context";
 import { cn } from "@/lib/utils";
-import type { KycStatus, MeResponse, OffchainClaim, WalletView } from "@/lib/types";
+import type { KycStatus, MeResponse, OffchainReceivable, WalletView } from "@/lib/types";
 
 function statusText(me: MeResponse): { label: string; detail: string } {
   const status = me.profile?.kycStatus ?? "not_started";
@@ -28,7 +28,7 @@ function statusText(me: MeResponse): { label: string; detail: string } {
   return { label: "Not started", detail: "Verify your email to start. Press the button above while signed in with it." };
 }
 
-/** A dot and a plain label, like the reimbursement states. */
+/** A dot and a plain label, like the receivable states. */
 const KYC_DOT: Record<KycStatus, string> = {
   not_started: "bg-muted-foreground",
   pending: "bg-warning",
@@ -39,27 +39,29 @@ const KYC_DOT: Record<KycStatus, string> = {
 type ChecklistStep = { label: string; detail: string; done: boolean };
 
 /** The getting-started checklist from real account state: no step here is guessed. */
-function checklistSteps(me: MeResponse, kycApproved: boolean, claims: OffchainClaim[]): ChecklistStep[] {
+function checklistSteps(me: MeResponse, kycApproved: boolean, receivables: OffchainReceivable[]): ChecklistStep[] {
   const wallet = me.profile?.wallet;
-  const mine = claims.filter((c) => c.recipientWallet === wallet);
-  const orgNames = me.officerOrgs.map((o) => o.name).join(", ");
-  // making a reimbursement means picking your org; getting one past a draft, or signing off for someone, is the first one
-  const inOrg = me.officerOrgs.length > 0 || mine.length > 0;
-  const first = mine.some((c) => c.status !== "Draft") || claims.some((c) => c.guarantorWallet === wallet && c.guarantySigned);
+  const mine = receivables.filter((c) => c.recipientWallet === wallet);
+  // getting one past a draft, or signing off for someone as an org officer, is the first one
+  const first = mine.some((c) => c.status !== "Draft") || receivables.some((c) => c.guarantorWallet === wallet && c.guarantySigned);
   return [
     { label: "Account created", detail: me.profile?.email ?? "Your account is set up", done: true },
+    {
+      label: "Your organization",
+      detail: me.membership ? `${me.membership.name} · ${formatJoinCode(me.membership.joinCode)}` : "Create or join one",
+      done: Boolean(me.membership),
+    },
     { label: "Verify your email", detail: me.profile?.emailVerified ? (me.profile.email ?? "Verified") : "Sign in with your email or Google", done: Boolean(me.profile?.emailVerified) },
     { label: "Reviewer approval", detail: kycApproved ? "You're approved" : "Usually within a day", done: kycApproved },
-    { label: "Join your business", detail: orgNames || (inOrg ? "You're set up for your business" : "An admin adds you as a borrower or approver"), done: inOrg },
-    { label: "Get your first loan", detail: first ? "You're all set" : "Or sign off for a teammate", done: first },
+    { label: "Expedite your first payment", detail: first ? "You're all set" : "An invoice, a card settlement, or a reimbursement", done: first },
   ];
 }
 
 function GettingStarted({ me, kycApproved }: { me: MeResponse; kycApproved: boolean }) {
   const call = useCall();
   // the same list and cache the sidebar's sign-off count uses
-  const claims = useQuery({ queryKey: ["claims", "mine", "raw"], queryFn: () => call<{ claims: OffchainClaim[] }>("claims"), staleTime: 30_000 });
-  const steps = checklistSteps(me, kycApproved, claims.data?.claims ?? []);
+  const receivables = useQuery({ queryKey: ["receivables", "mine", "raw"], queryFn: () => call<{ receivables: OffchainReceivable[] }>("receivables"), staleTime: 30_000 });
+  const steps = checklistSteps(me, kycApproved, receivables.data?.receivables ?? []);
   const current = steps.findIndex((s) => !s.done);
   return (
     <GradientPanel tone="panel" className="hidden w-[340px] shrink-0 p-7 lg:block">
@@ -99,7 +101,7 @@ function Hero({ me, onVerify, verifying }: { me: MeResponse; onVerify: () => voi
   const title = status === "approved" ? "You're verified" : emailVerified ? "Waiting on a reviewer" : "Verify your email";
   const body =
     status === "approved"
-      ? "A reviewer approved you. Once the XRPL credential flow is live, the app issues you a credential that unlocks the lending vault."
+      ? "A reviewer approved you. That approval issues the credential this account needs to use the vault."
       : emailVerified
         ? "Your email is verified. A reviewer checks who you are next and approves you, usually within a day."
         : "Sign-in already proved your email to Privy. Press below to share that proof with this app, so a reviewer can approve you.";
@@ -197,9 +199,25 @@ function Verify({ me }: { me: MeResponse }) {
         </div>
 
         <Wallet me={me} />
+        {me.membership ? (
+          <div className="bg-card flex flex-col gap-3 rounded-2xl p-5 sm:p-6" data-testid="org-card">
+            <div className="flex items-center justify-between gap-3">
+              <span className="text-muted-foreground text-sm">Organization</span>
+              <span className="text-sm font-medium">{me.membership.name}</span>
+            </div>
+            <div className="border-divider flex items-center justify-between gap-3 border-t pt-3">
+              <span className="text-muted-foreground text-sm">Organization ID</span>
+              <span className="font-mono text-sm font-medium">{formatJoinCode(me.membership.joinCode)}</span>
+            </div>
+            <div className="border-divider flex items-center justify-between gap-3 border-t pt-3">
+              <span className="text-muted-foreground text-sm">Your role</span>
+              <span className="text-sm font-medium">{me.membership.financeAgent ? "Finance agent" : me.membership.roleTitle}</span>
+            </div>
+          </div>
+        ) : null}
 
         <Button asChild size="lg" variant={current === "approved" ? "default" : "outline"} className="self-start">
-          <Link href="/claims/new/">Expedite a payment</Link>
+          <Link href="/receivables/new/">Expedite a payment</Link>
         </Button>
       </div>
     </div>

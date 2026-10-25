@@ -14,7 +14,7 @@ const days = (seconds: number) => `${Math.round(seconds / 86_400)} days`;
 const LIMITS: Row[] = [
   { label: "Advance rate", value: `${config.params.advanceRateBps / 100}%`, hint: "Share of face value that can be paid out" },
   { label: "Interest", value: `${config.params.feeBps / 100}% a year`, hint: "Yearly rate on the unpaid loan. A shorter horizon costs less." },
-  { label: "Per-loan cap", value: usd(config.params.perClaimCap), hint: "Largest single one" },
+  { label: "Per-loan cap", value: usd(config.params.perReceivableCap), hint: "Largest single one" },
   { label: "Per-business cap", value: usd(config.params.perOrgCap), hint: "Outstanding across one business" },
   { label: "Vault deposit cap", value: usd(config.params.poolDepositCap), hint: "Most the vault takes in" },
   { label: "Due window", value: days(config.params.overdueWindowSeconds), hint: "From payout to due date" },
@@ -31,8 +31,6 @@ const ACCOUNTS: Array<{ label: string; address: string | null | undefined }> = [
 ];
 const OBJECTS: Array<{ label: string; id: string | undefined }> = [
   { label: "Permissioned domain", id: config.ledger.domainId },
-  { label: "Single asset vault", id: config.ledger.vaultId },
-  { label: "Loan broker object", id: config.ledger.loanBrokerId },
 ];
 
 /** Product terms and ledger setup, read from deployments/<network>.json. Changing them is a config change and a redeploy. */
@@ -66,7 +64,9 @@ function Params() {
           </CardDescription>
         </CardHeader>
         <CardContent className="flex flex-col gap-4">
-          {!ledgerReady ? <InfoNotice title="Run the setup script">pnpm xrpl:setup creates the issuer, domain, vault, and loan broker.</InfoNotice> : null}
+          {!ledgerReady ? (
+            <InfoNotice title="Run the setup script">pnpm xrpl:setup creates the issuer, broker, and credential domain, then a first vault series with its loan broker and first-loss cover.</InfoNotice>
+          ) : null}
           <dl className="divide-divider divide-y text-sm">
             {ACCOUNTS.map((a) => (
               <div key={a.label} className="flex items-center justify-between gap-3 py-2.5">

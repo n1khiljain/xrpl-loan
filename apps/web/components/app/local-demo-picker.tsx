@@ -9,14 +9,14 @@ import { DEV_SESSION_KEY, type DevSessionSeed } from "@/lib/session/types";
 type DemoPerson = { role: string; name: string; seed: DevSessionSeed };
 
 const ROLE: Record<string, string> = {
-  claimant: "Borrower with five loans",
-  guarantor: "Approver who signs off",
+  seller: "Borrower with loans in each state",
+  guarantor: "Approver at a business",
   lender: "Lender",
   staff: "Admin (approves and reviews)",
 };
 
 /** Where each person lands, so one click shows their main screen. */
-const HOME: Record<string, string> = { claimant: "/claims/", guarantor: "/claims/", lender: "/lend/", staff: "/admin/" };
+const HOME: Record<string, string> = { seller: "/receivables/", guarantor: "/receivables/", lender: "/lend/", staff: "/admin/" };
 
 /**
  * Local demo builds only: one-click sign-in as the demo people that `pnpm demo` sets up, since real sign-in needs a
@@ -25,7 +25,7 @@ const HOME: Record<string, string> = { claimant: "/claims/", guarantor: "/claims
 function signInAs(person: DemoPerson) {
   // the session provider reads this on load (lib/session/providers.tsx)
   window.sessionStorage.setItem(DEV_SESSION_KEY, JSON.stringify(person.seed));
-  window.location.assign(HOME[person.role] ?? "/claims/");
+  window.location.assign(HOME[person.role] ?? "/receivables/");
 }
 
 export function LocalDemoPicker() {
@@ -40,7 +40,7 @@ export function LocalDemoPicker() {
     },
   });
 
-  // `?as=claimant` (or guarantor, lender, staff) signs this tab in as that person, so a demo can open one tab per
+  // `?as=seller` (or guarantor, lender, staff) signs this tab in as that person, so a demo can open one tab per
   // person already signed in; sessions are per tab
   useEffect(() => {
     const as = new URLSearchParams(window.location.search).get("as");

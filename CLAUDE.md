@@ -17,7 +17,8 @@ Install. Businesses selectively expedite a transaction, transfer, or payment wit
 | Loan asset | A stand-in "RLUSD" issued by the app's own issuer account, because RLUSD isn't on Devnet. Issuer and currency are config, so real RLUSD is a config swap. |
 | Wallets | Custodial: the `me` function makes an XRPL wallet per person, encrypts the seed with `WALLET_ENCRYPTION_KEY` (AES-GCM, bound to the address), and funds it from the Devnet faucet. The browser never holds a key and never talks to the ledger. |
 | Sign-in | Privy (email code or Google), sign-in only. No Privy wallets. |
-| KYC | A Privy identity token proves the email, then staff approve on `/admin/kyc`. Approval is what the app will issue an XRPL Credential for. |
+| KYC | A Privy identity token proves the email, then staff approve on `/admin/kyc`. Approval issues an XRPL Credential when the vault is set up. |
+| Vaults | Rolling series of closed-ended vaults (a V1_1 loan broker can't lend from an open one), discovered from what the broker owns. |
 | Branding | The product name is Install, set in type. No third-party logos; name the network and asset in text. |
 | Git | Commit each phase on `xrpl-migration`. Never push; the user pushes. |
 
@@ -28,13 +29,14 @@ Install. Businesses selectively expedite a transaction, transfer, or payment wit
 ├── deployments/xrpl-devnet.json    # network, asset, terms, and the ledger objects the setup script creates (public IDs only)
 ├── packages/
 │   ├── config/                     # @app/config: zod schema + loader for deployments/*.json
-│   └── adapters/                   # @app/adapters: claim shapes, base-unit <-> XRPL amount conversion, explorer links
+│   └── adapters/                   # @app/adapters: receivable shapes, base-unit <-> XRPL amount conversion, explorer links
 ├── supabase/
-│   ├── migrations/                 # schema: wallets, profiles, claims (lifecycle in Postgres), ledger_txs, ...
+│   ├── migrations/                 # schema: wallets, profiles, receivables (typed, lifecycle in Postgres), ledger_txs, ...
 │   └── functions/                  # Deno edge functions; _shared/ has auth, db, ledger (xrpl.js), wallets (custody)
 ├── apps/web/                       # Next.js static export; talks only to the edge functions
 ├── scripts/local-up.sh             # pnpm local: Supabase + functions + demo seed + web
-└── scripts/local-demo.ts           # pnpm demo: demo people with funded Devnet wallets and claims in each state
+├── scripts/local-demo.ts           # pnpm demo: demo people with funded Devnet wallets and loans of each kind
+└── scripts/xrpl-setup.ts           # pnpm xrpl:setup: issuer, broker, domain; `series` opens a vault series with its loan broker and cover
 ```
 
 ## Commands
@@ -42,6 +44,7 @@ Install. Businesses selectively expedite a transaction, transfer, or payment wit
 ```bash
 pnpm install
 pnpm local                                   # everything, then http://localhost:3000 with one-click demo people
+pnpm xrpl:setup [series ...]                 # Devnet issuer, broker, domain, and rolling vault series; seeds stay in .env
 supabase start && supabase db reset && supabase test db
 cd supabase/functions && deno test --allow-all   # unit tests use FakeLedger; DB tests need the local stack
 pnpm test && pnpm lint && pnpm typecheck
@@ -54,8 +57,8 @@ Toolchain: Node 24, pnpm 10, Deno 2, Supabase CLI 2.122+, Docker.
 
 - TypeScript `strict`, no `any`. Deno functions import `xrpl` as `npm:xrpl@5.3.0` (deno.json has `nodeModulesDir: "auto"`, which the edge runtime needs).
 - Amounts are integer base units of the loan asset with 6 decimals (`ASSET_DECIMALS`), as decimal strings in JSON and `numeric` in Postgres. Convert to XRPL values only at the ledger boundary (`unitsToValue` / `valueToUnits`).
-- Every XRPL transaction goes through `Ledger.submit` in `supabase/functions/_shared/ledger.ts`, which records it in `ledger_txs` for explorer links.
+- Every XRPL transaction goes through `Ledger.submit` in `supabase/functions/_shared/ledger.ts`, which records it in `ledger_txs` for explorer links. A loan is the exception that needs two signatures: `submitCoSigned` still records the one transaction.
 - Edge functions verify the Privy token before anything else. The browser never sees a Supabase service key or a wallet seed.
-- Claim state changes go through `db.transitionClaim` so two requests can't both apply.
+- Receivable state changes go through `db.transitionReceivable` so two requests can't both apply.
 - Ledger addresses and object IDs come from `@app/config`; never hand-copy them.
 - Match the surrounding code's comment density and voice: comments say why, in plain sentences.

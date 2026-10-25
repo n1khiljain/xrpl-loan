@@ -6,6 +6,7 @@ import { InfoNotice } from "@/components/app/notice";
 import { Topbar } from "@/components/app/topbar";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { VaultActions } from "@/components/lend/vault-actions";
 import { ASSET, accountUrl, config, ledgerReady } from "@/lib/config";
 import { usd } from "@/lib/format";
 
@@ -13,13 +14,13 @@ import { usd } from "@/lib/format";
 const STEPS = [
   { title: "Get verified", body: "A reviewer approves you, then the app issues you an XRPL credential." },
   { title: "Join the vault's domain", body: "The vault is private: only accounts holding that credential can deposit." },
-  { title: `Deposit ${ASSET}`, body: "You get vault shares back. Withdraw any time there's idle cash." },
+  { title: `Deposit ${ASSET}`, body: "The vault runs in rolling series. Deposit into the series taking deposits; it lends after that and pays out on its date, when you withdraw." },
   { title: "Earn the interest", body: "Each funded payment is an upfront loan from the vault. Borrowers pay it back with interest, and that interest flows back to the vault." },
 ];
 
 /**
- * The lender's view of the XRPL single asset vault. Until `pnpm xrpl:setup` creates the vault, it shows the terms
- * and how lending works; deposits, withdrawals, and live vault stats switch on with the vault.
+ * The lender's view of the XRPL single asset vaults, which run as rolling series. Until `pnpm xrpl:setup` has run, it
+ * shows the terms and how lending works.
  */
 export default function LendPage() {
   return (
@@ -33,7 +34,7 @@ export default function LendPage() {
             Lenders deposit {ASSET} into a private vault on the XRP Ledger. Verified businesses get an upfront loan from it,
             and pay it back with interest based on the loan horizon. A first-loss cushion from the loan broker sits in front of lenders.
           </p>
-          {config.ledger.vaultId ? (
+          {config.ledger.broker ? (
             <div>
               <Button asChild variant="light" size="sm">
                 <a href={accountUrl(config.ledger.broker ?? "")} target="_blank" rel="noopener noreferrer">
@@ -44,12 +45,21 @@ export default function LendPage() {
           ) : null}
         </GradientPanel>
 
-        {!ledgerReady ? (
+        {ledgerReady ? (
+          <Card>
+            <CardHeader>
+              <CardTitle>Vault series</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <VaultActions />
+            </CardContent>
+          </Card>
+        ) : (
           <InfoNotice title="The vault isn't set up yet">
             Deposits, withdrawals, and live vault numbers switch on once the vault, loan broker, and credential domain are
             created on the ledger.
           </InfoNotice>
-        ) : null}
+        )}
 
         <Card>
           <CardHeader>
@@ -81,7 +91,7 @@ export default function LendPage() {
             </div>
             <div className="flex flex-col gap-0.5">
               <span className="text-muted-foreground">Largest single loan</span>
-              <span className="tabular font-semibold">{usd(config.params.perClaimCap)}</span>
+              <span className="tabular font-semibold">{usd(config.params.perReceivableCap)}</span>
             </div>
             <div className="flex flex-col gap-0.5">
               <span className="text-muted-foreground">Interest</span>

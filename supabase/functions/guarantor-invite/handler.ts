@@ -1,6 +1,6 @@
 import { z } from "zod";
 import { type TokenVerifier, requireCaller } from "../_shared/auth.ts";
-import { loadClaim, requireClaimant, uuid } from "../_shared/claims.ts";
+import { loadReceivable, requireSeller, uuid } from "../_shared/receivables.ts";
 import type { Db } from "../_shared/db/types.ts";
 import { renderEmail, usd } from "../_shared/emails.ts";
 import { type Handler, HttpError, badRequest, conflict, forbidden, json, methodNotAllowed, notFound, readJson } from "../_shared/http.ts";
@@ -18,11 +18,11 @@ export type InviteDeps = {
 /** Invite links expire after 7 days. */
 export const INVITE_TTL_MS = 7 * 24 * 60 * 60 * 1000;
 
-/** At most this many invites (and emails) per claim in any 24 hours. */
+/** At most this many invites (and emails) per receivable in any 24 hours. */
 export const MAX_INVITES_PER_DAY = 3;
 const DAY_MS = 24 * 60 * 60 * 1000;
 
-const PostBody = z.strictObject({ claimId: uuid });
+const PostBody = z.strictObject({ receivableId: uuid });
 const encoder = new TextEncoder();
 
 export const hashToken = (token: string) => sha256Hex(encoder.encode(token));
@@ -34,49 +34,49 @@ export function newInviteToken(): string {
 }
 
 /**
- * POST: the claimant creates a 7-day invite link for their guarantor and we email it. Only the token's
- * hash is stored, and a claim gets at most `MAX_INVITES_PER_DAY` a day. GET `?invite=`: the guarantor opens it and
- * gets the claim summary to sign off on; an invite that was already used to sign answers 410.
+ * POST: the seller creates a 7-day invite link for their guarantor and we email it. Only the token's
+ * hash is stored, and a receivable gets at most `MAX_INVITES_PER_DAY` a day. GET `?invite=`: the guarantor opens it and
+ * gets the receivable summary to sign off on; an invite that was already used to sign answers 410.
  */
 export function createInviteHandler(deps: InviteDeps): Handler {
   const now = deps.now ?? (() => new Date());
   const { db } = deps;
 
   async function create(req: Request, caller: Awaited<ReturnType<typeof requireCaller>>) {
-    const { claimId } = await readJson(req, PostBody);
-    const claim = await loadClaim(db, claimId);
-    requireClaimant(caller, claim);
-    if (!claim.packetHash || !claim.guarantorWallet) throw conflict("freeze the packet first", "not_frozen");
-    if (claim.status !== "Draft") throw conflict("this claim was already submitted", "not_draft");
-    if (!(await db.isActiveOfficer(claim.orgId, claim.guarantorWallet))) {
+    const { receivableId } = await readJson(req, PostBody);
+    const receivable = await loadReceivable(db, receivableId);
+    requireSeller(caller, receivable);
+    if (!receivable.packetHash || !receivable.guarantorWallet) throw conflict("freeze the packet first", "not_frozen");
+    if (receivable.status !== "Draft") throw conflict("this receivable was already submitted", "not_draft");
+    if (receivable.orgId === null || !(await db.isActiveOfficer(receivable.orgId, receivable.guarantorWallet))) {
       throw conflict("the guarantor is no longer an active officer of the org", "not_officer");
     }
 
     const since = new Date(now().getTime() - DAY_MS).toISOString();
-    if ((await db.countInvitesSince(claimId, since)) >= MAX_INVITES_PER_DAY) {
+    if ((await db.countInvitesSince(receivableId, since)) >= MAX_INVITES_PER_DAY) {
       throw new HttpError(429, "rate_limited", "you've sent this sign-off request enough times today; try again tomorrow");
     }
 
     const token = newInviteToken();
     const expiresAt = new Date(now().getTime() + INVITE_TTL_MS).toISOString();
-    await db.insertInvite({ claimId, guarantorWallet: claim.guarantorWallet, tokenHash: await hashToken(token), expiresAt });
+    await db.insertInvite({ receivableId, guarantorWallet: receivable.guarantorWallet, tokenHash: await hashToken(token), expiresAt });
     const inviteUrl = `${deps.appBaseUrl.replace(/\/+$/, "")}/guarantee?invite=${token}`;
 
-    const guarantor = await db.getProfile(claim.guarantorWallet);
+    const guarantor = await db.getProfile(receivable.guarantorWallet);
     let emailed = false;
     if (guarantor?.email) {
-      const org = await db.getOrg(claim.orgId);
+      const org = receivable.orgId === null ? null : await db.getOrg(receivable.orgId);
       await deps.mailer.send(
         renderEmail(guarantor.email, {
           kind: "guaranty_requested",
-          claimantName: caller.profile.displayName ?? "A member of your org",
+          sellerName: caller.profile.displayName ?? "A member of your org",
           orgName: org?.name ?? "your org",
-          amount: usd(claim.requestedAmount),
+          amount: usd(receivable.requestedAmount),
           link: inviteUrl,
           expires: new Date(expiresAt).toLocaleDateString("en-US", { dateStyle: "long", timeZone: "UTC" }),
         }),
       );
-      await db.recordNotification({ wallet: claim.guarantorWallet, kind: "guaranty_requested", claimId });
+      await db.recordNotification({ wallet: receivable.guarantorWallet, kind: "guaranty_requested", receivableId });
       emailed = true;
     }
     return json({ inviteUrl, expiresAt, emailed }, { status: 201 });
@@ -91,31 +91,34 @@ export function createInviteHandler(deps: InviteDeps): Handler {
     if (invite.usedAt !== null) throw new HttpError(410, "used", "this invite was already used to sign off");
     if (Date.parse(invite.expiresAt) <= now().getTime()) throw new HttpError(410, "expired", "this invite expired; ask for a new one");
 
-    const claim = await loadClaim(db, invite.claimId);
-    const [org, claimant, documents] = await Promise.all([
-      db.getOrg(claim.orgId),
-      db.getProfile(claim.recipientWallet),
-      db.listDocuments(claim.id),
+    const receivable = await loadReceivable(db, invite.receivableId);
+    const [org, seller, documents] = await Promise.all([
+      receivable.orgId === null ? Promise.resolve(null) : db.getOrg(receivable.orgId),
+      db.getProfile(receivable.recipientWallet),
+      db.listDocuments(receivable.id),
     ]);
-    const signed = claim.guarantySignedAt !== null;
+    const signed = receivable.guarantySignedAt !== null;
     return json({
-      claim: {
-        id: claim.id,
-        orgId: claim.orgId,
+      receivable: {
+        id: receivable.id,
+        orgId: receivable.orgId,
         orgName: org?.name ?? null,
-        claimantName: claimant?.displayName ?? null,
-        recipientWallet: claim.recipientWallet,
-        faceValue: claim.faceValue,
-        requestedAmount: claim.requestedAmount,
-        callinkPrNumber: claim.callinkPrNumber,
-        description: claim.description,
+        sellerName: seller?.displayName ?? null,
+        recipientWallet: receivable.recipientWallet,
+        faceValue: receivable.faceValue,
+        requestedAmount: receivable.requestedAmount,
+        type: receivable.type,
+        payerName: receivable.payerName,
+        dueDate: receivable.dueDate,
+        reference: receivable.reference,
+        description: receivable.description,
         documentCount: documents.length,
-        packetHash: claim.packetHash,
-        status: claim.status,
+        packetHash: receivable.packetHash,
+        status: receivable.status,
       },
       expiresAt: invite.expiresAt,
       signed,
-      signable: !signed && claim.status === "Draft" && claim.packetHash !== null,
+      signable: !signed && receivable.status === "Draft" && receivable.packetHash !== null,
     });
   }
 

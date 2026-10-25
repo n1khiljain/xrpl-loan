@@ -43,7 +43,8 @@ export function loadNetworkConfig(network: string): NetworkConfig {
   return parseNetworkConfig(RAW_CONFIGS[network], network);
 }
 
-export type LedgerSetup = Required<LedgerObjects> & { issuer: NonNullable<NetworkConfig["asset"]["issuer"]> };
+/** What every vault series shares: the issuer, the broker account, and the credential domain. */
+export type LedgerSetup = Required<Omit<LedgerObjects, "vaultId" | "loanBrokerId">> & { issuer: NonNullable<NetworkConfig["asset"]["issuer"]> };
 
 /** Thrown when code needs ledger objects the setup script has not created yet. */
 export class NotSetUpError extends Error {
@@ -58,11 +59,13 @@ export class NotSetUpError extends Error {
 
 /** Every ledger object the app needs, or throws `NotSetUpError` naming the missing ones. */
 export function requireSetup(config: NetworkConfig): LedgerSetup {
-  const keys = ["broker", "credentialIssuer", "credentialType", "domainId", "vaultId", "loanBrokerId", "repaymentAccount"] as const;
+  // the vaults themselves are rolling series found on the ledger, so they aren't required here
+  const keys = ["broker", "credentialIssuer", "credentialType", "domainId", "repaymentAccount"] as const;
   const missing: string[] = keys.filter((key) => config.ledger[key] === undefined);
   if (config.asset.issuer === null) missing.unshift("asset.issuer");
   if (missing.length > 0) throw new NotSetUpError(config.network, missing);
-  return { ...(config.ledger as Required<LedgerObjects>), issuer: config.asset.issuer! };
+  const { vaultId: _vault, loanBrokerId: _broker, ...shared } = config.ledger;
+  return { ...(shared as Omit<LedgerSetup, "issuer">), issuer: config.asset.issuer! };
 }
 
 /** Whether the setup script has run, without throwing. */
@@ -80,7 +83,7 @@ export function paramsAsBigInt(config: NetworkConfig) {
   const p = config.params;
   return {
     advanceRateBps: BigInt(p.advanceRateBps),
-    perClaimCap: BigInt(p.perClaimCap),
+    perReceivableCap: BigInt(p.perReceivableCap),
     perOrgCap: BigInt(p.perOrgCap),
     poolDepositCap: BigInt(p.poolDepositCap),
     feeBps: BigInt(p.feeBps),

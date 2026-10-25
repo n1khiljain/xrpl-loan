@@ -2,8 +2,8 @@ import { readFileSync } from "node:fs";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
 import { CARD_TONE, StateChip } from "../components/app/state-chip";
-import { ClaimCard } from "../components/brand/claim-card";
-import { LiveClaimCard } from "../components/brand/live-claim-card";
+import { ReceivableCard } from "../components/brand/receivable-card";
+import { LiveReceivableCard } from "../components/brand/live-receivable-card";
 import { CountUp, Expand, Swap } from "../components/motion";
 
 const css = readFileSync(new URL("../app/globals.css", import.meta.url), "utf8");
@@ -46,12 +46,12 @@ describe("the app follows the landing page's look (U-75)", () => {
     expect(html).not.toMatch(/bg-info-soft|rounded-full px-/);
   });
 
-  it("claim cards show a plain number and state in the card's font", () => {
-    const html = renderToStaticMarkup(<ClaimCard claimId="0014" amount="$240.00" state="IN REVIEW" org="Launchpad" />);
+  it("receivable cards show a plain number and state in the card's font", () => {
+    const html = renderToStaticMarkup(<ReceivableCard receivableId="0014" amount="$240.00" state="IN REVIEW" org="Launchpad" />);
     expect(html).toContain("No. 0014");
     expect(html).toContain("In review");
     expect(html).not.toContain("font-mono");
-    expect(renderToStaticMarkup(<ClaimCard claimId="DRAFT" amount="$0.00" state="DRAFT" org="Launchpad" />)).toContain(">Draft<");
+    expect(renderToStaticMarkup(<ReceivableCard receivableId="DRAFT" amount="$0.00" state="DRAFT" org="Launchpad" />)).toContain(">Draft<");
   });
 
   it("the card's color changes at every step a member sees, so each state looks different", () => {
@@ -62,10 +62,10 @@ describe("the app follows the landing page's look (U-75)", () => {
 
   it("cards are flat in every state, with no glass or metal finish, and closed-out cards still get their stamp", () => {
     for (const tone of ["frost", "sky", "deep", "gold"] as const) {
-      const html = renderToStaticMarkup(<ClaimCard claimId="0014" amount="$240.00" state="IN REVIEW" org="Launchpad" tone={tone} />);
+      const html = renderToStaticMarkup(<ReceivableCard receivableId="0014" amount="$240.00" state="IN REVIEW" org="Launchpad" tone={tone} />);
       expect(html).not.toMatch(/card-(frost-edge|brushed|holo)|grain/);
     }
-    const closed = renderToStaticMarkup(<LiveClaimCard claimId="0014" amount="$240.00" state="CLOSED OUT" org="Launchpad" tone="gold" moment="closed" />);
+    const closed = renderToStaticMarkup(<LiveReceivableCard receivableId="0014" amount="$240.00" state="CLOSED OUT" org="Launchpad" tone="gold" moment="closed" />);
     expect(closed).toContain("Paid in full");
   });
 });

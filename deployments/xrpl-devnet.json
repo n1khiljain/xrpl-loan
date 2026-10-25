@@ -8,15 +8,15 @@
   "asset": {
     "code": "RLUSD",
     "currency": "524C555344000000000000000000000000000000",
-    "issuer": null,
+    "issuer": "rKTyLjvRtmPurChodfDUWce8f2RCpUDpXA",
     "standIn": true
   },
   "params": {
     "advanceRateBps": 10000,
-    "perClaimCap": "2500000000",
+    "perReceivableCap": "2500000000",
     "perOrgCap": "10000000000",
     "poolDepositCap": "50000000000",
-    "feeBps": 0,
+    "feeBps": 500,
     "overdueWindowSeconds": 15552000,
     "approvalExpirySeconds": 1209600,
     "writeOffGraceSeconds": 5184000
@@ -25,5 +25,11 @@
     "simulatePayment": true,
     "testnetBanner": true
   },
-  "ledger": {}
+  "ledger": {
+    "broker": "rwCXRKLfC1vzqkUXfNnuMsA7geg2z6NXF3",
+    "credentialIssuer": "rwCXRKLfC1vzqkUXfNnuMsA7geg2z6NXF3",
+    "repaymentAccount": "rwCXRKLfC1vzqkUXfNnuMsA7geg2z6NXF3",
+    "credentialType": "496E7374616C6C",
+    "domainId": "51B23A04C698090BBB62345A77164DF696A5FB0A2C5291F0BF6FF6D8B16F3D4B"
+  }
 }

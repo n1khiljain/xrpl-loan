@@ -20,20 +20,26 @@ Deno.test("canonicalize follows RFC 8785: sorted keys, no whitespace, ES number 
 Deno.test("the same inputs give the same packetHash regardless of key order or file order", async () => {
   const hashes = ["c".repeat(64), "a".repeat(64), "B".repeat(64)];
   const one = buildPacket({
-    orgId: 1,
+    type: "reimbursement",
     recipient: RECIPIENT,
+    payerName: "ASUC",
+    dueDate: "2026-12-10",
+    orgId: 1,
     faceValue: 500_000_000n,
-    callinkPrNumber: "PR-7",
+    reference: "PR-7",
     documentHashes: hashes,
     createdAt: "2026-10-01T12:00:00Z",
   });
   const two = buildPacket({
     createdAt: new Date("2026-10-01T12:00:00.000Z"),
     documentHashes: [hashes[2] as string, hashes[0] as string, hashes[1] as string],
-    callinkPrNumber: " PR-7 ",
+    reference: " PR-7 ",
     faceValue: "500000000",
     recipient: RECIPIENT,
     orgId: 1,
+    dueDate: "2026-12-10",
+    payerName: " ASUC ",
+    type: "reimbursement",
   });
   assertEquals(await packetHash(one), await packetHash(two));
   const reordered = Object.fromEntries(Object.entries(one).reverse()) as typeof one;
@@ -45,41 +51,41 @@ Deno.test("the same inputs give the same packetHash regardless of key order or f
 Deno.test("packet freezes the draft once; later receipts don't change the hash", async () => {
   const w = await draftWorld({ receipts: ["receipt C", "receipt A", "receipt B"] });
   const handler = createPacketHandler({ auth: verifier, db: w.db });
-  const res = await call(handler, "POST", ENDPOINT, { token: w.claimant.token, body: { claimId: w.claim.id } });
+  const res = await call(handler, "POST", ENDPOINT, { token: w.seller.token, body: { receivableId: w.receivable.id } });
   assertStatus(res, 200);
-  const stored = await w.db.getClaim(w.claim.id);
+  const stored = await w.db.getReceivable(w.receivable.id);
   assertEquals(stored?.packetHash, res.body.packetHash);
   const docs = (res.body.packet as { documentHashes: string[] }).documentHashes;
   assertEquals(docs, [...docs].sort());
 
-  await addReceipt(w.db, w.storage, w.claim, w.claimant, "late receipt", 9);
-  const again = await call(handler, "POST", ENDPOINT, { token: w.claimant.token, body: { claimId: w.claim.id } });
+  await addReceipt(w.db, w.storage, w.receivable, w.seller, "late receipt", 9);
+  const again = await call(handler, "POST", ENDPOINT, { token: w.seller.token, body: { receivableId: w.receivable.id } });
   assertEquals(again.body.packetHash, res.body.packetHash);
 });
 
 Deno.test("packet won't freeze a draft for a member whose verification lapsed", async () => {
   const w = await draftWorld();
-  await w.db.updateProfile(w.claimant.wallet, { kycStatus: "pending" });
+  await w.db.updateProfile(w.seller.wallet, { kycStatus: "pending" });
   const handler = createPacketHandler({ auth: verifier, db: w.db });
-  assertStatus(await call(handler, "POST", ENDPOINT, { token: w.claimant.token, body: { claimId: w.claim.id } }), 403, "kyc_required");
-  assertEquals((await w.db.getClaim(w.claim.id))?.packetHash, null);
+  assertStatus(await call(handler, "POST", ENDPOINT, { token: w.seller.token, body: { receivableId: w.receivable.id } }), 403, "kyc_required");
+  assertEquals((await w.db.getReceivable(w.receivable.id))?.packetHash, null);
 });
 
-Deno.test("packet needs the claimant, a guarantor, and confirmed receipts", async () => {
+Deno.test("packet needs the seller, a guarantor, and confirmed receipts", async () => {
   const w = await draftWorld({ receipts: [] });
   const handler = createPacketHandler({ auth: verifier, db: w.db });
-  const post = (token: string) => call(handler, "POST", ENDPOINT, { token, body: { claimId: w.claim.id } });
+  const post = (token: string) => call(handler, "POST", ENDPOINT, { token, body: { receivableId: w.receivable.id } });
   assertStatus(await post(w.guarantor.token), 403);
-  assertStatus(await post(w.claimant.token), 409, "no_documents");
+  assertStatus(await post(w.seller.token), 409, "no_documents");
   const pending = await w.db.insertDocument({
-    claimId: w.claim.id,
-    storagePath: `${w.claim.id}/pending`,
+    receivableId: w.receivable.id,
+    storagePath: `${w.receivable.id}/pending`,
     mimeType: "image/png",
     sizeBytes: 5,
-    uploadedBy: w.claimant.wallet,
+    uploadedBy: w.seller.wallet,
   });
-  assertStatus(await post(w.claimant.token), 409, "unconfirmed_documents");
+  assertStatus(await post(w.seller.token), 409, "unconfirmed_documents");
   await w.db.setDocumentHash(pending.id, "d".repeat(64));
-  await w.db.updateClaim(w.claim.id, { guarantorWallet: null });
-  assertStatus(await post(w.claimant.token), 409, "no_guarantor");
+  await w.db.updateReceivable(w.receivable.id, { guarantorWallet: null });
+  assertStatus(await post(w.seller.token), 409, "no_guarantor");
 });

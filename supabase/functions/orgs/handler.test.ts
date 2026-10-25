@@ -1,4 +1,4 @@
-import { assertEquals } from "@std/assert";
+import { assert, assertEquals } from "@std/assert";
 import { assertStatus } from "../_shared/fixtures.ts";
 import { FIXED_NOW, MemoryDb, assertRejectsBadTokens, call, makeUser, verifier } from "../_shared/testing.ts";
 import { createOrgsHandler } from "./handler.ts";
@@ -36,9 +36,14 @@ Deno.test("an admin creates an org, adds an officer, deactivates it, and every c
   assertStatus(await post({ action: "set-officer", orgId, wallet: "0xabc", active: true }), 400);
 
   const listed = await call(handler, "GET", ENDPOINT, { token: admin.token });
-  assertEquals(listed.body.orgs, [
-    { id: orgId, name: "Blockchain at Berkeley", active: true, officers: [{ wallet: officer.wallet, title: "Treasurer", displayName: "Grace" }] },
-  ]);
+  const listedOrgs = listed.body.orgs as Array<{ joinCode: string; id: number; name: string; active: boolean; officers: unknown }>;
+  const createdOrg = listedOrgs[0];
+  assert(createdOrg);
+  assert(/^[ABCDEFGHJKLMNPQRSTUVWXYZ23456789]{8}$/.test(createdOrg.joinCode));
+  assertEquals(
+    listedOrgs.map((org) => ({ id: org.id, name: org.name, active: org.active, officers: org.officers })),
+    [{ id: orgId, name: "Blockchain at Berkeley", active: true, officers: [{ wallet: officer.wallet, title: "Treasurer", displayName: "Grace" }] }],
+  );
 
   assertStatus(await post({ action: "set-active", orgId, active: false }), 200);
   assertEquals(db.orgs.get(orgId)?.active, false);

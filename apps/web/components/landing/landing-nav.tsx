@@ -42,7 +42,7 @@ export function LandingNav() {
         </nav>
         <div className="hidden items-center gap-2 lg:flex">
           <Button asChild variant="secondary">
-            <Link href="/claims/">Log in</Link>
+            <Link href="/receivables/">Log in</Link>
           </Button>
           {/* sign-up and log-in are the same email or Google step; sign-up lands on onboarding, where a new account is set up */}
           <Button asChild>
@@ -68,7 +68,7 @@ export function LandingNav() {
           ))}
           <div className="mt-2 flex gap-2">
             <Button asChild variant="secondary" className="flex-1">
-              <Link href="/claims/" onClick={() => setOpen(false)}>
+              <Link href="/receivables/" onClick={() => setOpen(false)}>
                 Log in
               </Link>
             </Button>

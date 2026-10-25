@@ -37,6 +37,11 @@ export function dateFromSeconds(seconds: number | bigint): string {
   return new Date(Number(seconds) * 1000).toLocaleDateString("en-US", { dateStyle: "medium" });
 }
 
+/** A date with the time, for loans due within the day (test-network demo loans). */
+export function dateTimeFromSeconds(seconds: number | bigint): string {
+  return new Date(Number(seconds) * 1000).toLocaleString("en-US", { dateStyle: "medium", timeStyle: "short" });
+}
+
 export function dateTime(iso: string): string {
   return new Date(iso).toLocaleString("en-US", { dateStyle: "medium", timeStyle: "short" });
 }
@@ -50,11 +55,4 @@ export function shortAddress(address: string): string {
   return `${address.slice(0, 6)}...${address.slice(-4)}`;
 }
 
-const FEE_YEAR_SECONDS = 365n * 86_400n;
-
-/** Amount due on a purchase price after `seconds` with nothing paid: price plus the yearly fee at `feeBps`, rounded up. */
-export function amountDue(price: bigint, feeBps: bigint, seconds: number): bigint {
-  const denominator = 10_000n * FEE_YEAR_SECONDS;
-  const fee = (price * feeBps * BigInt(seconds) + denominator - 1n) / denominator;
-  return price + fee;
-}
+export { amountDue } from "@app/adapters";

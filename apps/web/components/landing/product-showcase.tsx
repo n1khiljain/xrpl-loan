@@ -7,8 +7,8 @@ import { useEffect, useRef, useState } from "react";
 import { StateChip } from "@/components/app/state-chip";
 import { Stepper } from "@/components/app/stepper";
 import { Timeline } from "@/components/app/timeline";
-import { ClaimCard } from "@/components/brand/claim-card";
-import { WizardAside } from "@/components/claim/wizard-aside";
+import { ReceivableCard } from "@/components/brand/receivable-card";
+import { WizardAside } from "@/components/receivable/wizard-aside";
 import { PosterMark } from "@/components/landing/poster-card";
 import { EASE } from "@/components/motion";
 import { buttonVariants } from "@/components/ui/button";
@@ -159,7 +159,7 @@ function BorrowView() {
             </span>
           </span>
         </div>
-        <WizardAside org={ORG} requestedUnits={SAMPLE} state="DETAILS" className="hidden w-80 2xl:flex" />
+        <WizardAside org={ORG} kind="Invoice" requestedUnits={SAMPLE} termSeconds={30 * 24 * 60 * 60} state="DETAILS" className="hidden w-80 2xl:flex" />
       </div>
     </div>
   );
@@ -185,7 +185,7 @@ function LoanView() {
           </span>
           <Rows rows={[["Business", ORG], ["Payment reference", "INV-20418"], ["Signed off by", "Priya, finance"]]} />
         </div>
-        <ClaimCard claimId="0014" amount={usd(SAMPLE)} state="APPROVED" org={ORG} tone="sky" scale={0.78} className="hidden self-start xl:block" />
+        <ReceivableCard receivableId="0014" amount={usd(SAMPLE)} state="APPROVED" org={ORG} tone="sky" scale={0.78} className="hidden self-start xl:block" />
       </div>
     </div>
   );
@@ -217,7 +217,7 @@ function RepayView() {
             />
           </div>
         </div>
-        <ClaimCard claimId="0014" amount={usd(SAMPLE)} state="PAID" org={ORG} tone="deep" scale={0.78} className="hidden self-start xl:block" />
+        <ReceivableCard receivableId="0014" amount={usd(SAMPLE)} state="PAID" org={ORG} tone="deep" scale={0.78} className="hidden self-start xl:block" />
       </div>
     </div>
   );

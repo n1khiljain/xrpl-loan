@@ -24,9 +24,9 @@ const COLUMNS: { title: string; links: FooterLink[] }[] = [
   {
     title: "Borrow",
     links: [
-      { label: "Expedite a payment", href: "/claims/new/" },
-      { label: "My loans", href: "/claims/?view=claims" },
-      { label: "Sign-offs", href: "/claims/?view=guaranties" },
+      { label: "Expedite a payment", href: "/receivables/new/" },
+      { label: "My loans", href: "/receivables/?view=receivables" },
+      { label: "Sign-offs", href: "/receivables/?view=guaranties" },
       { label: "Verification", href: "/onboard/" },
     ],
   },
@@ -65,7 +65,7 @@ export function LandingFooter() {
             <h2 className="display-type max-w-[16ch] text-[clamp(1.75rem,3vw,2.5rem)]">Expedite the next payment you choose</h2>
             <p className="text-muted-foreground max-w-[34ch] text-base leading-relaxed sm:text-lg">Upfront loans for businesses. Interest depends on the loan horizon.</p>
             <Button asChild size="lg">
-              <Link href="/claims/new/">Expedite a payment</Link>
+              <Link href="/receivables/new/">Expedite a payment</Link>
             </Button>
           </div>
           <AppPreview className="h-[340px] sm:h-[420px] lg:h-[460px]" />

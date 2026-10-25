@@ -5,7 +5,7 @@ import { useInView, useReducedMotion } from "motion/react";
 import { type ReactNode, useEffect, useRef, useState } from "react";
 import { StateChip } from "@/components/app/state-chip";
 import { Timeline } from "@/components/app/timeline";
-import { ClaimCard } from "@/components/brand/claim-card";
+import { ReceivableCard } from "@/components/brand/receivable-card";
 import { LiquidPill } from "@/components/landing/liquid-pill";
 import { ASSET, params } from "@/lib/config";
 import { amountDue, usd } from "@/lib/format";
@@ -63,7 +63,7 @@ export function PaymentPreview() {
 
 /** The loan card, paid out. */
 export function LoanPreview() {
-  return <ClaimCard claimId="0014" amount={usd(SAMPLE)} state="PAID" org="Northwind Supply" tone="deep" scale={0.72} className="-rotate-6" />;
+  return <ReceivableCard receivableId="0014" amount={usd(SAMPLE)} state="PAID" org="Northwind Supply" tone="deep" scale={0.72} className="-rotate-6" />;
 }
 
 /** What's due, then the loan closed out. */

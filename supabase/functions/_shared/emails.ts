@@ -14,9 +14,9 @@ function day(seconds: number | bigint): string {
 
 /** Template fields. Amounts are base units as decimal strings and dates are unix seconds. */
 export type EmailData =
-  | { kind: "guaranty_requested"; claimantName: string; orgName: string; amount: string; link: string; expires: string }
-  | { kind: "claim_approved"; amount: string; link: string }
-  | { kind: "claim_funded"; price: string; due: string; dueAt: number; link: string }
+  | { kind: "guaranty_requested"; sellerName: string; orgName: string; amount: string; link: string; expires: string }
+  | { kind: "receivable_approved"; amount: string; link: string }
+  | { kind: "receivable_funded"; price: string; due: string; dueAt: number; link: string }
   | { kind: "due_soon"; remaining: string; dueAt: number; link: string }
   | { kind: "guarantor_called"; remaining: string; link: string };
 
@@ -27,11 +27,11 @@ export function emailDataFrom(kind: NotificationKind, data: Record<string, strin
   const link = str("link");
   if (!link) return null;
   switch (kind) {
-    case "claim_approved": {
+    case "receivable_approved": {
       const amount = str("amount");
       return amount ? { kind, amount, link } : null;
     }
-    case "claim_funded": {
+    case "receivable_funded": {
       const price = str("price");
       const due = str("due");
       const dueAt = num("dueAt");
@@ -58,18 +58,18 @@ export function renderEmail(to: string, data: EmailData): Email {
     case "guaranty_requested":
       return {
         to,
-        subject: `${data.claimantName} asked you to sign off on a loan`,
+        subject: `${data.sellerName} asked you to sign off on a loan`,
         text:
-          `${data.claimantName} wants an upfront loan of ${data.amount} for ${data.orgName}, and asked you to sign off. ` +
+          `${data.sellerName} wants an upfront loan of ${data.amount} for ${data.orgName}, and asked you to sign off. ` +
           `If the payment never arrives, you cover what's left.\n\nReview and sign off: ${data.link}\n\nThis link expires ${data.expires}.${sign}`,
       };
-    case "claim_approved":
+    case "receivable_approved":
       return {
         to,
         subject: "Your loan was approved",
         text: `You're approved for ${usd(data.amount)}. Open it to get the loan before the approval expires: ${data.link}${sign}`,
       };
-    case "claim_funded":
+    case "receivable_funded":
       return {
         to,
         subject: "You got paid",
@@ -80,7 +80,7 @@ export function renderEmail(to: string, data: EmailData): Email {
     case "due_soon":
       return {
         to,
-        subject: "Your payment to the vault is due within 14 days",
+        subject: "Your loan payment is due within 14 days",
         text: `Pay ${usd(data.remaining)} back to the vault, with interest, by ${day(data.dueAt)}. Do it here: ${data.link}${sign}`,
       };
     case "guarantor_called":

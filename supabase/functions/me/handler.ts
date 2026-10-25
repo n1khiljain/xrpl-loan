@@ -1,6 +1,7 @@
 import { z } from "zod";
 import { type TokenVerifier, authenticate } from "../_shared/auth.ts";
 import { type Db, type Profile, UniqueViolation, type Wallet } from "../_shared/db/types.ts";
+import { membershipFor } from "../_shared/membership.ts";
 import { type Handler, badRequest, json, methodNotAllowed, readJson } from "../_shared/http.ts";
 import type { Ledger } from "../_shared/ledger.ts";
 import type { Custody } from "../_shared/wallets.ts";
@@ -15,7 +16,7 @@ const PostBody = z.strictObject({
 });
 
 /**
- * GET: the caller's profile, staff role, and officer orgs. POST: set up the account the first time, which makes
+ * GET: the caller's profile, staff role, officer orgs, and organization. POST: set up the account the first time, which makes
  * the custodial XRPL wallet and asks the faucet to fund it, or update email and display name after that. A Privy
  * identity token proves the email; without one the email is stored unverified.
  */
@@ -23,13 +24,14 @@ export function createMeHandler(deps: MeDeps): Handler {
   const { db } = deps;
 
   async function view(profile: Profile | null) {
-    if (!profile) return { profile: null, staffRole: null, officerOrgs: [], wallet: null };
-    const [staffRole, officerOrgs, wallet] = await Promise.all([
+    if (!profile) return { profile: null, staffRole: null, officerOrgs: [], membership: null, wallet: null };
+    const [staffRole, officerOrgs, wallet, membership] = await Promise.all([
       db.getStaffRole(profile.wallet),
       db.listOfficerOrgs(profile.wallet),
       db.getWallet(profile.wallet),
+      membershipFor(db, profile.wallet),
     ]);
-    return { profile, staffRole, officerOrgs, wallet: { address: profile.wallet, funded: Boolean(wallet?.fundedTx), fundedTx: wallet?.fundedTx ?? null } };
+    return { profile, staffRole, officerOrgs, membership, wallet: { address: profile.wallet, funded: Boolean(wallet?.fundedTx), fundedTx: wallet?.fundedTx ?? null } };
   }
 
   /** Funds a wallet once. A faucet hiccup leaves it unfunded; the next POST tries again. */

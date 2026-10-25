@@ -16,7 +16,7 @@ Deno.test("view=orgs lists active orgs with active officers' names", async () =>
   const former = await makeUser(db, { name: "Former" });
   seedOrg(db, 1, "Blockchain at Berkeley", [officer.wallet, former.wallet]);
   db.officers.set(`1:${former.wallet}`, { orgId: 1, wallet: former.wallet, title: null, active: false });
-  db.orgs.set(2, { id: 2, name: "Dormant Club", active: false });
+  db.orgs.set(2, { id: 2, name: "Dormant Club", active: false, joinCode: "DORMANT2" });
   const res = await call(createDirectoryHandler({ auth: verifier, db }), "GET", `${ENDPOINT}?view=orgs`, { token: viewer.token });
   assertStatus(res, 200);
   assertEquals(res.body.orgs, [

@@ -1,10 +1,11 @@
-import type { ClaimViewJson } from "@app/adapters";
+import type { ReceivableViewJson } from "@app/adapters";
 
 /** Response shapes of the edge functions in supabase/functions. Amounts arrive as decimal strings of base units. */
 export type KycStatus = "not_started" | "pending" | "approved" | "rejected";
 export type StaffRole = "underwriter" | "attester" | "admin";
 export type OffchainStatus =
   | "Draft"
+  | "FinanceReview"
   | "Submitted"
   | "Approved"
   | "Funded"
@@ -29,56 +30,86 @@ export type Profile = {
   kycUpdatedAt: string | null;
 };
 
+export type Membership = {
+  orgId: number;
+  name: string;
+  joinCode: string;
+  active: boolean;
+  financeAgent: boolean;
+  roleTitle: string | null;
+  /** Other finance agents in the organization. The seller's own request skips them when this is zero. */
+  peerFinanceAgents: number;
+};
+
 export type MeResponse = {
   profile: Profile | null;
   staffRole: StaffRole | null;
   officerOrgs: Array<{ orgId: number; name: string; title: string | null }>;
+  membership: Membership | null;
   wallet: { address: Address; funded: boolean; fundedTx: string | null } | null;
 };
 
-export type OffchainClaim = {
+export type ReceivableType = "card_settlement" | "reimbursement" | "invoice" | "other";
+
+export type OffchainReceivable = {
   id: string;
   number: number;
-  orgId: number;
+  type: ReceivableType;
+  payerName: string;
+  payerEmail: string | null;
+  payerWallet: Address | null;
+  /** YYYY-MM-DD */
+  dueDate: string;
+  /** Only for an org's receivable (e.g. a club reimbursement). */
+  orgId: number | null;
   recipientWallet: Address;
-  recipientType: "member" | "org_treasurer";
   faceValue: string;
   requestedAmount: string;
-  callinkPrNumber: string;
+  reference: string;
   description: string | null;
   packetHash: string | null;
   guarantorWallet: Address | null;
   guarantySigned: boolean;
   guarantySignedAt: string | null;
   status: OffchainStatus;
+  /** Set once a finance agent has sent the request on to an admin. */
+  financeClearedAt: string | null;
   rejectReason: string | null;
   loanId: string | null;
-  asucOutcome: "none" | "rejected" | "short_paid";
-  asucOutcomeNote: string | null;
+  /** The vault series that funded the loan. */
+  vaultId: string | null;
+  /** When staff marked a missed payment (impaired) or defaulted the loan on the ledger. */
+  impairedAt: string | null;
+  defaultedAt: string | null;
+  payerOutcome: "none" | "rejected" | "short_paid";
+  payerOutcomeNote: string | null;
   createdAt: string;
   updatedAt: string;
   /** Money and dates once it's past a draft. */
-  ledger: ClaimViewJson | null;
+  ledger: ReceivableViewJson | null;
 };
 
 export type DocumentView = { id: string; sha256: string | null; mimeType: string; sizeBytes: number; createdAt: string };
 
-export type ClaimWithDocuments = { claim: OffchainClaim; documents: DocumentView[] };
+export type ReceivableWithDocuments = { receivable: OffchainReceivable; documents: DocumentView[] };
 
 export type PacketResponse = { packetHash: string };
 
 export type InviteCreated = { inviteUrl: string; expiresAt: string; emailed: boolean };
 
 export type InviteView = {
-  claim: {
+  receivable: {
     id: string;
-    orgId: number;
+    orgId: number | null;
     orgName: string | null;
-    claimantName: string | null;
+    sellerName: string | null;
     recipientWallet: Address;
     faceValue: string;
     requestedAmount: string;
-    callinkPrNumber: string;
+    type: ReceivableType;
+    payerName: string;
+    dueDate: string;
+    reference: string;
     description: string | null;
     documentCount: number;
     packetHash: string | null;
@@ -110,4 +141,38 @@ export type WalletView = {
   assetUnits: string | null;
   assetCode: string;
   transactions: LedgerTxView[];
+};
+
+/** One vault in the rolling series, from the `vault` function. Amounts are base units. */
+export type VaultSeriesView = {
+  vaultId: string;
+  loanBrokerId: string | null;
+  phase: "open" | "subscription" | "lending" | "closed";
+  subscriptionAt: number | null;
+  redemptionAt: number | null;
+  assetsTotal: string;
+  assetsAvailable: string;
+  lossUnrealized: string;
+  debtTotal: string;
+  coverAvailable: string;
+  yourShares: string;
+  yourValue: string;
+};
+
+export type VaultView = {
+  broker: string;
+  series: VaultSeriesView[];
+  totals: {
+    assetsTotal: string;
+    assetsAvailable: string;
+    debtTotal: string;
+    coverAvailable: string;
+    lossUnrealized: string;
+    interestEarned: string;
+    interestExpected: string;
+    loansOutstanding: number;
+    loansImpaired: number;
+    loansDefaulted: number;
+  };
+  balance: string;
 };

@@ -8,6 +8,8 @@ export const config: NetworkConfig = loadNetworkConfig(PUBLIC_ENV.network);
 export const onTestnet = isTestnet(config);
 /** Whether `pnpm xrpl:setup` has created the vault, broker, domain, and issuer on this network. */
 export const ledgerReady = isSetUp(config);
+/** Test-network demo tools: "Simulate payer payment" and loans due in minutes. Never on mainnet. */
+export const demoTools = onTestnet && config.features.simulatePayment;
 
 /** The loan asset's name as people see it, e.g. "RLUSD". */
 export const ASSET = config.asset.code;
@@ -17,7 +19,7 @@ export const accountUrl = (address: string) => explorerAccount(config, address);
 
 export const params = {
   advanceRateBps: BigInt(config.params.advanceRateBps),
-  perClaimCap: BigInt(config.params.perClaimCap),
+  perReceivableCap: BigInt(config.params.perReceivableCap),
   feeBps: BigInt(config.params.feeBps),
   overdueWindowSeconds: config.params.overdueWindowSeconds,
   approvalExpirySeconds: config.params.approvalExpirySeconds,

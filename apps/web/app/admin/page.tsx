@@ -1,6 +1,6 @@
 "use client";
 
-import { type ClaimView, claimViewFromJson } from "@app/adapters";
+import { type ReceivableView, receivableViewFromJson } from "@app/adapters";
 import { useQuery } from "@tanstack/react-query";
 import { useState } from "react";
 import { AdminShell } from "@/components/admin/admin-shell";
@@ -21,10 +21,11 @@ import { useNowSeconds } from "@/hooks/use-now";
 import { REJECT_REASONS } from "@/lib/admin";
 import { config } from "@/lib/config";
 import { parseUsd, shortAddress, unitsToInput, usd } from "@/lib/format";
-import type { ClaimWithDocuments, OffchainClaim, PersonView } from "@/lib/types";
+import type { ReceivableWithDocuments, OffchainReceivable, PersonView } from "@/lib/types";
 import { cn } from "@/lib/utils";
+import { RECEIVABLE_TYPES } from "@/lib/receivable-types";
 
-type QueueItem = { ledger: ClaimView; claim: OffchainClaim };
+type QueueItem = { ledger: ReceivableView; receivable: OffchainReceivable };
 type Exposure = { orgId: number; name: string; outstanding: bigint; cap: bigint };
 
 const OUTSTANDING = new Set(["Funded", "GuarantorCalled", "WrittenOff"]);
@@ -36,21 +37,21 @@ function useQueue() {
     queryKey: ["admin-queue", orgs.data?.length],
     enabled: orgs.isSuccess,
     queryFn: async () => {
-      const { claims } = await call<{ claims: OffchainClaim[] }>("claims", { query: { scope: "all" } });
-      const items: QueueItem[] = claims
+      const { receivables } = await call<{ receivables: OffchainReceivable[] }>("receivables", { query: { scope: "all" } });
+      const items: QueueItem[] = receivables
         .filter((c) => c.status === "Submitted" && c.ledger)
-        .map((claim) => ({ claim, ledger: claimViewFromJson(claim.ledger!) }))
+        .map((receivable) => ({ receivable, ledger: receivableViewFromJson(receivable.ledger!) }))
         .sort((a, b) => a.ledger.submittedAt - b.ledger.submittedAt);
       const cap = BigInt(config.params.perOrgCap);
       const exposure: Exposure[] = (orgs.data ?? []).map((o) => ({
         orgId: o.id,
         name: o.name,
         cap,
-        outstanding: claims
+        outstanding: receivables
           .filter((c) => c.orgId === o.id && OUTSTANDING.has(c.status) && c.ledger)
           .reduce((sum, c) => sum + BigInt(c.ledger!.amountRemaining), 0n),
       }));
-      const wallets = [...new Set(items.flatMap((i) => [i.claim.recipientWallet, i.claim.guarantorWallet].filter(Boolean)))] as string[];
+      const wallets = [...new Set(items.flatMap((i) => [i.receivable.recipientWallet, i.receivable.guarantorWallet].filter(Boolean)))] as string[];
       const people = wallets.length
         ? (await call<{ people: PersonView[] }>("directory", { query: { view: "people", wallets: wallets.join(",") } })).people
         : [];
@@ -95,20 +96,20 @@ function ReviewCard({
   highlighted: boolean;
 }) {
   const call = useCall();
-  const { ledger, claim } = item;
+  const { ledger, receivable } = item;
   const [amount, setAmount] = useState(unitsToInput(ledger.requestedAmount));
   const [reason, setReason] = useState<string>("MISSING_RECEIPTS");
   const docs = useQuery({
-    queryKey: ["claim", claim.id],
-    queryFn: () => call<ClaimWithDocuments>("claims", { query: { id: claim.id } }),
+    queryKey: ["receivable", receivable.id],
+    queryFn: () => call<ReceivableWithDocuments>("receivables", { query: { id: receivable.id } }),
   });
   const approveUnits = parseUsd(amount);
   const overCap = exposure && approveUnits ? exposure.outstanding + approveUnits > exposure.cap : false;
-  const claimant = people.get(claim.recipientWallet);
-  const guarantor = claim.guarantorWallet ? people.get(claim.guarantorWallet) : undefined;
+  const seller = people.get(receivable.recipientWallet);
+  const guarantor = receivable.guarantorWallet ? people.get(receivable.guarantorWallet) : undefined;
   const documents = docs.data?.documents ?? [];
-  // the member and the officer both need verification before the claim is funded
-  const kycReady = claimant?.kycStatus === "approved" && guarantor?.kycStatus === "approved";
+  // the seller, and the officer when there is one, need verification before the receivable is funded
+  const kycReady = seller?.kycStatus === "approved" && (!receivable.guarantorWallet || guarantor?.kycStatus === "approved");
   const number = ledger.id.toString();
 
   return (
@@ -121,11 +122,11 @@ function ReviewCard({
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div className="flex min-w-0 flex-col gap-1.5">
             <span className="text-on-ink/70 truncate text-[13px]">
-              Loan {number} · {exposure?.name ?? `Business ${claim.orgId}`}
-              {claimant?.displayName ? ` · ${claimant.displayName}` : ""}
+              {RECEIVABLE_TYPES[receivable.type].short} {number} · {receivable.payerName}{exposure ? ` · ${exposure.name}` : ""}
+              {seller?.displayName ? ` · ${seller.displayName}` : ""}
             </span>
             <Money units={ledger.requestedAmount} size="lg" />
-            {claim.description ? <p className="text-on-ink/80 max-w-md text-sm leading-snug">{claim.description}</p> : null}
+            {receivable.description ? <p className="text-on-ink/80 max-w-md text-sm leading-snug">{receivable.description}</p> : null}
           </div>
           <StateChip state="Submitted" className="text-on-ink shrink-0" />
         </div>
@@ -141,8 +142,8 @@ function ReviewCard({
         <div className="grid gap-4 lg:grid-cols-2">
           <div className="bg-surface-muted flex flex-col gap-2.5 rounded-md p-4 text-sm">
             <div className="flex items-center justify-between gap-3">
-              <span className="text-muted-foreground">Payment reference</span>
-              <span className="font-semibold">{claim.callinkPrNumber}</span>
+              <span className="text-muted-foreground">{RECEIVABLE_TYPES[receivable.type].referenceLabel}</span>
+              <span className="font-semibold">{receivable.reference}</span>
             </div>
             <div className="flex items-center justify-between gap-3">
               <span className="text-muted-foreground">Face value</span>
@@ -150,7 +151,7 @@ function ReviewCard({
             </div>
             <div className="flex items-center justify-between gap-3">
               <span className="text-muted-foreground">Borrower wallet</span>
-              <span className="font-mono text-xs">{shortAddress(claim.recipientWallet)}</span>
+              <span className="font-mono text-xs">{shortAddress(receivable.recipientWallet)}</span>
             </div>
             <div className="flex items-center justify-between gap-3">
               <span className="text-muted-foreground">Packet</span>
@@ -158,22 +159,32 @@ function ReviewCard({
             </div>
           </div>
           <div className="border-border divide-divider flex flex-col divide-y rounded-md border px-4">
-            <Kyc person={claimant} role="Borrower" />
-            <Kyc person={guarantor} role="Approver" />
+            <Kyc person={seller} role="Borrower" />
+            {receivable.guarantorWallet ? (
+              <>
+                <Kyc person={guarantor} role="Approver" />
+                <div className="flex items-center justify-between gap-3 py-2.5 text-sm">
+                  <span className="text-muted-foreground">Approver sign-off</span>
+                  <StatusText tone={receivable.guarantySigned ? "success" : "warning"}>{receivable.guarantySigned ? "Signed" : "Not signed"}</StatusText>
+                </div>
+              </>
+            ) : null}
             <div className="flex items-center justify-between gap-3 py-2.5 text-sm">
-              <span className="text-muted-foreground">Approver sign-off</span>
-              <StatusText tone={claim.guarantySigned ? "success" : "warning"}>{claim.guarantySigned ? "Signed" : "Not signed"}</StatusText>
+              <span className="text-muted-foreground">Payer pays by</span>
+              <span className="font-semibold">{new Date(`${receivable.dueDate}T12:00:00`).toLocaleDateString("en-US", { dateStyle: "medium" })}</span>
             </div>
-            <div className="flex items-center justify-between gap-3 py-2.5 text-sm">
-              <span className="text-muted-foreground">Business exposure</span>
-              <span className="tabular font-semibold">
-                {usd(exposure?.outstanding)} of {usd(exposure?.cap)}
-              </span>
-            </div>
+            {exposure ? (
+              <div className="flex items-center justify-between gap-3 py-2.5 text-sm">
+                <span className="text-muted-foreground">Business exposure</span>
+                <span className="tabular font-semibold">
+                  {usd(exposure.outstanding)} of {usd(exposure.cap)}
+                </span>
+              </div>
+            ) : null}
           </div>
         </div>
         {!kycReady ? (
-          <InfoNotice title="Waiting on verification">The borrower and the approver both need to be verified before this can be approved.</InfoNotice>
+          <InfoNotice title="Waiting on verification">The borrower{receivable.guarantorWallet ? " and the approver" : ""} need to be verified before this can be approved.</InfoNotice>
         ) : null}
         {overCap ? <InfoNotice title="This would go over the business's cap">Funding will fail until others are closed out.</InfoNotice> : null}
         <div className="grid gap-5 lg:grid-cols-2">
@@ -182,7 +193,7 @@ function ReviewCard({
             <Input id={`amount-${number}`} inputMode="decimal" className="tabular" value={amount} onChange={(e) => setAmount(e.target.value)} />
             <StaffAction
               label={`Approve ${approveUnits ? usd(approveUnits) : ""}`}
-              body={approveUnits ? { action: "approve", claimId: claim.id, amount: approveUnits.toString() } : null}
+              body={approveUnits ? { action: "approve", receivableId: receivable.id, amount: approveUnits.toString() } : null}
               disabled={!kycReady}
               testId={`approve-${number}`}
             />
@@ -201,7 +212,7 @@ function ReviewCard({
                 ))}
               </SelectContent>
             </Select>
-            <StaffAction label="Reject" variant="outline" body={{ action: "reject", claimId: claim.id, reason }} testId={`reject-${number}`} />
+            <StaffAction label="Reject" variant="outline" body={{ action: "reject", receivableId: receivable.id, reason }} testId={`reject-${number}`} />
           </div>
         </div>
       </CardContent>
@@ -210,7 +221,7 @@ function ReviewCard({
 }
 
 /**
- * Every submitted claim renders as a full review card in a scrollable column, with a compact list above (desktop:
+ * Every submitted receivable renders as a full review card in a scrollable column, with a compact list above (desktop:
  * to the side) for jumping between them.
  */
 function Queue() {
@@ -229,10 +240,10 @@ function Queue() {
     <div className="flex flex-col gap-5 lg:flex-row lg:items-start">
       <nav aria-label="Waiting for review" className="bg-card shadow-card flex shrink-0 flex-col gap-1 rounded-3xl p-3 lg:sticky lg:top-6 lg:w-80">
         <span className="eyebrow text-muted-foreground px-2.5 pt-1.5 pb-2">Submitted {items.length}</span>
-        {items.map(({ ledger, claim }) => {
+        {items.map(({ ledger, receivable }) => {
           const id = ledger.id.toString();
           const on = id === activeId;
-          const org = exposure.find((e) => e.orgId === claim.orgId)?.name ?? `Business ${claim.orgId}`;
+          const org = receivable.payerName;
           return (
             <a
               key={id}
@@ -244,7 +255,7 @@ function Queue() {
               <span className="flex min-w-0 flex-1 flex-col gap-0.5">
                 <span className="truncate font-bold">{org}</span>
                 <span className="text-muted-foreground truncate text-xs">
-                  {timeAgo(ledger.submittedAt, now)} · {claim.callinkPrNumber}
+                  {timeAgo(ledger.submittedAt, now)} · {receivable.reference}
                 </span>
               </span>
               <span className="tabular shrink-0 text-sm font-bold">{usd(ledger.requestedAmount)}</span>
@@ -255,9 +266,9 @@ function Queue() {
       <div className="flex min-w-0 flex-1 flex-col gap-4">
         {items.map((item) => (
           <ReviewCard
-            key={item.claim.id}
+            key={item.receivable.id}
             item={item}
-            exposure={exposure.find((e) => e.orgId === item.claim.orgId)}
+            exposure={exposure.find((e) => e.orgId === item.receivable.orgId)}
             people={people}
             highlighted={item.ledger.id.toString() === activeId}
           />

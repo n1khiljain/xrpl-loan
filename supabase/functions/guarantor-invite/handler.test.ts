@@ -10,7 +10,7 @@ const ENDPOINT = "http://localhost/guarantor-invite";
 async function frozenWorld() {
   const w = await draftWorld();
   const packet = createPacketHandler({ auth: verifier, db: w.db });
-  await call(packet, "POST", "http://localhost/packet", { token: w.claimant.token, body: { claimId: w.claim.id } });
+  await call(packet, "POST", "http://localhost/packet", { token: w.seller.token, body: { receivableId: w.receivable.id } });
   const mailer = new MemoryMailer();
   let now = FIXED_NOW;
   const handler = createInviteHandler({
@@ -32,7 +32,7 @@ Deno.test("guarantor-invite rejects requests without a valid Privy token", async
 
 Deno.test("POST makes a 7-day link, stores only its hash, and emails the guarantor", async () => {
   const w = await frozenWorld();
-  const res = await call(w.handler, "POST", ENDPOINT, { token: w.claimant.token, body: { claimId: w.claim.id } });
+  const res = await call(w.handler, "POST", ENDPOINT, { token: w.seller.token, body: { receivableId: w.receivable.id } });
   assertStatus(res, 201);
   const inviteUrl = String(res.body.inviteUrl);
   assertMatch(inviteUrl, /^https:\/\/receivables\.example\.test\/guarantee\?invite=[A-Za-z0-9_-]{43}$/);
@@ -50,36 +50,36 @@ Deno.test("POST makes a 7-day link, stores only its hash, and emails the guarant
   assert(email?.text.includes(inviteUrl));
 });
 
-Deno.test("POST needs a frozen packet, the claimant, and a guarantor who is still an officer", async () => {
+Deno.test("POST needs a frozen packet, the seller, and a guarantor who is still an officer", async () => {
   const w = await draftWorld();
   const mailer = new MemoryMailer();
   const handler = createInviteHandler({ auth: verifier, db: w.db, mailer, appBaseUrl: "http://x" });
-  assertStatus(await call(handler, "POST", ENDPOINT, { token: w.claimant.token, body: { claimId: w.claim.id } }), 409, "not_frozen");
+  assertStatus(await call(handler, "POST", ENDPOINT, { token: w.seller.token, body: { receivableId: w.receivable.id } }), 409, "not_frozen");
 
   const f = await frozenWorld();
-  assertStatus(await call(f.handler, "POST", ENDPOINT, { token: f.guarantor.token, body: { claimId: f.claim.id } }), 403);
+  assertStatus(await call(f.handler, "POST", ENDPOINT, { token: f.guarantor.token, body: { receivableId: f.receivable.id } }), 403);
   f.db.officers.set(`1:${f.guarantor.wallet}`, { orgId: 1, wallet: f.guarantor.wallet, title: null, active: false });
-  assertStatus(await call(f.handler, "POST", ENDPOINT, { token: f.claimant.token, body: { claimId: f.claim.id } }), 409, "not_officer");
+  assertStatus(await call(f.handler, "POST", ENDPOINT, { token: f.seller.token, body: { receivableId: f.receivable.id } }), 409, "not_officer");
 });
 
 Deno.test("a guarantor without an email still gets a link to share", async () => {
   const w = await frozenWorld();
   await w.db.updateProfile(w.guarantor.wallet, { email: null });
-  const res = await call(w.handler, "POST", ENDPOINT, { token: w.claimant.token, body: { claimId: w.claim.id } });
+  const res = await call(w.handler, "POST", ENDPOINT, { token: w.seller.token, body: { receivableId: w.receivable.id } });
   assertEquals([res.status, res.body.emailed], [201, false]);
   assertEquals(w.mailer.sent.length, 0);
 });
 
 Deno.test("GET resolves the token for the named guarantor only, until it expires", async () => {
   const w = await frozenWorld();
-  const created = await call(w.handler, "POST", ENDPOINT, { token: w.claimant.token, body: { claimId: w.claim.id } });
+  const created = await call(w.handler, "POST", ENDPOINT, { token: w.seller.token, body: { receivableId: w.receivable.id } });
   const token = new URL(String(created.body.inviteUrl)).searchParams.get("invite");
   const get = (userToken: string) => call(w.handler, "GET", `${ENDPOINT}?invite=${token}`, { token: userToken });
 
   const res = await get(w.guarantor.token);
   assertStatus(res, 200);
-  const claim = res.body.claim as Record<string, unknown>;
-  assertEquals([claim.orgName, claim.claimantName, claim.requestedAmount, claim.documentCount], [
+  const receivable = res.body.receivable as Record<string, unknown>;
+  assertEquals([receivable.orgName, receivable.sellerName, receivable.requestedAmount, receivable.documentCount], [
     "Blockchain at Berkeley",
     "Ada",
     "400000000",
@@ -88,14 +88,14 @@ Deno.test("GET resolves the token for the named guarantor only, until it expires
   assertEquals(res.body.signed, false);
   assertEquals(res.body.signable, true);
 
-  assertStatus(await get(w.claimant.token), 403, "wrong_guarantor");
+  assertStatus(await get(w.seller.token), 403, "wrong_guarantor");
   assertStatus(await call(w.handler, "GET", `${ENDPOINT}?invite=${"x".repeat(43)}`, { token: w.guarantor.token }), 404);
   w.setNow(new Date(FIXED_NOW.getTime() + 7 * 86_400_000));
   assertStatus(await get(w.guarantor.token), 410, "expired");
 });
 
-Deno.test("an outsider can't create an invite for someone else's claim", async () => {
+Deno.test("an outsider can't create an invite for someone else's receivable", async () => {
   const w = await frozenWorld();
   const outsider = await makeUser(w.db);
-  assertStatus(await call(w.handler, "POST", ENDPOINT, { token: outsider.token, body: { claimId: w.claim.id } }), 403);
+  assertStatus(await call(w.handler, "POST", ENDPOINT, { token: outsider.token, body: { receivableId: w.receivable.id } }), 403);
 });

@@ -13,6 +13,7 @@
     "db:test": "supabase test db",
     "functions:test": "cd supabase/functions && deno test --allow-all",
     "demo": "deno run --allow-all --config supabase/functions/deno.json scripts/local-demo.ts",
+    "xrpl:setup": "deno run --allow-all --config supabase/functions/deno.json scripts/xrpl-setup.ts",
     "local": "bash scripts/local-up.sh"
   }
 }

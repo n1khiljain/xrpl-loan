@@ -335,7 +335,7 @@
   background: var(--grad-card-deep);
 }
 /*
- * Claim card finishes and moments. Frosted glass while it waits and brushed metal when closed out; the shine
+ * Receivable card finishes and moments. Frosted glass while it waits and brushed metal when closed out; the shine
  * plays once on approval, and the glare follows the pointer on a live card.
  */
 @utility card-frost-edge {

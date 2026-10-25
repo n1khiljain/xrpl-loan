@@ -6,11 +6,12 @@ export type Wallet = `r${string}`;
 export type KycStatus = "not_started" | "pending" | "approved" | "rejected";
 export type KycSource = "manual";
 export type StaffRole = "underwriter" | "attester" | "admin";
-export type RecipientType = "member" | "org_treasurer";
-export type AsucOutcome = "none" | "rejected" | "short_paid";
-export type CallReason = "none" | "asuc_rejected" | "partial_shortfall" | "overdue";
-export type ClaimStatus =
+export type ReceivableType = "card_settlement" | "reimbursement" | "invoice" | "other";
+export type PayerOutcome = "none" | "rejected" | "short_paid";
+export type CallReason = "none" | "payer_rejected" | "partial_shortfall" | "overdue";
+export type ReceivableStatus =
   | "Draft"
+  | "FinanceReview"
   | "Submitted"
   | "Approved"
   | "Funded"
@@ -20,7 +21,7 @@ export type ClaimStatus =
   | "WrittenOff"
   | "Rejected"
   | "Cancelled";
-export type NotificationKind = "guaranty_requested" | "claim_approved" | "claim_funded" | "due_soon" | "guarantor_called";
+export type NotificationKind = "guaranty_requested" | "receivable_approved" | "receivable_funded" | "due_soon" | "guarantor_called";
 
 /** A custodial wallet. `encryptedSeed` is only ever decrypted inside an edge function (see wallets.ts). */
 export type WalletRow = { address: Wallet; encryptedSeed: string; fundedTx: string | null; createdAt: string };
@@ -40,24 +41,36 @@ export type Profile = {
 
 export type ProfilePatch = Partial<Omit<Profile, "wallet" | "privyUserId" | "createdAt">>;
 
-export type Org = { id: number; name: string; active: boolean };
+export type Org = { id: number; name: string; active: boolean; joinCode: string };
 export type Officer = { orgId: number; wallet: Wallet; title: string | null; active: boolean };
 
-export type Claim = {
+/** One organization per person. A finance agent has no title; everyone else has one. */
+export type OrgMember = { orgId: number; wallet: Wallet; financeAgent: boolean; roleTitle: string | null };
+
+export type Receivable = {
   id: string;
   number: number;
-  orgId: number;
+  type: ReceivableType;
   recipientWallet: Wallet;
-  recipientType: RecipientType;
+  payerName: string;
+  payerEmail: string | null;
+  payerWallet: Wallet | null;
+  /** YYYY-MM-DD: when the payer is expected to pay. */
+  dueDate: string;
+  /** Set only for an org's receivable (a club reimbursement), together with its officer as guarantor. */
+  orgId: number | null;
   faceValue: string;
   requestedAmount: string;
-  callinkPrNumber: string;
+  reference: string;
   description: string | null;
   packetJson: unknown;
   packetHash: string | null;
   guarantorWallet: Wallet | null;
   guarantySignedAt: string | null;
-  status: ClaimStatus;
+  status: ReceivableStatus;
+  /** Set when a finance agent sends the request on to an admin. */
+  financeClearedAt: string | null;
+  financeClearedBy: Wallet | null;
   submittedAt: string | null;
   approvedAmount: string;
   approvedBy: Wallet | null;
@@ -70,28 +83,45 @@ export type Claim = {
   purchasedAt: string | null;
   dueAt: string | null;
   loanId: string | null;
+  /** The vault series and its loan broker that funded the loan. */
+  vaultId: string | null;
+  loanBrokerId: string | null;
+  /** When staff marked the loan impaired (a missed payment) or defaulted it on the ledger. */
+  impairedAt: string | null;
+  defaultedAt: string | null;
   callReason: CallReason;
   guarantorCalledAt: string | null;
   writeOffEligibleAt: string | null;
   principalWrittenOff: boolean;
   writtenOffPrincipal: string;
-  asucOutcome: AsucOutcome;
-  asucOutcomeNote: string | null;
-  asucOutcomeAt: string | null;
+  payerOutcome: PayerOutcome;
+  payerOutcomeNote: string | null;
+  payerOutcomeAt: string | null;
   createdAt: string;
   updatedAt: string;
 };
 
-export type NewClaim = Pick<
-  Claim,
-  "orgId" | "recipientWallet" | "recipientType" | "faceValue" | "requestedAmount" | "callinkPrNumber" | "description" | "guarantorWallet"
+export type NewReceivable = Pick<
+  Receivable,
+  | "type"
+  | "recipientWallet"
+  | "payerName"
+  | "payerEmail"
+  | "payerWallet"
+  | "dueDate"
+  | "orgId"
+  | "faceValue"
+  | "requestedAmount"
+  | "reference"
+  | "description"
+  | "guarantorWallet"
 >;
 
-export type ClaimPatch = Partial<Omit<Claim, "id" | "number" | "orgId" | "recipientWallet" | "createdAt" | "updatedAt">>;
+export type ReceivablePatch = Partial<Omit<Receivable, "id" | "number" | "recipientWallet" | "createdAt" | "updatedAt">>;
 
-export type ClaimDocument = {
+export type ReceivableDocument = {
   id: string;
-  claimId: string;
+  receivableId: string;
   storagePath: string;
   sha256: string | null;
   mimeType: string;
@@ -102,7 +132,7 @@ export type ClaimDocument = {
 
 export type GuarantorInvite = {
   id: string;
-  claimId: string;
+  receivableId: string;
   guarantorWallet: Wallet;
   tokenHash: string;
   expiresAt: string;
@@ -115,21 +145,21 @@ export type LedgerTx = {
   txHash: string;
   txType: string;
   account: Wallet;
-  claimId: string | null;
+  receivableId: string | null;
   purpose: string;
   result: string;
   createdAt: string;
 };
 
-export type ClaimScope =
-  /** Claims the wallet sells, guarantees, or can see as an officer of the org. */
-  | { kind: "wallet"; wallet: Wallet; officerOrgIds: number[] }
-  /** Every claim, for staff. */
+export type ReceivableScope =
+  /** Receivables the wallet sells, guarantees, or can see as an officer of the org. */
+  | { kind: "wallet"; wallet: Wallet; officerOrgIds: number[]; /** Set when the caller is a finance agent, so they see requests waiting on them. */ financeOrgId: number | null }
+  /** Every receivable, for staff. */
   | { kind: "all" }
-  /** Claims with a payer outcome report, for the attester's exceptions list. */
+  /** Receivables with a payer outcome report, for the attester's exceptions list. */
   | { kind: "reported" };
 
-export type NotificationKey = { wallet: Wallet; kind: NotificationKind; claimId: string };
+export type NotificationKey = { wallet: Wallet; kind: NotificationKind; receivableId: string };
 
 /** Thrown when an insert breaks a unique constraint. `constraint` names it. */
 export class UniqueViolation extends Error {
@@ -159,6 +189,7 @@ export interface Db {
 
   insertOrg(name: string): Promise<Org>;
   getOrg(id: number): Promise<Org | null>;
+  getOrgByJoinCode(joinCode: string): Promise<Org | null>;
   listOrgs(): Promise<Org[]>;
   setOrgActive(id: number, active: boolean): Promise<void>;
   upsertOfficer(officer: Officer): Promise<void>;
@@ -167,30 +198,35 @@ export interface Db {
   /** Active orgs with their active officers and the officers' display names (for picking a guarantor). */
   listActiveOrgsWithOfficers(): Promise<Array<Org & { officers: Array<{ wallet: Wallet; title: string | null; displayName: string | null }> }>>;
 
-  insertClaim(claim: NewClaim): Promise<Claim>;
-  getClaim(id: string): Promise<Claim | null>;
-  updateClaim(id: string, patch: ClaimPatch): Promise<Claim>;
+  insertMember(member: OrgMember): Promise<void>;
+  getMember(wallet: Wallet): Promise<OrgMember | null>;
+  /** Wallets of the organization's finance agents. */
+  listFinanceAgents(orgId: number): Promise<Wallet[]>;
+
+  insertReceivable(receivable: NewReceivable): Promise<Receivable>;
+  getReceivable(id: string): Promise<Receivable | null>;
+  updateReceivable(id: string, patch: ReceivablePatch): Promise<Receivable>;
   /**
-   * Updates only if the claim is still in `from`; returns null when another request moved it first, so two clicks
+   * Updates only if the receivable is still in `from`; returns null when another request moved it first, so two clicks
    * can't both approve or fund.
    */
-  transitionClaim(id: string, from: ClaimStatus[], patch: ClaimPatch): Promise<Claim | null>;
-  listClaims(scope: ClaimScope): Promise<Claim[]>;
-  listClaimsByStatus(statuses: ClaimStatus[]): Promise<Claim[]>;
+  transitionReceivable(id: string, from: ReceivableStatus[], patch: ReceivablePatch): Promise<Receivable | null>;
+  listReceivables(scope: ReceivableScope): Promise<Receivable[]>;
+  listReceivablesByStatus(statuses: ReceivableStatus[]): Promise<Receivable[]>;
 
-  insertDocument(doc: Omit<ClaimDocument, "id" | "createdAt" | "sha256"> & { id?: string }): Promise<ClaimDocument>;
-  getDocument(id: string): Promise<ClaimDocument | null>;
-  listDocuments(claimId: string): Promise<ClaimDocument[]>;
-  setDocumentHash(id: string, sha256: string): Promise<ClaimDocument>;
+  insertDocument(doc: Omit<ReceivableDocument, "id" | "createdAt" | "sha256"> & { id?: string }): Promise<ReceivableDocument>;
+  getDocument(id: string): Promise<ReceivableDocument | null>;
+  listDocuments(receivableId: string): Promise<ReceivableDocument[]>;
+  setDocumentHash(id: string, sha256: string): Promise<ReceivableDocument>;
 
   insertInvite(invite: Omit<GuarantorInvite, "id" | "createdAt" | "usedAt">): Promise<GuarantorInvite>;
   getInviteByTokenHash(tokenHash: string): Promise<GuarantorInvite | null>;
   markInviteUsed(id: string): Promise<void>;
-  /** Invites created for the claim at or after `since` (an ISO timestamp), used or not. */
-  countInvitesSince(claimId: string, since: string): Promise<number>;
+  /** Invites created for the receivable at or after `since` (an ISO timestamp), used or not. */
+  countInvitesSince(receivableId: string, since: string): Promise<number>;
 
   recordLedgerTx(tx: Omit<LedgerTx, "createdAt">): Promise<void>;
-  listLedgerTxs(filter: { claimId?: string; account?: Wallet; limit?: number }): Promise<LedgerTx[]>;
+  listLedgerTxs(filter: { receivableId?: string; account?: Wallet; limit?: number }): Promise<LedgerTx[]>;
 
   insertAdminAction(action: { actorWallet: Wallet; action: string; target: string; payload: Record<string, unknown> }): Promise<void>;
 

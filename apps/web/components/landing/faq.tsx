@@ -33,15 +33,23 @@ export function Faq() {
         {FAQ.map((item, i) => {
           const isOpen = open === i;
           return (
-            <div key={item.q} className="bg-divider rounded-3xl p-6 sm:p-8">
+            // the whole card toggles; the button's own click (mouse or keyboard) bubbles up to here.
+            // selecting answer text to copy it shouldn't close the card
+            <div
+              key={item.q}
+              onClick={() => {
+                if (window.getSelection()?.toString()) return;
+                setOpen(isOpen ? -1 : i);
+              }}
+              className="bg-divider cursor-pointer rounded-3xl p-6 sm:p-8"
+            >
               <h3>
                 <button
                   type="button"
                   id={`faq-q-${i}`}
                   aria-expanded={isOpen}
                   aria-controls={`faq-a-${i}`}
-                  onClick={() => setOpen(isOpen ? -1 : i)}
-                  className="flex w-full items-center justify-between gap-6 text-left"
+                  className="flex w-full cursor-pointer items-center justify-between gap-6 text-left"
                 >
                   {/* the question as a card title, like the poster cards, with its idea drawn small in glyphs just before it */}
                   <span className="flex min-w-0 items-center gap-4 sm:gap-5">

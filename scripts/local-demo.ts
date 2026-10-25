@@ -5,8 +5,9 @@
  * Needs `supabase start` and `supabase functions serve --env-file <dir>/functions.env`, where <dir> (default
  * apps/web/e2e/.cache) holds the env file and Privy test key from supabase/functions/_tests/make-e2e-env.ts. It signs
  * up four demo people through the real `me` function, so each gets a custodial wallet funded by the XRPL Devnet
- * faucet; makes the staff person an admin; verifies everyone; adds a demo org with the officer; and gives the member
- * reimbursements in different states. It writes each person's session to apps/web/public/local-demo-sessions.json,
+ * faucet; makes the staff person an admin; verifies everyone; adds a demo business with its approver; and gives the borrower
+ * loans of different kinds in different states: a card settlement, an invoice, a business reimbursement the approver
+ * signs off on, and a draft. It writes each person's session to apps/web/public/local-demo-sessions.json,
  * which a build with NEXT_PUBLIC_DEMO_SESSIONS=true offers as one-click buttons (gitignored). Run it again any time;
  * it only adds what's missing. Local Supabase only; XRPL Devnet only.
  */
@@ -66,10 +67,10 @@ async function api<T>(who: Persona, name: string, method: string, body?: unknown
 }
 
 const staff = await persona("staff", "did:privy:demo-staff", "Pilot admin", "admin@example.test");
-const claimant = await persona("claimant", "did:privy:demo-claimant", "Jordan Park", "jordan@example.test");
+const seller = await persona("seller", "did:privy:demo-seller", "Jordan Park", "jordan@example.test");
 const guarantor = await persona("guarantor", "did:privy:demo-guarantor", "Sam Rivera", "sam@example.test");
 const lender = await persona("lender", "did:privy:demo-lender", "Pilot lender", "lender@example.test");
-const people = [staff, claimant, guarantor, lender];
+const people = [staff, seller, guarantor, lender];
 
 // 1. everyone signs up: a custodial wallet each, funded by the Devnet faucet
 for (const p of people) {
@@ -83,29 +84,63 @@ for (const p of people) {
   await api(staff, "kyc-manual", "POST", { wallet: p.wallet, status: "approved", note: "local demo" });
 }
 
-// 3. the org and its officer
-const { orgs } = await api<{ orgs: Array<{ id: number; name: string }> }>(staff, "orgs", "GET");
-const org = orgs.find((o) => o.name === ORG_NAME) ?? (await api<{ org: { id: number } }>(staff, "orgs", "POST", { action: "create", name: ORG_NAME })).org;
-await api(staff, "orgs", "POST", { action: "set-officer", orgId: org.id, wallet: guarantor.wallet, title: "Treasurer", active: true });
+// 3. the business and its approver
+const { orgs } = await api<{ orgs: Array<{ id: number; name: string; joinCode: string }> }>(staff, "orgs", "GET");
+const org = orgs.find((o) => o.name === ORG_NAME) ?? (await api<{ org: { id: number; joinCode: string } }>(staff, "orgs", "POST", { action: "create", name: ORG_NAME })).org;
+await api(staff, "orgs", "POST", { action: "set-officer", orgId: org.id, wallet: guarantor.wallet, title: "Finance lead", active: true });
 
-// 4. reimbursements in different states, made once
-type Claim = { id: string; callinkPrNumber: string; status: string };
-const { claims } = await api<{ claims: Claim[] }>(claimant, "claims", "GET");
-const have = new Set(claims.map((c) => c.callinkPrNumber));
-const PDF = new TextEncoder().encode("%PDF-1.4\n% demo receipt\n");
+// everyone belongs to the demo business, so the app doesn't stop them on organization setup.
+// the approver is the finance agent who sees expedite requests before the admin does
+async function joinOrg(who: Persona, financeAgent: boolean, roleTitle: string | null) {
+  try {
+    await api(who, "membership", "POST", { action: "join", joinCode: org.joinCode, financeAgent, roleTitle });
+  } catch (error) {
+    if (!String(error).includes("already_member")) throw error;
+  }
+}
+await joinOrg(guarantor, true, null);
+await joinOrg(seller, false, "Buyer");
+await joinOrg(staff, false, "Operator");
+await joinOrg(lender, false, "Lender");
 
-async function draft(pr: string, dollars: bigint, description: string): Promise<string> {
-  const { claim } = await api<{ claim: { id: string } }>(claimant, "claims", "POST", {
-    orgId: org.id,
-    faceValue: (dollars * USD).toString(),
-    requestedAmount: (dollars * USD).toString(),
-    callinkPrNumber: pr,
-    description,
-    guarantorWallet: guarantor.wallet,
+// 4. receivables of each kind, in different states, made once
+type Receivable = { id: string; reference: string; status: string };
+const { receivables } = await api<{ receivables: Receivable[] }>(seller, "receivables", "GET");
+const have = new Set(receivables.map((c) => c.reference));
+const PDF = new TextEncoder().encode("%PDF-1.4\n% demo invoice\n");
+
+/** YYYY-MM-DD, `days` from today. */
+const inDays = (days: number) => new Date(Date.now() + days * 86_400_000).toISOString().slice(0, 10);
+
+type Draft = {
+  type: "card_settlement" | "reimbursement" | "invoice" | "other";
+  reference: string;
+  payerName: string;
+  payerEmail?: string;
+  dueInDays: number;
+  face: bigint;
+  dollars: bigint;
+  description: string;
+  /** a business loan: the demo business, with its approver signing off */
+  org?: boolean;
+  to: "draft" | "signed" | "submitted" | "approved";
+};
+
+async function draft(d: Draft): Promise<string> {
+  const { receivable } = await api<{ receivable: { id: string } }>(seller, "receivables", "POST", {
+    type: d.type,
+    payerName: d.payerName,
+    ...(d.payerEmail ? { payerEmail: d.payerEmail } : {}),
+    dueDate: inDays(d.dueInDays),
+    ...(d.org ? { orgId: org.id, guarantorWallet: guarantor.wallet } : {}),
+    faceValue: (d.face * USD).toString(),
+    requestedAmount: (d.dollars * USD).toString(),
+    reference: d.reference,
+    description: d.description,
   });
-  const created = await api<{ document: { id: string }; upload: { path: string; token: string } }>(claimant, "documents", "POST", {
+  const created = await api<{ document: { id: string }; upload: { path: string; token: string } }>(seller, "documents", "POST", {
     action: "create",
-    claimId: claim.id,
+    receivableId: receivable.id,
     mimeType: "application/pdf",
     sizeBytes: PDF.byteLength,
   });
@@ -117,38 +152,80 @@ async function draft(pr: string, dollars: bigint, description: string): Promise<
     body: form,
   });
   if (!up.ok) throw new Error(`upload failed: ${up.status} ${await up.text()}`);
-  await api(claimant, "documents", "POST", { action: "confirm", documentId: created.document.id });
-  return claim.id;
+  await api(seller, "documents", "POST", { action: "confirm", documentId: created.document.id });
+  return receivable.id;
 }
 
-async function signOff(id: string) {
-  const { packetHash } = await api<{ packetHash: string }>(claimant, "packet", "POST", { claimId: id });
-  await api(guarantor, "guaranty", "POST", { claimId: id, packetHash });
-}
-
-const STEPS: Array<{ pr: string; dollars: bigint; description: string; to: "draft" | "signed" | "submitted" | "approved" }> = [
-  { pr: "PAY-DEMO-1", dollars: 2400n, description: "Supplier invoice", to: "approved" },
-  { pr: "PAY-DEMO-2", dollars: 850n, description: "Freight transfer", to: "submitted" },
-  { pr: "PAY-DEMO-3", dollars: 320n, description: "Vendor payment", to: "signed" },
-  { pr: "PAY-DEMO-4", dollars: 120n, description: "Equipment deposit", to: "draft" },
+const DRAFTS: Draft[] = [
+  {
+    type: "card_settlement",
+    reference: "STRIPE-PO-48213",
+    payerName: "Stripe",
+    dueInDays: 3,
+    face: 2400n,
+    dollars: 2280n,
+    description: "Weekend card sales waiting on the Stripe payout",
+    to: "approved",
+  },
+  {
+    type: "invoice",
+    reference: "INV-1042",
+    payerName: "Acme Supply Co.",
+    payerEmail: "ap@acme.example",
+    dueInDays: 30,
+    face: 1850n,
+    dollars: 1700n,
+    description: "Net-30 invoice for catering supplies",
+    to: "submitted",
+  },
+  {
+    type: "reimbursement",
+    reference: "EXP-DEMO-3",
+    payerName: "Northwind Supply",
+    dueInDays: 45,
+    face: 320n,
+    dollars: 320n,
+    description: "Travel expenses Northwind owes back",
+    org: true,
+    to: "signed",
+  },
+  {
+    type: "other",
+    reference: "DEPOSIT-77",
+    payerName: "Bayview Properties",
+    dueInDays: 14,
+    face: 1200n,
+    dollars: 1000n,
+    description: "Security deposit refund owed by the old landlord",
+    to: "draft",
+  },
 ];
-for (const step of STEPS) {
-  if (have.has(step.pr)) continue;
-  const id = await draft(step.pr, step.dollars, step.description);
-  if (step.to === "draft") {
-    await api(claimant, "packet", "POST", { claimId: id });
-    continue;
+
+for (const d of DRAFTS) {
+  if (have.has(d.reference)) continue;
+  const id = await draft(d);
+  if (d.to === "draft") continue;
+  const { packetHash } = await api<{ packetHash: string }>(seller, "packet", "POST", { receivableId: id });
+  if (d.org) await api(guarantor, "guaranty", "POST", { receivableId: id, packetHash });
+  if (d.to === "signed") continue;
+  const submitted = await api<{ receivable: { status: string } }>(seller, "receivable-actions", "POST", { action: "submit", receivableId: id });
+  if (submitted.receivable.status === "FinanceReview") {
+    await api(guarantor, "receivable-actions", "POST", { action: "send-to-admin", receivableId: id });
   }
-  await signOff(id);
-  if (step.to === "signed") continue;
-  await api(claimant, "claim-actions", "POST", { action: "submit", claimId: id });
-  if (step.to === "approved") await api(staff, "claim-actions", "POST", { action: "approve", claimId: id, amount: (step.dollars * USD).toString() });
+  if (d.to === "approved") await api(staff, "receivable-actions", "POST", { action: "approve", receivableId: id, amount: (d.dollars * USD).toString() });
 }
 
 // 5. one-click sessions for the sign-in screen
+/** How each person shows on the sign-in screen's demo list. */
+const LABEL: Record<string, string> = {
+  staff: "Pilot admin",
+  seller: "Jordan Park, small business owner",
+  guarantor: "Sam Rivera, approver at Northwind Supply",
+  lender: "Pilot lender",
+};
 const sessions = people.map((p) => ({
   role: p.role,
-  name: p.name,
+  name: LABEL[p.role] ?? p.name,
   seed: { accessToken: p.accessToken, identityToken: p.identityToken, userId: p.userId, email: p.email },
 }));
 await Deno.writeTextFile(new URL("../apps/web/public/local-demo-sessions.json", import.meta.url), JSON.stringify(sessions, null, 2));

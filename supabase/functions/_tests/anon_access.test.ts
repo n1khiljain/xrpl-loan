@@ -9,15 +9,16 @@ import { LOCAL_STACK } from "../_shared/local-stack.ts";
 
 const EXPECTED_TABLES = [
   "admin_actions",
-  "claim_documents",
-  "claims",
   "guarantor_invites",
   "ledger_txs",
   "notifications",
   "once_keys",
+  "org_members",
   "org_officers",
   "orgs",
   "profiles",
+  "receivable_documents",
+  "receivables",
   "staff",
   "sync_state",
   "wallets",
@@ -84,6 +85,10 @@ Deno.test({
         });
         await rpc.body?.cancel();
         assert(rpc.status >= 400, `${label} rpc reserve_gas_drip: HTTP ${rpc.status}`);
+
+        const joinCode = await fetch(`${stack.url}/rest/v1/rpc/generate_join_code`, { method: "POST", headers, body: "{}" });
+        await joinCode.body?.cancel();
+        assert(joinCode.status >= 400, `${label} rpc generate_join_code: HTTP ${joinCode.status}`);
       }
     } finally {
       await service.from("staff").delete().eq("wallet_address", probe);

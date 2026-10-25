@@ -1,38 +1,45 @@
 import { assertEquals } from "@std/assert";
-import type { Claim, Wallet } from "./db/types.ts";
+import type { Receivable, Wallet } from "./db/types.ts";
 import { FIXED_NOW, MemoryDb, type TestUser, makeUser, seedOrg, testConfig } from "./testing.ts";
 import { MemoryStorage } from "./storage.ts";
 
-/** A claimant, a guarantor officer, an org, and a draft with confirmed receipts, ready to freeze. */
+/** About 60 days after FIXED_NOW: a due date every handler accepts. */
+export const DUE_DATE = "2026-12-10";
+
+/** A seller, a guarantor officer, an org, and a draft with confirmed receipts, ready to freeze. */
 export async function draftWorld(opts: { receipts?: string[] } = {}) {
   const db = new MemoryDb(() => FIXED_NOW);
   const storage = new MemoryStorage();
   const config = testConfig();
-  const claimant = await makeUser(db, { name: "Ada", kyc: "approved" });
+  const seller = await makeUser(db, { name: "Ada", kyc: "approved" });
   const guarantor = await makeUser(db, { name: "Grace", kyc: "approved" });
   const outsider = await makeUser(db);
   seedOrg(db, 1, "Blockchain at Berkeley", [guarantor.wallet]);
-  const claim = await db.insertClaim({
+  const receivable = await db.insertReceivable({
+    type: "reimbursement",
+    recipientWallet: seller.wallet,
+    payerName: "ASUC",
+    payerEmail: null,
+    payerWallet: null,
+    dueDate: DUE_DATE,
     orgId: 1,
-    recipientWallet: claimant.wallet,
-    recipientType: "member",
     faceValue: "500000000",
     requestedAmount: "400000000",
-    callinkPrNumber: "PR-2026-0042",
+    reference: "PR-2026-0042",
     description: "Hackathon snacks",
     guarantorWallet: guarantor.wallet,
   });
   for (const [i, text] of (opts.receipts ?? ["receipt one"]).entries()) {
-    await addReceipt(db, storage, claim, claimant, text, i);
+    await addReceipt(db, storage, receivable, seller, text, i);
   }
-  return { db, storage, config, claimant, guarantor, outsider, claim };
+  return { db, storage, config, seller, guarantor, outsider, receivable };
 }
 
-export async function addReceipt(db: MemoryDb, storage: MemoryStorage, claim: Claim, by: TestUser, text: string, i = 0) {
+export async function addReceipt(db: MemoryDb, storage: MemoryStorage, receivable: Receivable, by: TestUser, text: string, i = 0) {
   const bytes = new TextEncoder().encode(text);
   const doc = await db.insertDocument({
-    claimId: claim.id,
-    storagePath: `${claim.id}/doc-${i}-${crypto.randomUUID()}`,
+    receivableId: receivable.id,
+    storagePath: `${receivable.id}/doc-${i}-${crypto.randomUUID()}`,
     mimeType: "application/pdf",
     sizeBytes: bytes.byteLength,
     uploadedBy: by.wallet,
