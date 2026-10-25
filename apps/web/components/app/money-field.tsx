@@ -27,7 +27,7 @@ export function MoneyField({
   hint?: ReactNode;
 }) {
   return (
-    <div className="space-y-2">
+    <div className="space-y-3">
       <Label htmlFor={id} className="text-sm font-semibold">
         {label}
       </Label>
