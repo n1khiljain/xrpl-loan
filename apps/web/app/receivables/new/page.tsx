@@ -241,18 +241,19 @@ function WizardForm({ me, initial }: { me: MeResponse; initial: ReceivableWithDo
     <div>
       <Topbar title="Expedite a payment" crumb={`Step ${step + 1} of ${steps.length} · ${stepName}`} action={null} back={BACK} />
       <div className="flex flex-col gap-5 lg:flex-row lg:items-start">
-        <Card className="min-w-0 lg:flex-1">
-          <CardContent className="flex flex-col gap-6">
+        <Card className="min-w-0 lg:flex-1 lg:py-10">
+          {/* room to breathe: sections sit well apart, and each label has air above its field */}
+          <CardContent className="flex flex-col gap-10 sm:px-8 lg:px-10">
             <Stepper steps={steps} current={step} />
-            <motion.div key={step} className="flex flex-col gap-6" initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.35, ease: EASE }}>
+            <motion.div key={step} className="flex flex-col gap-10" initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.35, ease: EASE }}>
               {stepName === "Details" ? (
                 <>
-                  <div className="space-y-1">
+                  <div className="space-y-3">
                     <h2 className="display-type text-2xl">Which payment do you want to expedite?</h2>
                     <p className="text-muted-foreground text-sm">Get an upfront loan instead of waiting. You pay it back with interest based on how long it runs.</p>
                   </div>
 
-                  <div className="space-y-2.5">
+                  <div className="space-y-4">
                     <p className="text-sm font-semibold">What kind of payment is it?</p>
                     <RadioGroup
                       value={type}
@@ -261,14 +262,14 @@ function WizardForm({ me, initial }: { me: MeResponse; initial: ReceivableWithDo
                       }}
                       aria-label="Kind of payment"
                       disabled={Boolean(receivableId)}
-                      className="grid gap-2.5 sm:grid-cols-2"
+                      className="grid gap-3 sm:grid-cols-2"
                       data-testid="receivable-type"
                     >
                       {TYPE_ORDER.map((t) => (
                         <Label
                           key={t}
                           htmlFor={`type-${t}`}
-                          className="has-data-[state=checked]:border-foreground has-data-[state=checked]:border-[1.5px] border-border has-data-[disabled]:opacity-60 bg-surface flex cursor-pointer flex-col items-start gap-0.5 rounded-lg border p-3"
+                          className="has-data-[state=checked]:border-foreground has-data-[state=checked]:border-[1.5px] border-border has-data-[disabled]:opacity-60 bg-surface flex cursor-pointer flex-col items-start gap-1 rounded-lg border px-5 py-4"
                         >
                           <RadioGroupItem value={t} id={`type-${t}`} className="sr-only" />
                           <span className="text-sm font-semibold">{RECEIVABLE_TYPES[t].label}</span>
@@ -281,14 +282,14 @@ function WizardForm({ me, initial }: { me: MeResponse; initial: ReceivableWithDo
 
                   {/* a business can have one of its approvers vouch for the loan; only offered when there is one */}
                   {orgList.length > 0 ? (
-                    <div className="space-y-2.5">
+                    <div className="space-y-4">
                       <p className="text-sm font-semibold">Is this for a business?</p>
                       <RadioGroup
                         value={orgId ? String(orgId) : "none"}
                         onValueChange={(v) => setOrgId(v === "none" ? null : Number(v))}
                         aria-label="Business"
                         disabled={Boolean(receivableId)}
-                        className="flex flex-wrap gap-2.5"
+                        className="flex flex-wrap gap-3"
                       >
                         {[{ id: "none", name: "No, just me" }, ...orgList.map((o) => ({ id: String(o.id), name: o.name }))].map((o) => (
                           <Label
@@ -304,18 +305,18 @@ function WizardForm({ me, initial }: { me: MeResponse; initial: ReceivableWithDo
                           </Label>
                         ))}
                       </RadioGroup>
-                      <p className="text-muted-foreground text-xs">Someone at the business signs off as approver and covers what&apos;s left if the payment never arrives.</p>
+                      <p className="text-muted-foreground pt-1 text-sm">Someone at the business signs off as approver and covers what&apos;s left if the payment never arrives.</p>
                     </div>
                   ) : null}
 
-                  <div className="grid gap-5 sm:grid-cols-2">
-                    <div className="space-y-2">
+                  <div className="grid gap-x-6 gap-y-8 sm:grid-cols-2">
+                    <div className="space-y-3">
                       <Label htmlFor="payer" className="text-sm font-semibold">
                         {kind.payerLabel}
                       </Label>
                       <Input id="payer" value={payerName} onChange={(e) => setPayerName(e.target.value)} maxLength={120} placeholder={kind.payerPlaceholder} />
                     </div>
-                    <div className="space-y-2">
+                    <div className="space-y-3">
                       <Label htmlFor="reference" className="text-sm font-semibold">
                         {kind.referenceLabel}
                       </Label>
@@ -323,7 +324,7 @@ function WizardForm({ me, initial }: { me: MeResponse; initial: ReceivableWithDo
                     </div>
                   </div>
 
-                  <div className="space-y-2">
+                  <div className="space-y-3">
                     <MoneyField
                       id="face"
                       label="Amount of the payment"
@@ -337,7 +338,7 @@ function WizardForm({ me, initial }: { me: MeResponse; initial: ReceivableWithDo
                     />
                     {/* most people take the most they can, so the second amount stays a line until you ask for less */}
                     {takeLess ? (
-                      <div className="space-y-2 pt-2">
+                      <div className="space-y-3 pt-4">
                         <Label htmlFor="requested" className="text-sm font-semibold">
                           How much you want now ($)
                         </Label>
@@ -362,15 +363,15 @@ function WizardForm({ me, initial }: { me: MeResponse; initial: ReceivableWithDo
                     )}
                   </div>
 
-                  <div className="grid gap-5 sm:grid-cols-2">
-                    <div className="space-y-2">
+                  <div className="grid gap-x-6 gap-y-8 sm:grid-cols-2">
+                    <div className="space-y-3">
                       <Label htmlFor="due" className="text-sm font-semibold">
                         When the payment arrives
                       </Label>
                       <Input id="due" type="date" value={dueDate} min={isoDay(1)} max={isoDay(MAX_TERM_DAYS)} onChange={(e) => setDueDate(e.target.value)} />
                       <p className="text-muted-foreground text-xs">Your loan runs to this date, at most {MAX_TERM_DAYS} days out.</p>
                     </div>
-                    <div className="space-y-2">
+                    <div className="space-y-3">
                       <Label htmlFor="description" className="text-sm font-semibold">
                         What it&apos;s for
                       </Label>
@@ -380,14 +381,14 @@ function WizardForm({ me, initial }: { me: MeResponse; initial: ReceivableWithDo
 
                   <details className="group">
                     <summary className="text-muted-foreground cursor-pointer text-sm font-medium">Payer contact (optional)</summary>
-                    <div className="grid gap-5 pt-4 sm:grid-cols-2">
-                      <div className="space-y-2">
+                    <div className="grid gap-x-6 gap-y-8 pt-4 sm:grid-cols-2">
+                      <div className="space-y-3">
                         <Label htmlFor="payer-email" className="text-sm font-semibold">
                           Payer email
                         </Label>
                         <Input id="payer-email" type="email" value={payerEmail} onChange={(e) => setPayerEmail(e.target.value)} />
                       </div>
-                      <div className="space-y-2">
+                      <div className="space-y-3">
                         <Label htmlFor="payer-wallet" className="text-sm font-semibold">
                           Payer&apos;s XRP Ledger address
                         </Label>
@@ -398,7 +399,7 @@ function WizardForm({ me, initial }: { me: MeResponse; initial: ReceivableWithDo
                   </details>
 
                   {/* stacked on phones, primary on top, so a long label never pushes past 375px */}
-                  <div className="flex flex-col-reverse gap-3 sm:flex-row sm:items-center sm:justify-between">
+                  <div className="flex flex-col-reverse gap-3 pt-2 sm:flex-row sm:items-center sm:justify-between">
                     <Button asChild variant="secondary" size="lg" className="w-full sm:w-auto">
                       <Link href="/receivables/">Cancel</Link>
                     </Button>
@@ -417,7 +418,7 @@ function WizardForm({ me, initial }: { me: MeResponse; initial: ReceivableWithDo
 
               {stepName === "Documents" ? (
                 <>
-                  <div className="space-y-1">
+                  <div className="space-y-3">
                     <h2 className="display-type text-2xl">Add the {type === "invoice" ? "invoice" : type === "card_settlement" ? "settlement report" : "receipts"}</h2>
                     <p className="text-muted-foreground text-sm">Upload invoices, receipts, or reports that show the payment is coming, up to 10 MB each.</p>
                   </div>
@@ -445,7 +446,7 @@ function WizardForm({ me, initial }: { me: MeResponse; initial: ReceivableWithDo
                     <ShieldCheck className="size-[18px] shrink-0" />
                     Documents stay private. Only a fingerprint of them is kept with your request.
                   </div>
-                  <div className="flex flex-col-reverse gap-3 sm:flex-row sm:items-center sm:justify-between">
+                  <div className="flex flex-col-reverse gap-3 pt-2 sm:flex-row sm:items-center sm:justify-between">
                     <Button variant="secondary" size="lg" className="w-full sm:w-auto" onClick={() => setStep(0)} disabled={busy}>
                       Back
                     </Button>
@@ -458,19 +459,19 @@ function WizardForm({ me, initial }: { me: MeResponse; initial: ReceivableWithDo
 
               {stepName === "Sign-off" ? (
                 <>
-                  <div className="space-y-1">
+                  <div className="space-y-3">
                     <h2 className="display-type text-2xl">Pick an approver to sign off</h2>
                     <p className="text-muted-foreground text-sm">
                       Someone at {org?.name ?? "your business"} who isn&apos;t you. They confirm {payerName.trim() || "the payer"} will pay. If the payment never arrives, they cover it. We&apos;ll email them a link.
                     </p>
                   </div>
                   {officers.length === 0 ? <ErrorNotice title="No other approvers">Ask an admin to add another approver to {org?.name ?? "your business"}.</ErrorNotice> : null}
-                  <RadioGroup value={guarantor ?? ""} onValueChange={setGuarantor} aria-label="Approver" className="grid gap-2.5 sm:grid-cols-2">
+                  <RadioGroup value={guarantor ?? ""} onValueChange={setGuarantor} aria-label="Approver" className="grid gap-3 sm:grid-cols-2">
                     {officers.map((o) => (
                       <Label
                         key={o.wallet}
                         htmlFor={`g-${o.wallet}`}
-                        className="has-data-[state=checked]:border-foreground has-data-[state=checked]:border-[1.5px] border-border flex cursor-pointer items-center gap-3 rounded-lg border bg-surface p-3"
+                        className="has-data-[state=checked]:border-foreground has-data-[state=checked]:border-[1.5px] border-border flex cursor-pointer items-center gap-3 rounded-lg border bg-surface px-5 py-4"
                       >
                         <span aria-hidden className="bg-surface-muted text-foreground flex size-10 shrink-0 items-center justify-center rounded-full text-xs font-semibold">
                           {initials(o.displayName)}
@@ -483,7 +484,7 @@ function WizardForm({ me, initial }: { me: MeResponse; initial: ReceivableWithDo
                       </Label>
                     ))}
                   </RadioGroup>
-                  <div className="flex flex-col-reverse gap-3 sm:flex-row sm:items-center sm:justify-between">
+                  <div className="flex flex-col-reverse gap-3 pt-2 sm:flex-row sm:items-center sm:justify-between">
                     <Button variant="secondary" size="lg" className="w-full sm:w-auto" onClick={() => setStep(1)} disabled={busy}>
                       Back
                     </Button>
@@ -496,7 +497,7 @@ function WizardForm({ me, initial }: { me: MeResponse; initial: ReceivableWithDo
 
               {stepName === "Review" ? (
                 <>
-                  <div className="space-y-1">
+                  <div className="space-y-3">
                     <h2 className="display-type text-2xl">Review and send</h2>
                     <p className="text-muted-foreground text-sm">
                       {withOfficer ? `Double check the numbers, then send it to ${guarantorName} to sign off.` : "Double check the numbers, then send it for review."}
@@ -527,7 +528,7 @@ function WizardForm({ me, initial }: { me: MeResponse; initial: ReceivableWithDo
                     {withOfficer ? ` ${guarantorName} gets an email to sign off first.` : ""}
                     {financeFirst ? ` A finance agent at ${me.membership?.name} reviews it before an admin approves it.` : ""}
                   </p>
-                  <div className="flex flex-col-reverse gap-3 sm:flex-row sm:items-center sm:justify-between">
+                  <div className="flex flex-col-reverse gap-3 pt-2 sm:flex-row sm:items-center sm:justify-between">
                     <Button variant="secondary" size="lg" className="w-full sm:w-auto" onClick={() => setStep(step - 1)} disabled={busy}>
                       Back
                     </Button>
