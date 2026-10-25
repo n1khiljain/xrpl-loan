@@ -1,14 +1,14 @@
 import type { Metadata, Viewport } from "next";
 import type { ReactNode } from "react";
 import { AppShell } from "@/components/app/app-shell";
-import { TestnetBanner } from "@/components/app/testnet-banner";
+import { AppTestnetBanner } from "@/components/app/app-testnet-banner";
 import { logoFiles } from "@/components/brand/lockup";
 import { LogosProvider } from "@/components/brand/logos-context";
 import { MotionRoot } from "@/components/motion";
 import { Toaster } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { config, onTestnet } from "@/lib/config";
-import { figtree, geistMono } from "@/lib/fonts";
+import { geistMono, inter, interTight } from "@/lib/fonts";
 import { AppProviders } from "@/lib/session/providers";
 import "./globals.css";
 
@@ -23,12 +23,12 @@ export const viewport: Viewport = { width: "device-width", initialScale: 1 };
 export default function RootLayout({ children }: { children: ReactNode }) {
   const logos = logoFiles();
   return (
-    <html lang="en" data-scroll-behavior="smooth" className={`${figtree.variable} ${geistMono.variable}`}>
+    <html lang="en" data-scroll-behavior="smooth" className={`${inter.variable} ${interTight.variable} ${geistMono.variable}`}>
       <body className="flex min-h-screen flex-col">
           <TooltipProvider>
             <AppProviders>
               <LogosProvider files={logos}>
-                <TestnetBanner isTestnet={onTestnet && config.features.testnetBanner} />
+                <AppTestnetBanner isTestnet={onTestnet && config.features.testnetBanner} />
                 <MotionRoot>
                   <AppShell logos={logos}>{children}</AppShell>
                 </MotionRoot>

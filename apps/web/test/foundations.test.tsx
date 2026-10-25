@@ -25,9 +25,9 @@ describe("motion kit renders the real content without JavaScript (U-75)", () => 
 });
 
 describe("the app follows the landing page's look (U-75)", () => {
-  it("uses Figtree and Geist Mono, not the design canvas's Manrope, Archivo, and JetBrains Mono", () => {
-    expect(css).toMatch(/--font-body: var\(--font-figtree\)/);
-    expect(css).toMatch(/--font-display: var\(--font-figtree\)/);
+  it("uses Inter for headings, Inter for text, and Geist Mono, not the design canvas's Manrope, Archivo, and JetBrains Mono", () => {
+    expect(css).toMatch(/--font-body: var\(--font-inter\)/);
+    expect(css).toMatch(/--font-display: var\(--font-inter\)/);
     expect(css).toMatch(/--font-mono: var\(--font-geist-mono\)/);
     expect(css).not.toMatch(/manrope|archivo|jetbrains/i);
   });
@@ -60,12 +60,12 @@ describe("the app follows the landing page's look (U-75)", () => {
     for (const tone of new Set(Object.values(CARD_TONE))) expect(css).toContain(`@utility bg-grad-card-${tone} {`);
   });
 
-  it("waiting cards are frosted glass and closed-out cards are brushed gold with a stamp", () => {
-    expect(renderToStaticMarkup(<ClaimCard claimId="0014" amount="$240.00" state="IN REVIEW" org="Launchpad" tone="frost" />)).toContain("card-frost-edge");
-    const paid = renderToStaticMarkup(<ClaimCard claimId="0014" amount="$240.00" state="PAID" org="Launchpad" tone="deep" />);
-    expect(paid).not.toMatch(/card-(frost-edge|brushed|holo)/);
+  it("cards are flat in every state, with no glass or metal finish, and closed-out cards still get their stamp", () => {
+    for (const tone of ["frost", "sky", "deep", "gold"] as const) {
+      const html = renderToStaticMarkup(<ClaimCard claimId="0014" amount="$240.00" state="IN REVIEW" org="Launchpad" tone={tone} />);
+      expect(html).not.toMatch(/card-(frost-edge|brushed|holo)|grain/);
+    }
     const closed = renderToStaticMarkup(<LiveClaimCard claimId="0014" amount="$240.00" state="CLOSED OUT" org="Launchpad" tone="gold" moment="closed" />);
-    expect(closed).toContain("card-brushed");
     expect(closed).toContain("Paid in full");
   });
 });

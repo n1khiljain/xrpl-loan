@@ -1,98 +1,100 @@
 @import "tailwindcss";
 
 /*
- * Design tokens. The values started from the Blockchain at Berkeley design team's screens canvas and now follow the
- * landing page: near-black and neutral greys, Figtree, and blue kept for
- * the claim card. There is one theme, light; dark mode was taken out.
+ * Design tokens. A warm, graphic identity: a warm light-grey page, white cards with rounded corners, Night for text,
+ * buttons, and dark surfaces, and spot orange as the one accent and the filled surface. Pictures on those surfaces
+ * are built from small round glyphs (components/landing/glyph-field.tsx) in the glyph tint, with a few cells lighting
+ * up. White on spot orange is 3.1:1, so only large titles go white on it; smaller text on orange is Night (5.2:1).
  * This is the only file with raw color values. Components use the Tailwind names mapped below; Tailwind's own
  * palette and radii are switched off, so a color or radius that isn't a token produces no CSS at all.
  */
 
-/* the only theme: the app is light, with near-black ink surfaces for the sidebar and panels */
+/* the only theme: the app is light, with Night ink surfaces for the sidebar and panels */
 :root {
-  --bg: #f3f5f9;
+  --bg: #f2f0ec; /* warm light grey */
   --surface: #ffffff;
-  --surface-muted: #f3f5f9;
-  --border: #e4e6ee;
-  --divider: #eef0f5;
-  --text: #0a0a0a;
-  --text-muted: #5f6478;
-  --accent: #0a0a0a;
+  --surface-muted: #f7f5f2;
+  --border: #e7e3dc;
+  --divider: #efece7;
+  --text: #21201c; /* Night */
+  --text-muted: #6b675f; /* warm grey, 4.9:1 on the page */
+  --accent: #21201c;
   --accent-contrast: #ffffff;
-  --link: #2c4bd8;
-  --info: #2446c7;
-  --info-soft: #e8eeff;
-  --success: #137a3f;
-  --success-soft: #e7f7ee;
+  --link: #b4470f; /* deep spot orange, 4.8:1 on the page */
+  --info: #2d5ba8;
+  --info-soft: #e6eef9;
+  --success: #1f7a45;
+  --success-soft: #e7f4ec;
   --warning: #8a5a00;
-  --warning-soft: #fff4d6;
-  --danger: #b42318;
-  --danger-soft: #fdecec;
-  --highlight: #ffc72c;
-  --highlight-contrast: #0a0a0a;
+  --warning-soft: #fbf0d2;
+  --danger: #a22514;
+  --danger-soft: #fdece7;
+  --highlight: #ffd2bc; /* glyph tint */
+  --highlight-contrast: #21201c;
   color-scheme: light;
 }
 
 :root {
-  /* the dark "ink" surfaces (sidebar, panels) are the landing's near-black */
-  --ink: #0a0a0a;
-  --ink-2: #18181b;
+  /* the identity's three colours beyond the neutrals: spot orange, its glyph tint, and the pop that lights cells */
+  --spot: #eb6a33;
+  --glyph-tint: #ffd2bc;
+  --glyph-pop: #ffe9dc;
+
+  /* the dark "ink" surfaces (sidebar, panels) are Night */
+  --ink: #21201c;
+  --ink-2: #2c2a26; /* one step up from Night */
   --on-ink: #ffffff;
 
-  /*
-   * Panels are the landing's black glass: near-black with a faint light from the top. Gold and called keep a trace of
-   * their color so the state still reads; the claim card gradients below stay blue and gold.
-   */
-  --grad-panel:
-    radial-gradient(120% 70% at 50% -20%, rgba(255, 255, 255, 0.1) 0%, rgba(255, 255, 255, 0) 60%),
-    linear-gradient(180deg, #141416 0%, #0a0a0a 100%);
+  /* panels are flat Night; gold and called keep a trace of orange and red so the state still reads */
+  --grad-panel: linear-gradient(180deg, #21201c 0%, #21201c 100%);
   --grad-hero: var(--grad-panel);
   --grad-hero-mobile: var(--grad-panel);
   --grad-sky: var(--grad-panel);
-  /* the identity and ledger panels keep the design canvas's blue */
+  /* the identity and ledger panels: Night with a warm glow from the corner */
   --grad-ledger:
-    radial-gradient(60% 90% at 88% 10%, rgba(170, 230, 248, 0.85) 0%, rgba(170, 230, 248, 0) 60%),
-    radial-gradient(50% 80% at 10% 110%, rgba(60, 80, 220, 0.9) 0%, rgba(60, 80, 220, 0) 70%),
-    linear-gradient(120deg, #05060f 0%, #0d1450 42%, #2b52c8 74%, #8cc7ee 100%);
-  /* the sign-in screen keeps the design canvas's sky: pale cyan into periwinkle into ink */
-  --grad-signin:
-    radial-gradient(70% 50% at 70% 20%, rgba(170, 230, 248, 0.8) 0%, rgba(170, 230, 248, 0) 60%),
-    linear-gradient(180deg, #a9e7f1 0%, #6c84de 38%, #2a2e86 62%, #0a0b24 82%, #05060f 100%);
+    radial-gradient(70% 90% at 92% 0%, rgba(235, 106, 51, 0.55) 0%, rgba(235, 106, 51, 0) 70%),
+    linear-gradient(120deg, #21201c 0%, #2c2a26 100%);
+  /* the sign-in screen's panel: the spot surface */
+  --grad-signin: var(--grad-feature);
   --grad-aside: var(--grad-panel);
   --grad-paid: var(--grad-panel);
   --grad-gold:
-    radial-gradient(120% 70% at 50% -20%, rgba(255, 199, 44, 0.16) 0%, rgba(255, 199, 44, 0) 60%),
-    linear-gradient(180deg, #141416 0%, #0a0a0a 100%);
+    radial-gradient(120% 70% at 50% -20%, rgba(235, 106, 51, 0.22) 0%, rgba(235, 106, 51, 0) 60%),
+    linear-gradient(180deg, #21201c 0%, #21201c 100%);
   --grad-called:
-    radial-gradient(120% 70% at 50% -20%, rgba(255, 120, 100, 0.16) 0%, rgba(255, 120, 100, 0) 60%),
-    linear-gradient(180deg, #141416 0%, #0a0a0a 100%);
-  --grad-avatar: linear-gradient(160deg, #9ed3f2, #2a45c8 60%, #03040c);
-  --grad-card-deep:
-    radial-gradient(80% 45% at 30% 74%, rgba(10, 12, 40, 0.9) 0%, rgba(10, 12, 40, 0) 70%),
-    linear-gradient(180deg, #b6e1f6 0%, #5ca2e4 28%, #1b2b94 58%, #070921 80%, #020308 100%);
-  /* still waiting (draft, in review): frosted silver, so it reads as not yet real money */
-  --grad-card-frost:
-    radial-gradient(90% 60% at 75% 10%, rgba(255, 255, 255, 0.85) 0%, rgba(255, 255, 255, 0) 60%),
-    linear-gradient(180deg, #f1f4f8 0%, #c9d2de 35%, #8391a8 62%, #3d4a61 84%, #1c2433 100%);
-  --grad-card-sky:
-    radial-gradient(90% 60% at 80% 10%, rgba(255, 255, 255, 0.8) 0%, rgba(255, 255, 255, 0) 60%),
-    linear-gradient(180deg, #d8f4fb 0%, #8cc7ee 40%, #4c6fdb 75%, #1b2b94 100%);
-  --grad-card-gold:
-    radial-gradient(90% 60% at 20% 15%, rgba(255, 236, 170, 0.9) 0%, rgba(255, 236, 170, 0) 60%),
-    linear-gradient(180deg, #ffd65a 0%, #eba83a 35%, #6b4a12 70%, #0b0906 100%);
+    radial-gradient(120% 70% at 50% -20%, rgba(240, 100, 58, 0.16) 0%, rgba(240, 100, 58, 0) 60%),
+    linear-gradient(180deg, #21201c 0%, #21201c 100%);
+  --grad-avatar: linear-gradient(160deg, #ffd2bc, #eb6a33 60%, #21201c);
+  /* the signature surface: flat spot orange, printed rather than glossy. Glyph fields sit on it. */
+  --grad-feature: linear-gradient(180deg, #eb6a33 0%, #eb6a33 100%);
+  /* the product frame and quieter tiles: the page's warm grey with a faint wash of the pop colour */
+  --grad-showcase:
+    radial-gradient(50% 60% at 50% 0%, rgba(255, 233, 220, 0.9) 0%, rgba(255, 233, 220, 0) 100%),
+    linear-gradient(180deg, #ece9e4 0%, #f2f0ec 100%);
+  /*
+   * The loan card's four states, flat like the identity's posters; a glyph picture of the state sits on each.
+   * Waiting is the pale pop, approved the glyph tint, paid spot orange, and closed out Night.
+   */
+  --grad-card-frost: linear-gradient(#ffe9dc, #ffe9dc);
+  --grad-card-sky: linear-gradient(#ffd2bc, #ffd2bc);
+  --grad-card-deep: linear-gradient(#eb6a33, #eb6a33);
+  --grad-card-gold: linear-gradient(#21201c, #21201c);
   /* fades the hex texture into the ink behind it */
-  --fade-ink-up: linear-gradient(180deg, #0a0a0a 0%, rgba(10, 10, 10, 0.25) 60%, rgba(10, 10, 10, 0.6) 100%);
-  --fade-tabbar: linear-gradient(180deg, rgba(243, 245, 249, 0) 0%, rgba(243, 245, 249, 0.92) 60%);
+  --fade-ink-up: linear-gradient(180deg, #21201c 0%, rgba(33, 32, 28, 0.25) 60%, rgba(33, 32, 28, 0.6) 100%);
+  --fade-tabbar: linear-gradient(180deg, rgba(242, 240, 236, 0) 0%, rgba(242, 240, 236, 0.92) 60%);
 
-  /* plain black lifts, never a navy glow */
-  --shadow-card: 0 30px 60px -24px rgba(0, 0, 0, 0.6);
-  --shadow-float: 0 12px 30px rgba(0, 0, 0, 0.14), 0 0 0 1px rgba(0, 0, 0, 0.05);
-  --shadow-soft: 0 1px 2px rgba(0, 0, 0, 0.08);
+  /* flat: cards barely lift, only floating menus cast a real shadow */
+  --shadow-card: 0 1px 2px rgba(20, 20, 20, 0.08);
+  --shadow-float: 0 12px 30px rgba(20, 20, 20, 0.12), 0 0 0 1px rgba(20, 20, 20, 0.05);
+  --shadow-soft: 0 1px 2px rgba(20, 20, 20, 0.06);
 
-  --font-display: var(--font-figtree), "Figtree", system-ui, sans-serif;
-  --font-body: var(--font-figtree), "Figtree", system-ui, sans-serif;
+  /* Inter for headings (Medium, Display at large sizes) and body copy (Light), Inter Tight for figures */
+  --font-display: var(--font-inter), "Inter", system-ui, sans-serif;
+  --font-tight: var(--font-inter-tight), "Inter Tight", system-ui, sans-serif;
+  --font-body: var(--font-inter), "Inter", system-ui, sans-serif;
   --font-mono: var(--font-geist-mono), "Geist Mono", ui-monospace, monospace;
-  --radius: 14px;
+  /* soft rounded cards and panels, like the inspiration's; buttons, chips, and inputs stay pills */
+  --radius: 20px;
 
   /* shadcn/ui variables, pointed at the brand tokens */
   --background: var(--bg);
@@ -162,15 +164,16 @@
 
   --font-sans: var(--font-body);
   --font-display: var(--font-display);
+  --font-tight: var(--font-tight);
   --font-mono: var(--font-mono);
 
-  --radius-xs: 8px;
-  --radius-sm: 10px;
+  --radius-xs: var(--radius);
+  --radius-sm: var(--radius);
   --radius-md: var(--radius);
-  --radius-lg: 18px;
-  --radius-xl: 20px;
-  --radius-2xl: 24px;
-  --radius-3xl: 28px;
+  --radius-lg: var(--radius);
+  --radius-xl: var(--radius);
+  --radius-2xl: var(--radius);
+  --radius-3xl: var(--radius);
   --radius-full: 9999px;
 
   --shadow-card: var(--shadow-card);
@@ -193,6 +196,8 @@
   }
   body {
     @apply bg-background text-foreground font-sans antialiased;
+    /* body copy is the heading face in its light weight; labels and buttons set their own heavier weights */
+    font-weight: 300;
   }
   /* money is the main content; figures line up */
   .tabular {
@@ -200,18 +205,43 @@
   }
 }
 
-/* headings: Figtree, sentence case, tight, as on the landing page */
+/* headings: the identity's grotesk at medium weight, sentence case, lightly tightened like the posters */
 @utility display-type {
   font-family: var(--font-display);
   font-weight: 500;
-  letter-spacing: -0.01em;
-  line-height: 1.08;
+  font-optical-sizing: auto;
+  letter-spacing: -0.02em;
+  line-height: 1.05;
 }
 
-/* big dollar figures: Figtree 600, tight */
+/* the hero headline: the heading face, a little tighter and set solid at its size */
+@utility hero-type {
+  font-family: var(--font-display);
+  font-weight: 500;
+  font-optical-sizing: auto;
+  letter-spacing: -0.025em;
+  line-height: 1.02;
+}
+
+/*
+ * The one title size for cards and tiles across the landing, a step down from the section headings: same face and
+ * weight, sized to sit beside an 18px description.
+ */
+@utility card-title {
+  font-family: var(--font-display);
+  font-weight: 500;
+  font-size: clamp(1.5rem, 2.2vw, 2rem);
+  line-height: 1.15;
+  letter-spacing: -0.012em;
+  font-optical-sizing: auto;
+  text-wrap: balance;
+}
+
+/* big dollar figures: the heading face at the headings' medium weight and tracking, with figures that line up */
 @utility money-type {
-  font-weight: 600;
-  letter-spacing: -0.035em;
+  font-family: var(--font-display);
+  font-weight: 500;
+  letter-spacing: -0.02em;
   line-height: 1;
   font-variant-numeric: tabular-nums;
 }
@@ -255,6 +285,51 @@
 }
 @utility bg-grad-avatar {
   background: var(--grad-avatar);
+}
+@utility bg-grad-feature {
+  background: var(--grad-feature);
+}
+@utility bg-grad-showcase {
+  background: var(--grad-showcase);
+}
+/* the product frame's halftone: fine ink dots, strongest along the top and the right edge, gone behind the window */
+@utility showcase-dots {
+  background-image: radial-gradient(circle, rgba(20, 20, 20, 0.16) 0.9px, rgba(20, 20, 20, 0) 1.5px);
+  background-size: 12px 12px;
+  mask-image:
+    linear-gradient(180deg, black 0%, rgba(0, 0, 0, 0.5) 22%, transparent 45%),
+    linear-gradient(270deg, black 0%, rgba(0, 0, 0, 0.4) 6%, transparent 12%);
+}
+/*
+ * The product frame's Borrow / Lend switch as glass: a see-through track that blurs the dots behind it, with a bright
+ * rim, a sheen across the top half, and a translucent glass thumb lit along its top edge.
+ */
+@utility glass-track {
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.3) 0%, rgba(255, 255, 255, 0.04) 52%, rgba(255, 255, 255, 0.12) 100%);
+  border: 1px solid rgba(255, 255, 255, 0.6);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.85),
+    inset 0 -1px 0 rgba(255, 255, 255, 0.25),
+    0 0 0 0.5px rgba(20, 20, 20, 0.06),
+    0 10px 30px -12px rgba(20, 20, 20, 0.22);
+  backdrop-filter: blur(1px) saturate(170%);
+}
+@utility glass-thumb {
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.78) 0%, rgba(255, 255, 255, 0.4) 100%);
+  border: 1px solid rgba(255, 255, 255, 0.9);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 1),
+    inset 0 -6px 10px -6px rgba(255, 255, 255, 0.6),
+    0 2px 6px -1px rgba(20, 20, 20, 0.12);
+  backdrop-filter: blur(2px) saturate(180%);
+}
+/* How it works: the bar along the open tile's bottom edge fills over the time it stays open (STEP_MS) */
+@utility step-progress {
+  animation: step-progress 7s linear forwards;
+}
+@keyframes step-progress {
+  from { transform: scaleX(0); }
+  to { transform: scaleX(1); }
 }
 @utility bg-grad-card-deep {
   background: var(--grad-card-deep);
@@ -315,11 +390,11 @@
 
 /*
  * The landing's film grain, visible on light and dark surfaces alike. Sits between an element's background and its
- * content; set --noise-opacity to tune it. Pair with relative. noise-dark puts it on pure black at a lower strength,
+ * content; set --noise-opacity to tune it. Pair with relative. noise-dark puts it on Black at a lower strength,
  * so dark panels stay as dark as the footer.
  */
 @utility noise-dark {
-  background-color: #000000;
+  background-color: #141414;
   --noise-opacity: 0.16;
 }
 
@@ -355,16 +430,13 @@
   background-position: center;
 }
 
-/*
- * The sign-in form keeps the design canvas's navy ink instead of the app's near-black, so it sits with the sky panel
- * beside it.
- */
+/* the sign-in form's ink; Black like the rest of the app now that the panel beside it is green */
 .signin-ink {
-  --text: #0a0b24;
-  --accent: #0a0b24;
-  --foreground: #0a0b24;
-  --card-foreground: #0a0b24;
-  --popover-foreground: #0a0b24;
-  --primary: #0a0b24;
-  --secondary-foreground: #0a0b24;
+  --text: #141414;
+  --accent: #141414;
+  --foreground: #141414;
+  --card-foreground: #141414;
+  --popover-foreground: #141414;
+  --primary: #141414;
+  --secondary-foreground: #141414;
 }

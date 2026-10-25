@@ -437,7 +437,7 @@ function WizardForm({ me, initial }: { me: MeResponse; initial: ClaimWithDocumen
                   <div className="border-border flex flex-col rounded-xl border text-sm" data-testid="review-summary">
                     <div className="flex items-end justify-between gap-4 p-5">
                       <span className="text-muted-foreground">You get now</span>
-                      <span className="money-type text-3xl font-semibold">{usd(requestedUnits)}</span>
+                      <span className="money-type text-3xl">{usd(requestedUnits)}</span>
                     </div>
                     {[reviewMoney, reviewDetails].map((rows, i) => (
                       <div key={i} className="border-divider grid grid-cols-[1fr_auto] gap-x-8 gap-y-2.5 border-t p-5">

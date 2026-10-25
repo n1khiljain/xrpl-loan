@@ -12,7 +12,7 @@ const NONE = { bab: null, babOnDark: null };
 const ALL = { bab: "/brand/bab-logo.png", babOnDark: "/brand/bab-logo-on-dark.png" };
 
 describe("header lockup", () => {
-  it("shows the product name and draws no logo", () => {
+  it("shows the product name and its own mark, never a third-party logo", () => {
     for (const files of [NONE, ALL, { ...NONE, babOnDark: "/brand/bab-logo-on-dark.png" }]) {
       for (const tone of ["auto", "on-dark", "on-light"] as const) {
         const html = renderToStaticMarkup(<LockupView files={files} tone={tone} />);
@@ -42,6 +42,8 @@ describe("header lockup", () => {
       for (const name of readdirSync(dir)) {
         const path = join(dir, name);
         if (statSync(path).isDirectory()) walk(path);
+        // the glyph field draws the identity's pattern (dots, rings, plus signs), not anyone's logo
+        else if (name === "glyph-field.tsx") continue;
         else if (/\.(tsx?|css)$/.test(name) && /<svg|<path\b|<polygon|<circle/.test(readFileSync(path, "utf8"))) offenders.push(path);
       }
     };

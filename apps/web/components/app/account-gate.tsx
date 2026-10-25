@@ -118,10 +118,10 @@ function SignIn({ reason }: { reason: string }) {
         <div className="flex flex-1 items-center justify-center pb-10 lg:pb-0">
           <div className="-rotate-6">
             <span className="lg:hidden">
-              <ClaimCard claimId="0001" amount="$0.00" state="YOURS NEXT" org="Your business" scale={0.5} />
+              <ClaimCard claimId="0001" amount="$0.00" state="YOURS NEXT" org="Your business" tone="light" scale={0.5} />
             </span>
             <span className="hidden lg:block">
-              <ClaimCard claimId="0001" amount="$0.00" state="YOURS NEXT" org="Your business" />
+              <ClaimCard claimId="0001" amount="$0.00" state="YOURS NEXT" org="Your business" tone="light" />
             </span>
           </div>
         </div>

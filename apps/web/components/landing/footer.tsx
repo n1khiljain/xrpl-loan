@@ -1,58 +1,110 @@
 import Link from "next/link";
 import { ClientLockup } from "@/components/brand/logos-context";
+import { AppPreview } from "@/components/landing/product-showcase";
 import { SectionLink } from "@/components/landing/section-link";
+import { Button } from "@/components/ui/button";
+import { config } from "@/lib/config";
 
-/* eslint-disable @next/next/no-img-element */
+/*
+ * The landing's close, after smallest.ai's: a centred last call to action, then the wordmark with columns of links,
+ * and a status line along the bottom. The status says which XRPL test network the app runs on, from config.
+ */
 
-const LINKS = [
-  { label: "Home", href: "#top" },
-  { label: "How it works", href: "#how" },
-  { label: "For lenders", href: "/lend/" },
-  { label: "Launch app", href: "/claims/" },
-] as const;
+type FooterLink = { label: string; href: string };
+
+const COLUMNS: { title: string; links: FooterLink[] }[] = [
+  {
+    title: "Product",
+    links: [
+      { label: "How it works", href: "#how" },
+      { label: "Product tour", href: "#product" },
+      { label: "FAQ", href: "#faq" },
+    ],
+  },
+  {
+    title: "Borrow",
+    links: [
+      { label: "Expedite a payment", href: "/claims/new/" },
+      { label: "My loans", href: "/claims/?view=claims" },
+      { label: "Sign-offs", href: "/claims/?view=guaranties" },
+      { label: "Verification", href: "/onboard/" },
+    ],
+  },
+  {
+    title: "Lend",
+    links: [
+      { label: "Lending vault", href: "/lend/" },
+      { label: "Deposit and withdraw", href: "/lend/?view=deposit" },
+    ],
+  },
+];
+
+function FooterAnchor({ label, href }: FooterLink) {
+  const className = "text-on-ink/60 hover:text-on-ink text-[15px] transition-colors";
+  return href.startsWith("#") ? (
+    <SectionLink href={href as `#${string}`} className={className}>
+      {label}
+    </SectionLink>
+  ) : (
+    <Link href={href} className={className}>
+      {label}
+    </Link>
+  );
+}
 
 export function LandingFooter() {
+  const network = config.network.replace("xrpl-", "");
   return (
-    <footer className="relative h-dvh min-h-[720px] w-full p-2 sm:p-3 lg:p-4">
-      <img src="/images/landing/footer-glow.webp" alt="" width={1868} height={1432} loading="lazy" className="bg-ink size-full rounded-3xl object-cover object-center" />
-      <div className="text-on-ink absolute inset-0 flex flex-col p-2 sm:p-3 lg:p-4">
-        <div className="flex flex-1 flex-col items-center justify-center gap-6 px-4 pt-8 sm:gap-8 lg:gap-10">
-          <h2 className="display-type max-w-sm text-center text-2xl sm:max-w-2xl sm:text-3xl lg:max-w-3xl lg:text-4xl xl:max-w-4xl xl:text-5xl 2xl:text-6xl">
-            Expedite the next payment you choose.
-          </h2>
-          <p className="text-on-ink/70 max-w-xl text-center text-sm leading-relaxed sm:text-base">
-            Upfront loans for businesses. Interest depends on the loan horizon.
+    // after Ramp's close: the last call to action sits on a white panel whose rounded bottom corners lift off the Night
+    // footer underneath, so the page ends on dark
+    <footer className="bg-ink text-on-ink w-full">
+      <div className="bg-surface text-foreground overflow-hidden rounded-b-[2.5rem] lg:rounded-b-[3rem]">
+        {/* the line and its button on the left; on the right a still of the app rises from the panel's bottom edge */}
+        <div className="mx-auto grid w-full max-w-[1440px] gap-12 px-4 pt-24 sm:px-6 lg:grid-cols-[minmax(0,4fr)_minmax(0,8fr)] lg:items-end lg:gap-16 lg:px-10 lg:pt-32">
+          <div className="flex flex-col items-start gap-6 lg:self-center lg:pb-32">
+            <h2 className="display-type max-w-[16ch] text-[clamp(1.75rem,3vw,2.5rem)]">Expedite the next payment you choose</h2>
+            <p className="text-muted-foreground max-w-[34ch] text-base leading-relaxed sm:text-lg">Upfront loans for businesses. Interest depends on the loan horizon.</p>
+            <Button asChild size="lg">
+              <Link href="/claims/new/">Expedite a payment</Link>
+            </Button>
+          </div>
+          <AppPreview className="h-[340px] sm:h-[420px] lg:h-[460px]" />
+        </div>
+      </div>
+
+      <div className="mx-auto flex w-full max-w-[1440px] flex-col gap-12 px-4 pt-20 pb-16 sm:px-6 lg:flex-row lg:justify-between lg:px-10 lg:pt-28 lg:pb-24">
+        <div className="flex flex-col gap-3">
+          <span className="text-2xl">
+            <ClientLockup tone="on-dark" />
+          </span>
+          <p className="text-on-ink/60 max-w-xs text-[15px] leading-relaxed">
+            Upfront loans for businesses, from a lending vault on the XRP Ledger.
           </p>
         </div>
-
-        <div className="border-on-ink/25 flex flex-col rounded-b-3xl border-t border-dashed backdrop-blur-2xl sm:flex-row">
-          <div className="border-on-ink/25 flex flex-col justify-between gap-5 p-4 sm:w-[70%] sm:border-r sm:border-dashed sm:p-6 lg:p-8 xl:p-10">
-            <nav aria-label="Footer" className="grid grid-cols-2 gap-3 sm:flex sm:flex-col sm:gap-1">
-              {LINKS.map((l) => (
-                l.href.startsWith("#") ? (
-                  <SectionLink key={l.href} href={l.href as `#${string}`} className="hover:text-on-ink/70 w-fit text-sm font-medium transition-colors sm:text-base lg:text-lg">
-                    {l.label}
-                  </SectionLink>
-                ) : (
-                <Link key={l.href} href={l.href} className="hover:text-on-ink/70 w-fit text-sm font-medium transition-colors sm:text-base lg:text-lg">
-                  {l.label}
-                </Link>
-                )
-              ))}
-            </nav>
-            <div className="flex flex-col gap-2 lg:flex-row lg:items-center lg:gap-6">
-              <span className="text-base">
-                <ClientLockup tone="on-dark" />
-              </span>
-              <p className="text-on-ink/60 text-xs leading-relaxed lg:text-[13px]">Install on the XRP Ledger. Runs on XRPL test networks only; no real money moves.</p>
+        <nav aria-label="Footer" className="grid grid-cols-2 gap-x-16 gap-y-10 sm:grid-cols-3 lg:gap-x-24">
+          {COLUMNS.map((col) => (
+            <div key={col.title} className="flex flex-col gap-4">
+              <span className="text-on-ink text-[15px] font-medium">{col.title}</span>
+              <ul className="flex flex-col gap-3">
+                {col.links.map((link) => (
+                  <li key={link.href}>
+                    <FooterAnchor {...link} />
+                  </li>
+                ))}
+              </ul>
             </div>
-          </div>
-          <div className="flex flex-col justify-end gap-3 p-4 sm:w-[30%] sm:gap-4 sm:p-6 lg:gap-5 lg:p-8 xl:p-12">
-            <p className="text-sm font-medium sm:text-base lg:text-lg">Install</p>
-            <p className="text-on-ink/60 text-sm leading-relaxed">
-              Liquidity for a transaction, transfer, or payment, paid back with interest.
-            </p>
-          </div>
+          ))}
+        </nav>
+      </div>
+
+      {/* the status bar in the glyph tint, the peach of the approved card, with Night type */}
+      <div className="bg-[var(--glyph-tint)] text-ink">
+        <div className="mx-auto flex w-full max-w-[1440px] flex-col gap-3 px-4 py-6 text-sm sm:flex-row sm:items-center sm:justify-between sm:px-6 lg:px-10">
+          <span className="flex items-center gap-2 font-medium">
+            <span aria-hidden className="size-2 rounded-full bg-[var(--spot)]" />
+            Running on XRPL {network}
+          </span>
+          <span>Test networks only. No real money moves.</span>
         </div>
       </div>
     </footer>

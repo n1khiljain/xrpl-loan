@@ -32,7 +32,7 @@ export function MoneyField({
         {label}
       </Label>
       <div className="border-input bg-surface focus-within:border-ring focus-within:ring-ring/50 flex h-16 items-center gap-1 rounded-md border pr-2.5 pl-4 focus-within:ring-[3px]">
-        <span aria-hidden className="money-type text-muted-foreground text-3xl font-semibold">
+        <span aria-hidden className="money-type text-muted-foreground text-3xl">
           $
         </span>
         <Input
@@ -41,7 +41,7 @@ export function MoneyField({
           value={value}
           onChange={(e) => onChange(e.target.value)}
           placeholder={placeholder}
-          className="money-type h-auto min-w-0 flex-1 rounded-none border-0 bg-transparent p-0 text-3xl font-semibold shadow-none focus-visible:ring-0 md:text-3xl"
+          className="money-type h-auto min-w-0 flex-1 rounded-none border-0 bg-transparent p-0 text-3xl shadow-none focus-visible:ring-0 md:text-3xl"
         />
         {onMax ? (
           <Button type="button" variant="secondary" size="sm" onClick={onMax} disabled={maxDisabled}>

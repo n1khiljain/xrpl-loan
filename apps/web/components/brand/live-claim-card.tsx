@@ -1,28 +1,14 @@
 "use client";
 
-import { motion, useMotionValue, useReducedMotion, useSpring } from "motion/react";
-import { type ComponentProps, type PointerEvent, useRef } from "react";
-import { CountUp, EASE } from "@/components/motion";
-import { cn } from "@/lib/utils";
+import { motion } from "motion/react";
+import type { ComponentProps } from "react";
+import { CountUp } from "@/components/motion";
 import { ClaimCard } from "./claim-card";
 
 /** The moment a state plays when the card arrives in it. */
 export type CardMoment = "approved" | "paid" | "closed";
 
 const USD = new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" });
-
-/** Approved: one band of light crosses the card, once. */
-function Shine() {
-  return (
-    <motion.span
-      aria-hidden
-      className="card-shine pointer-events-none absolute inset-y-0 w-full"
-      initial={{ x: "-120%" }}
-      animate={{ x: "120%" }}
-      transition={{ duration: 1.1, ease: EASE, delay: 0.35 }}
-    />
-  );
-}
 
 /** Closed out: a round stamp presses into the gold, a little crooked, like a real one. */
 function Stamp() {
@@ -42,9 +28,9 @@ function Stamp() {
 }
 
 /**
- * The claim card, alive: it leans toward the pointer with a glare that follows it, and each state plays its moment
- * when it arrives. Swap it with a new key when the state
- * changes so the moment plays again. Under reduced motion it's the still card with its finish.
+ * The claim card, alive: each state plays its moment when it arrives (the paid amount counts up, the closed-out stamp
+ * presses in). It stays flat and still under the pointer; nothing leans or tilts on hover. Swap it with a new key when
+ * the state changes so the moment plays again.
  */
 export function LiveClaimCard({
   moment,
@@ -52,41 +38,14 @@ export function LiveClaimCard({
   className,
   ...card
 }: ComponentProps<typeof ClaimCard> & { moment?: CardMoment | null; amountValue?: number }) {
-  const reduced = useReducedMotion();
-  const ref = useRef<HTMLDivElement>(null);
-  const rx = useSpring(useMotionValue(0), { stiffness: 180, damping: 18 });
-  const ry = useSpring(useMotionValue(0), { stiffness: 180, damping: 18 });
-
-  function move(e: PointerEvent<HTMLDivElement>) {
-    if (reduced || e.pointerType !== "mouse" || !ref.current) return;
-    const box = ref.current.getBoundingClientRect();
-    const px = (e.clientX - box.left) / box.width;
-    const py = (e.clientY - box.top) / box.height;
-    ry.set((px - 0.5) * 14);
-    rx.set((0.5 - py) * 14);
-    ref.current.style.setProperty("--glare-x", `${px * 100}%`);
-    ref.current.style.setProperty("--glare-y", `${py * 100}%`);
-  }
-
-  function leave() {
-    rx.set(0);
-    ry.set(0);
-    ref.current?.style.removeProperty("--glare-x");
-    ref.current?.style.removeProperty("--glare-y");
-  }
-
   const amountNode =
     moment === "paid" && amountValue !== undefined ? <CountUp value={amountValue} format={(n) => USD.format(n)} duration={1.2} /> : undefined;
 
   return (
-    <div className={cn("[perspective:900px]", className)} onPointerMove={move} onPointerLeave={leave}>
-      <motion.div ref={ref} style={{ rotateX: rx, rotateY: ry }} className="rounded-[22px] [transform-style:preserve-3d]">
-        <ClaimCard {...card} amountNode={amountNode}>
-          <span aria-hidden className="card-glare pointer-events-none absolute inset-0 rounded-[inherit]" />
-          {!reduced && moment === "approved" ? <Shine /> : null}
-          {moment === "closed" ? <Stamp /> : null}
-        </ClaimCard>
-      </motion.div>
+    <div className={className}>
+      <ClaimCard {...card} amountNode={amountNode}>
+        {moment === "closed" ? <Stamp /> : null}
+      </ClaimCard>
     </div>
   );
 }
