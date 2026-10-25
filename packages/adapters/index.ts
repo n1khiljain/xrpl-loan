@@ -3,6 +3,7 @@
  * values, and explorer links. Adapters chosen by the network config live here too.
  */
 export * from "./shared/errors.ts";
+export * from "./shared/org-code.ts";
 export * from "./shared/receivables.ts";
 export * from "./shared/amounts.ts";
 export * from "./shared/lending.ts";

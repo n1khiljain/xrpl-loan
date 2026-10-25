@@ -456,6 +456,12 @@ verify_jwt = false
 import_map = "./functions/deno.json"
 entrypoint = "./functions/orgs/index.ts"
 
+[functions.membership]
+enabled = true
+verify_jwt = false
+import_map = "./functions/deno.json"
+entrypoint = "./functions/membership/index.ts"
+
 [functions.wallet]
 enabled = true
 verify_jwt = false

@@ -35,18 +35,27 @@ export function requireSeller(caller: Caller, receivable: Receivable): void {
   if (!isSeller(caller, receivable)) throw forbidden("only the seller can do this");
 }
 
-/** Seller, guarantor, an active officer of the org, or staff. */
+/** A finance agent in the seller's organization, for a request that is or was waiting on finance. */
+async function isOrgFinanceAgent(db: Db, caller: Caller, receivable: Receivable): Promise<boolean> {
+  const [mine, seller] = await Promise.all([db.getMember(caller.profile.wallet), db.getMember(receivable.recipientWallet)]);
+  return Boolean(mine?.financeAgent && seller && mine.orgId === seller.orgId);
+}
+
+/** Seller, guarantor, an active officer of the org, a finance agent reviewing it, or staff. */
 export async function canViewReceivable(db: Db, caller: Caller, receivable: Receivable): Promise<boolean> {
   if (isSeller(caller, receivable) || receivable.guarantorWallet === caller.profile.wallet) return true;
   if (caller.staffRole !== null) return true;
-  return receivable.orgId !== null && db.isActiveOfficer(receivable.orgId, caller.profile.wallet);
+  if (receivable.orgId !== null && (await db.isActiveOfficer(receivable.orgId, caller.profile.wallet))) return true;
+  if (receivable.status !== "FinanceReview" && !receivable.financeClearedBy) return false;
+  return isOrgFinanceAgent(db, caller, receivable);
 }
 
-/** Documents are readable by the seller, the org's active officers, and underwriters. */
+/** Documents are readable by the seller, the org's active officers, underwriters, and the finance agent reviewing it. */
 export async function canReadReceipts(db: Db, caller: Caller, receivable: Receivable): Promise<boolean> {
   if (isSeller(caller, receivable)) return true;
   if (caller.staffRole === "underwriter") return true;
-  return receivable.orgId !== null && db.isActiveOfficer(receivable.orgId, caller.profile.wallet);
+  if (receivable.orgId !== null && (await db.isActiveOfficer(receivable.orgId, caller.profile.wallet))) return true;
+  return receivable.status === "FinanceReview" && isOrgFinanceAgent(db, caller, receivable);
 }
 
 /** A draft can change until its packet is frozen. */
@@ -133,6 +142,7 @@ export function receivableView(receivable: Receivable) {
     guarantySigned: receivable.guarantySignedAt !== null,
     guarantySignedAt: receivable.guarantySignedAt,
     status: receivable.status,
+    financeClearedAt: receivable.financeClearedAt,
     rejectReason: receivable.rejectReason,
     loanId: receivable.loanId,
     payerOutcome: receivable.payerOutcome,

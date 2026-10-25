@@ -10,7 +10,7 @@ import { Timeline } from "@/components/app/timeline";
 import { Topbar } from "@/components/app/topbar";
 import { cardNumber } from "@/components/brand/receivable-card";
 import { LiveReceivableCard } from "@/components/brand/live-receivable-card";
-import { SellerActions, PageSection, StatePanel } from "@/components/receivable/seller-actions";
+import { FinanceRelease, SellerActions, PageSection, StatePanel } from "@/components/receivable/seller-actions";
 import { Swap } from "@/components/motion";
 import { SettlePanel } from "@/components/receivable/settle-panel";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -24,6 +24,7 @@ import { RECEIVABLE_TYPES } from "@/lib/receivable-types";
 
 const TITLES: Partial<Record<DisplayState, string>> = {
   Draft: "Your loan",
+  FinanceReview: "With your finance team",
   Submitted: "In review",
   Approved: "Approved",
   Funded: "You got the loan",
@@ -117,9 +118,10 @@ function ReceivableDetail({ me }: { me: MeResponse }) {
   const wallet = me.profile?.wallet;
   const isSeller = receivable.recipientWallet === wallet;
   const isGuarantor = receivable.guarantorWallet === wallet;
+  const isFinance = state === "FinanceReview" && Boolean(me.membership?.financeAgent) && !isSeller;
   const cardId = receivable.number;
   const calledAsGuarantor = isGuarantor && (state === "GuarantorCalled" || state === "WrittenOff");
-  const title = calledAsGuarantor ? "You're asked to cover this" : (TITLES[state] ?? "Loan");
+  const title = isFinance ? "Review this payment" : calledAsGuarantor ? "You're asked to cover this" : (TITLES[state] ?? "Loan");
   const fromSignOffs = isGuarantor && !isSeller;
   const crumb = `No. ${cardNumber(cardId)}`;
   const back = fromSignOffs ? { href: "/receivables/?view=guaranties", label: "Sign-offs" } : { href: "/receivables/?view=receivables", label: "My loans" };
@@ -154,6 +156,8 @@ function ReceivableDetail({ me }: { me: MeResponse }) {
           <div className="min-w-0" data-testid="receivable-action" data-state={state}>
             {isSeller ? (
               <SellerActions receivable={receivable} onchain={onchain} />
+            ) : isFinance ? (
+              <FinanceRelease receivable={receivable} />
             ) : isGuarantor ? (
               <GuarantorPanel receivable={receivable} onchain={onchain} state={state} />
             ) : (

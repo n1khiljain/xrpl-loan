@@ -218,6 +218,7 @@ function WizardForm({ me, initial }: { me: MeResponse; initial: ReceivableWithDo
   const due = requestedUnits ? amountDue(requestedUnits, params.feeBps, termSeconds) : 0n;
   const fee = due - requestedUnits;
   const guarantorName = officers.find((o) => o.wallet === guarantor)?.displayName ?? "your approver";
+  const financeFirst = Boolean(me.membership?.active && me.membership.peerFinanceAgents > 0);
   const cardLabel = payerName.trim() || kind.payerLabel;
   const previewState = stepName.toUpperCase();
 
@@ -524,13 +525,14 @@ function WizardForm({ me, initial }: { me: MeResponse; initial: ReceivableWithDo
                   <p className="text-sm">
                     You&apos;ll get {usd(requestedUnits)} now. When {payerName.trim() || "the payer"} pays you, pay {usd(due)} back to the vault, with interest.
                     {withOfficer ? ` ${guarantorName} gets an email to sign off first.` : ""}
+                    {financeFirst ? ` A finance agent at ${me.membership?.name} reviews it before an admin approves it.` : ""}
                   </p>
                   <div className="flex flex-col-reverse gap-3 sm:flex-row sm:items-center sm:justify-between">
                     <Button variant="secondary" size="lg" className="w-full sm:w-auto" onClick={() => setStep(step - 1)} disabled={busy}>
                       Back
                     </Button>
                     <Button size="lg" className="w-full pr-2 sm:w-auto" onClick={() => void finish()} disabled={busy} data-testid="send-receivable">
-                      {busy ? "Sending..." : <CtaLabel>{withOfficer ? `Send to ${guarantorName}` : "Send for review"}</CtaLabel>}
+                      {busy ? "Sending..." : <CtaLabel>{withOfficer ? `Send to ${guarantorName}` : financeFirst ? "Send to your finance team" : "Send for review"}</CtaLabel>}
                     </Button>
                   </div>
                 </>

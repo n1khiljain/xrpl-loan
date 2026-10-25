@@ -4,6 +4,7 @@ import { cn } from "@/lib/utils";
 
 export type DisplayState =
   | "Draft"
+  | "FinanceReview"
   | "Submitted"
   | "Approved"
   | "Funded"
@@ -17,6 +18,7 @@ export type DisplayState =
 /** Plain-language names. The chip always shows the name, so color is never the only signal (BRAND.md). */
 export const STATE_LABEL: Record<DisplayState, string> = {
   Draft: "Draft",
+  FinanceReview: "With finance",
   Submitted: "In review",
   Approved: "Approved",
   Funded: "Paid",
@@ -34,6 +36,7 @@ export const STATE_LABEL: Record<DisplayState, string> = {
  */
 export const CARD_TONE: Record<DisplayState, ReceivableCardTone> = {
   Draft: "frost",
+  FinanceReview: "frost",
   Submitted: "frost",
   Approved: "sky",
   Funded: "deep",
@@ -56,6 +59,7 @@ export const CARD_MOMENT: Partial<Record<DisplayState, CardMoment>> = {
 /** Dot colors, mapped from BRAND.md's state colors. The label sits beside the dot, as plain text like the landing's. */
 const STATE_DOT: Record<DisplayState, string> = {
   Draft: "bg-muted-foreground",
+  FinanceReview: "bg-warning",
   Submitted: "bg-info",
   Approved: "bg-info",
   Funded: "bg-foreground",

@@ -140,7 +140,7 @@ export function testConfig(overrides: Partial<NetworkConfig> = {}): NetworkConfi
 }
 
 export function seedOrg(db: MemoryDb, id: number, name: string, officers: Wallet[] = []) {
-  db.orgs.set(id, { id, name, active: true });
+  db.orgs.set(id, { id, name, active: true, joinCode: `JOIN${String(id).padStart(4, "0")}` });
   for (const wallet of officers) db.officers.set(`${id}:${wallet}`, { orgId: id, wallet, title: "Treasurer", active: true });
 }
 

@@ -17,7 +17,13 @@ export function createDirectoryHandler(deps: DirectoryDeps): Handler {
     const url = new URL(req.url);
     const view = url.searchParams.get("view");
 
-    if (view === "orgs") return json({ orgs: await db.listActiveOrgsWithOfficers() });
+    if (view === "orgs") {
+      // the join code stays off this list: people type the one a teammate gave them
+      const orgs = await db.listActiveOrgsWithOfficers();
+      return json({
+        orgs: orgs.map((org) => ({ id: org.id, name: org.name, active: org.active, officers: org.officers })),
+      });
+    }
 
     if (view === "people") {
       requireStaff(await requireCaller(req, deps), ["underwriter", "attester", "admin"]);

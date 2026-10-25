@@ -12,7 +12,7 @@ import { WalletCopy } from "@/components/app/wallet-copy";
 import { Swap } from "@/components/motion";
 import { Button } from "@/components/ui/button";
 import { useCall } from "@/hooks/use-api";
-import { dropsToXrp } from "@app/adapters";
+import { dropsToXrp, formatJoinCode } from "@app/adapters";
 import { ASSET } from "@/lib/config";
 import { friendlyError } from "@/lib/errors";
 import { usd } from "@/lib/format";
@@ -46,6 +46,11 @@ function checklistSteps(me: MeResponse, kycApproved: boolean, receivables: Offch
   const first = mine.some((c) => c.status !== "Draft") || receivables.some((c) => c.guarantorWallet === wallet && c.guarantySigned);
   return [
     { label: "Account created", detail: me.profile?.email ?? "Your account is set up", done: true },
+    {
+      label: "Your organization",
+      detail: me.membership ? `${me.membership.name} · ${formatJoinCode(me.membership.joinCode)}` : "Create or join one",
+      done: Boolean(me.membership),
+    },
     { label: "Verify your email", detail: me.profile?.emailVerified ? (me.profile.email ?? "Verified") : "Sign in with your email or Google", done: Boolean(me.profile?.emailVerified) },
     { label: "Reviewer approval", detail: kycApproved ? "You're approved" : "Usually within a day", done: kycApproved },
     { label: "Expedite your first payment", detail: first ? "You're all set" : "An invoice, a card settlement, or a reimbursement", done: first },
@@ -194,6 +199,22 @@ function Verify({ me }: { me: MeResponse }) {
         </div>
 
         <Wallet me={me} />
+        {me.membership ? (
+          <div className="bg-card flex flex-col gap-3 rounded-2xl p-5 sm:p-6" data-testid="org-card">
+            <div className="flex items-center justify-between gap-3">
+              <span className="text-muted-foreground text-sm">Organization</span>
+              <span className="text-sm font-medium">{me.membership.name}</span>
+            </div>
+            <div className="border-divider flex items-center justify-between gap-3 border-t pt-3">
+              <span className="text-muted-foreground text-sm">Organization ID</span>
+              <span className="font-mono text-sm font-medium">{formatJoinCode(me.membership.joinCode)}</span>
+            </div>
+            <div className="border-divider flex items-center justify-between gap-3 border-t pt-3">
+              <span className="text-muted-foreground text-sm">Your role</span>
+              <span className="text-sm font-medium">{me.membership.financeAgent ? "Finance agent" : me.membership.roleTitle}</span>
+            </div>
+          </div>
+        ) : null}
 
         <Button asChild size="lg" variant={current === "approved" ? "default" : "outline"} className="self-start">
           <Link href="/receivables/new/">Expedite a payment</Link>

@@ -126,6 +126,33 @@ Deno.test("a paid receivable can be reported, the guarantor called, and after th
   assertEquals([after.state, after.principalWrittenOff, after.writtenOffPrincipal], ["WrittenOff", true, "300000000"]);
 });
 
+Deno.test("a finance agent sends a request to an admin, who can then approve it", async () => {
+  const w = await world();
+  await w.db.insertMember({ orgId: 1, wallet: w.seller.wallet, financeAgent: false, roleTitle: "Buyer" });
+  await w.db.insertMember({ orgId: 1, wallet: w.guarantor.wallet, financeAgent: true, roleTitle: null });
+  const submitted = await w.act(w.seller.token, { action: "submit" });
+  assertEquals((submitted.body.receivable as { status: string }).status, "FinanceReview");
+  assertStatus(await w.act(w.underwriter.token, { action: "approve", amount: "350000000" }), 409, "invalid_state");
+  assertStatus(await w.act(w.seller.token, { action: "send-to-admin" }), 403);
+  assertStatus(await w.act(w.outsider.token, { action: "send-to-admin" }), 403);
+  const released = await w.act(w.guarantor.token, { action: "send-to-admin" });
+  assertEquals((released.body.receivable as { status: string; financeClearedAt: string | null }).financeClearedAt !== null, true);
+  assertEquals((released.body.receivable as { status: string }).status, "Submitted");
+  assertStatus(await w.act(w.underwriter.token, { action: "approve", amount: "350000000" }), 200);
+});
+
+Deno.test("the only finance agent, or a seller with no organization, goes straight to an admin", async () => {
+  const alone = await world();
+  await alone.db.insertMember({ orgId: 1, wallet: alone.seller.wallet, financeAgent: true, roleTitle: null });
+  assertEquals(((await alone.act(alone.seller.token, { action: "submit" })).body.receivable as { status: string }).status, "Submitted");
+
+  const open = await world();
+  await open.db.insertMember({ orgId: 1, wallet: open.seller.wallet, financeAgent: false, roleTitle: "Buyer" });
+  await open.db.insertMember({ orgId: 1, wallet: open.guarantor.wallet, financeAgent: true, roleTitle: null });
+  await open.act(open.seller.token, { action: "submit" });
+  assertEquals(((await open.act(open.seller.token, { action: "cancel" })).body.receivable as { status: string }).status, "Cancelled");
+});
+
 Deno.test("two approvals racing apply once", async () => {
   const w = await world();
   await w.act(w.seller.token, { action: "submit" });

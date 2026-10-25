@@ -1,6 +1,6 @@
 "use client";
 
-import type { ReceivableView } from "@app/adapters";
+import { formatJoinCode, type ReceivableView } from "@app/adapters";
 import { useQuery } from "@tanstack/react-query";
 import { ArrowRight } from "lucide-react";
 import { motion } from "motion/react";
@@ -29,10 +29,10 @@ import type { DirectoryOrg, MeResponse, OffchainReceivable } from "@/lib/types";
 import { cn } from "@/lib/utils";
 import { RECEIVABLE_TYPES } from "@/lib/receivable-types";
 
-type Role = "seller" | "guarantor" | "org";
+type Role = "seller" | "guarantor" | "finance" | "org";
 type Row = { receivable: OffchainReceivable; onchain: ReceivableView | null; state: DisplayState; role: Role };
 
-const OPEN_STATES: DisplayState[] = ["Draft", "Submitted", "Approved", "Funded", "GuarantorCalled"];
+const OPEN_STATES: DisplayState[] = ["Draft", "FinanceReview", "Submitted", "Approved", "Funded", "GuarantorCalled"];
 // the table needs about 670px; below that (a narrow window, or the laptop widths where the card aside takes room)
 // the section shows the phone rows instead. Keyed to the section's own width, not the window's.
 const TABLE_COLS = "@2xl:grid-cols-[40px_minmax(0,1fr)_104px_88px_120px_100px]";
@@ -47,7 +47,8 @@ function useReceivableRows(me: MeResponse) {
       const rows = receivables.map((receivable): Row => {
         const onchain = ledgerOf(receivable);
         const state = displayState(receivable, onchain);
-        const role: Role = receivable.recipientWallet === wallet ? "seller" : receivable.guarantorWallet === wallet ? "guarantor" : "org";
+        const waitingOnFinance = receivable.status === "FinanceReview" && me.membership?.financeAgent && receivable.recipientWallet !== wallet;
+        const role: Role = receivable.recipientWallet === wallet ? "seller" : waitingOnFinance ? "finance" : receivable.guarantorWallet === wallet ? "guarantor" : "org";
         return { receivable, onchain, state, role };
       });
       return rows.sort((a, b) => new Date(b.receivable.updatedAt).getTime() - new Date(a.receivable.updatedAt).getTime());
@@ -63,12 +64,16 @@ function resolveOrgName(rows: Row[], orgs: DirectoryOrg[] | undefined): string |
 }
 
 function crumbFor(me: MeResponse, orgName: string | null): string {
+  if (me.membership) return `${me.membership.name} · ${formatJoinCode(me.membership.joinCode)}`;
   if (me.officerOrgs.length > 0) return me.officerOrgs.map((o) => o.name).join(", ");
   return orgName ?? "Borrower";
 }
 
 function roleLabel(role: Role): string {
-  return role === "seller" ? "Yours" : role === "guarantor" ? "You signed off" : "Your business";
+  if (role === "seller") return "Yours";
+  if (role === "guarantor") return "You signed off";
+  if (role === "finance") return "For you to review";
+  return "Your business";
 }
 
 function payerLabel(receivable: OffchainReceivable): string {
@@ -102,6 +107,7 @@ function nextStepFor(row: Row, nowSeconds: number): string {
     if (!receivable.guarantySigned) return "Waiting for approver sign-off";
     return "Ready to submit";
   }
+  if (state === "FinanceReview") return row.role === "finance" ? "Send it to an admin" : "Waiting on a finance agent";
   if (state === "Submitted") return "Reviewed within a day";
   if (state === "Approved" && onchain) {
     const days = daysFrom(onchain.approvalExpiresAt, nowSeconds * 1000);
@@ -120,11 +126,12 @@ function actionFor(row: Row): string {
   const { state, role } = row;
   if (role === "seller") {
     if (state === "Draft") return "Finish";
-    if (state === "Submitted") return "View";
+    if (state === "FinanceReview" || state === "Submitted") return "View";
     if (state === "Approved") return "Get the loan";
     if (state === "Funded" || state === "GuarantorCalled") return "Pay it back";
     return "";
   }
+  if (role === "finance") return "Review";
   if (role === "guarantor") {
     if (state === "GuarantorCalled" || state === "WrittenOff") return "Pay it back";
     if (state === "Settled" || state === "Recovered" || state === "Rejected" || state === "Cancelled") return "";
@@ -277,7 +284,25 @@ function GuarantyCard({ row, className }: { row: Row; className?: string }) {
   );
 }
 
-function HomeView({ rows, orgName }: { rows: Row[]; orgName: string | null }) {
+function FinanceCard({ row }: { row: Row }) {
+  const amount = usd(BigInt(row.receivable.requestedAmount));
+  const who = row.receivable.description ?? row.receivable.payerName;
+  return (
+    <Link href={`/receivable/?id=${row.receivable.id}`} className="flex flex-col">
+      <GradientPanel tone="gold" className="flex flex-1 flex-col justify-between gap-3 p-5">
+        <span className="eyebrow text-highlight">Finance request</span>
+        <span className="text-[15px] leading-snug font-semibold">
+          {who} · {amount}. Send it on for an admin to approve.
+        </span>
+        <span className="flex items-center gap-2 text-[13px] font-semibold">
+          Review <ArrowRight className="size-3.5" />
+        </span>
+      </GradientPanel>
+    </Link>
+  );
+}
+
+function HomeView({ rows }: { rows: Row[] }) {
   const [figure, setFigure] = useState<Figure>("due");
   if (rows.length === 0) return <EmptyReceivables text="No loans yet." />;
   const mine = rows.filter((r) => r.role === "seller");
@@ -295,12 +320,20 @@ function HomeView({ rows, orgName }: { rows: Row[]; orgName: string | null }) {
   }[figure];
   const funded = mine.find((r) => r.state === "Funded");
   const settleHref = funded ? `/receivable/?id=${funded.receivable.id}` : null;
-  const cardRow = mine.find((r) => r.state === "Funded") ?? mine.find((r) => r.state === "Approved") ?? mine.find((r) => r.state === "Submitted") ?? mine.find((r) => r.state === "Draft");
+  const cardRow = mine.find((r) => r.state === "Funded") ?? mine.find((r) => r.state === "Approved") ?? mine.find((r) => r.state === "FinanceReview") ?? mine.find((r) => r.state === "Submitted") ?? mine.find((r) => r.state === "Draft");
+  const financeRows = rows.filter((r) => r.role === "finance");
   const guarantyRow = rows.find((r) => r.role === "guarantor" && r.receivable.packetHash && !r.receivable.guarantySigned);
 
   return (
     <div className="flex flex-col gap-5 lg:flex-row lg:items-start">
       <div className="flex min-w-0 flex-1 flex-col gap-5">
+        {financeRows.length > 0 ? (
+          <div className="flex flex-col gap-3" data-testid="finance-requests">
+            {financeRows.map((row) => (
+              <FinanceCard key={row.receivable.id} row={row} />
+            ))}
+          </div>
+        ) : null}
         <GradientPanel tone="panel" className="flex flex-col gap-5 p-6 lg:h-[300px]">
           <div className="flex gap-6 border-b border-on-ink/15">
             <TabFigure label="To pay back" value={due} active={figure === "due"} onSelect={() => setFigure("due")} />
@@ -369,7 +402,7 @@ function ReceivablesView({ me }: { me: MeResponse }) {
       ) : view === "receivables" ? (
         <ReceivablesSection rows={rows.data} emptyText="No loans yet." />
       ) : (
-        <HomeView rows={rows.data} orgName={orgName} />
+        <HomeView rows={rows.data} />
       )}
     </div>
   );

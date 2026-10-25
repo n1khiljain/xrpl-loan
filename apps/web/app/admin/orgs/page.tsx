@@ -1,5 +1,6 @@
 "use client";
 
+import { formatJoinCode } from "@app/adapters";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { AdminShell } from "@/components/admin/admin-shell";
@@ -15,7 +16,7 @@ import { friendlyError } from "@/lib/errors";
 import { shortAddress } from "@/lib/format";
 import type { DirectoryOrg, MeResponse } from "@/lib/types";
 
-type AdminOrg = DirectoryOrg & { active: boolean };
+type AdminOrg = DirectoryOrg & { active: boolean; joinCode: string };
 
 const isAddress = (value: string) => /^r[1-9A-HJ-NP-Za-km-z]{24,34}$/.test(value);
 
@@ -64,6 +65,9 @@ function OrgCard({ org }: { org: AdminOrg }) {
         </Button>
       </CardHeader>
       <CardContent className="flex flex-col gap-4">
+        <p className="text-muted-foreground text-sm">
+          Organization ID <span className="text-foreground font-mono">{formatJoinCode(org.joinCode)}</span>
+        </p>
         <ul className="divide-divider flex flex-col divide-y text-sm">
           {org.officers.length === 0 ? <li className="text-muted-foreground py-2">No approvers yet.</li> : null}
           {org.officers.map((o) => (

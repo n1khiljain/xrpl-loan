@@ -5,6 +5,7 @@ export type KycStatus = "not_started" | "pending" | "approved" | "rejected";
 export type StaffRole = "underwriter" | "attester" | "admin";
 export type OffchainStatus =
   | "Draft"
+  | "FinanceReview"
   | "Submitted"
   | "Approved"
   | "Funded"
@@ -29,10 +30,22 @@ export type Profile = {
   kycUpdatedAt: string | null;
 };
 
+export type Membership = {
+  orgId: number;
+  name: string;
+  joinCode: string;
+  active: boolean;
+  financeAgent: boolean;
+  roleTitle: string | null;
+  /** Other finance agents in the organization. The seller's own request skips them when this is zero. */
+  peerFinanceAgents: number;
+};
+
 export type MeResponse = {
   profile: Profile | null;
   staffRole: StaffRole | null;
   officerOrgs: Array<{ orgId: number; name: string; title: string | null }>;
+  membership: Membership | null;
   wallet: { address: Address; funded: boolean; fundedTx: string | null } | null;
 };
 
@@ -59,6 +72,8 @@ export type OffchainReceivable = {
   guarantySigned: boolean;
   guarantySignedAt: string | null;
   status: OffchainStatus;
+  /** Set once a finance agent has sent the request on to an admin. */
+  financeClearedAt: string | null;
   rejectReason: string | null;
   loanId: string | null;
   payerOutcome: "none" | "rejected" | "short_paid";

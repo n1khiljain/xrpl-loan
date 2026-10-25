@@ -1,3 +1,4 @@
+import { makeJoinCode } from "@app/adapters";
 import {
   type Receivable,
   type ReceivableDocument,
@@ -12,6 +13,7 @@ import {
   type NotificationKey,
   type Officer,
   type Org,
+  type OrgMember,
   type Profile,
   type ProfilePatch,
   type StaffRole,
@@ -27,6 +29,7 @@ export class MemoryDb implements Db {
   readonly staff = new Map<Wallet, StaffRole>();
   readonly orgs = new Map<number, Org>();
   readonly officers = new Map<string, Officer>();
+  readonly members = new Map<Wallet, OrgMember>();
   readonly receivables = new Map<string, Receivable>();
   readonly documents = new Map<string, ReceivableDocument>();
   readonly invites = new Map<string, GuarantorInvite>();
@@ -96,12 +99,18 @@ export class MemoryDb implements Db {
 
   async insertOrg(name: string) {
     if ([...this.orgs.values()].some((o) => o.name === name)) throw new UniqueViolation("orgs_name_key");
-    const org = { id: ++this.orgSeq, name, active: true };
+    let joinCode = makeJoinCode();
+    for (let attempt = 0; attempt < 5 && [...this.orgs.values()].some((o) => o.joinCode === joinCode); attempt++) joinCode = makeJoinCode();
+    if ([...this.orgs.values()].some((o) => o.joinCode === joinCode)) throw new UniqueViolation("orgs_join_code_key");
+    const org = { id: ++this.orgSeq, name, active: true, joinCode };
     this.orgs.set(org.id, org);
     return org;
   }
   async getOrg(id: number) {
     return this.orgs.get(id) ?? null;
+  }
+  async getOrgByJoinCode(joinCode: string) {
+    return [...this.orgs.values()].find((o) => o.joinCode === joinCode) ?? null;
   }
   async listOrgs() {
     return [...this.orgs.values()].sort((a, b) => a.id - b.id);
@@ -135,6 +144,21 @@ export class MemoryDb implements Db {
       }));
   }
 
+  async insertMember(m: OrgMember) {
+    if (!this.orgs.has(m.orgId)) throw new Error("org_members_org_id_fkey");
+    if (!this.profiles.has(m.wallet)) throw new Error("org_members_wallet_address_fkey");
+    // one role: finance agent, or a title
+    if (m.financeAgent === (m.roleTitle !== null)) throw new Error("member_has_one_role");
+    if (this.members.has(m.wallet)) throw new UniqueViolation("org_members_wallet_address_key");
+    this.members.set(m.wallet, { ...m });
+  }
+  async getMember(wallet: Wallet) {
+    return this.members.get(wallet) ?? null;
+  }
+  async listFinanceAgents(orgId: number) {
+    return [...this.members.values()].filter((m) => m.orgId === orgId && m.financeAgent).map((m) => m.wallet);
+  }
+
   async insertReceivable(c: NewReceivable) {
     if (c.orgId !== null && !this.orgs.has(c.orgId)) throw new Error("receivables_org_id_fkey");
     if (!this.profiles.has(c.recipientWallet)) throw new Error("receivables_recipient_wallet_fkey");
@@ -153,6 +177,8 @@ export class MemoryDb implements Db {
       packetHash: null,
       guarantySignedAt: null,
       status: "Draft",
+      financeClearedAt: null,
+      financeClearedBy: null,
       submittedAt: null,
       approvedAmount: "0",
       approvedBy: null,
@@ -209,7 +235,10 @@ export class MemoryDb implements Db {
     if (scope.kind === "reported") return all.filter((c) => c.payerOutcome !== "none");
     return all.filter(
       (c) =>
-        c.recipientWallet === scope.wallet || c.guarantorWallet === scope.wallet || (c.orgId !== null && scope.officerOrgIds.includes(c.orgId)),
+        c.recipientWallet === scope.wallet ||
+          c.guarantorWallet === scope.wallet ||
+          (c.orgId !== null && scope.officerOrgIds.includes(c.orgId)) ||
+          (scope.financeOrgId !== null && c.status === "FinanceReview" && this.members.get(c.recipientWallet)?.orgId === scope.financeOrgId),
     );
   }
   async listReceivablesByStatus(statuses: ReceivableStatus[]) {

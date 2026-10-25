@@ -1,3 +1,4 @@
+import { makeJoinCode } from "@app/adapters";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Database, Json, Tables, TablesInsert, TablesUpdate } from "./database.types.ts";
 import {
@@ -13,6 +14,8 @@ import {
   type NewReceivable,
   type NotificationKey,
   type Officer,
+  type Org,
+  type OrgMember,
   type Profile,
   type ProfilePatch,
   type StaffRole,
@@ -31,6 +34,7 @@ type PgError = { code?: string; message: string };
  */
 const numeric = (units: string) => units as unknown as number;
 
+const ORG = "id, name, active, join_code";
 const PROFILE =
   "wallet_address, privy_user_id, email, email_verified, display_name, kyc_status, kyc_source, kyc_updated_by, kyc_updated_at, created_at";
 const AMOUNTS = ["face_value", "requested_amount", "approved_amount", "purchase_price", "amount_due", "amount_paid", "written_off_principal"] as const;
@@ -38,6 +42,7 @@ const RECEIVABLE = [
   "id, number, type, recipient_wallet, payer_name, payer_email, payer_wallet, due_date, org_id, reference, description",
   "packet_json, packet_hash",
   "guarantor_wallet, guaranty_signed_at, status, submitted_at, approved_by, approval_expires_at, reject_reason, fee_bps",
+  "finance_cleared_at, finance_cleared_by",
   "purchased_at, due_at, loan_id, call_reason, guarantor_called_at, write_off_eligible_at, principal_written_off",
   "payer_outcome, payer_outcome_note, payer_outcome_at, created_at, updated_at",
   ...AMOUNTS.map((c) => `${c}::text`),
@@ -74,6 +79,10 @@ function done(result: { error: PgError | null }): void {
 
 function toWallet(r: Tables<"wallets">): WalletRow {
   return { address: r.address as Wallet, encryptedSeed: r.encrypted_seed, fundedTx: r.funded_tx, createdAt: r.created_at };
+}
+
+function toOrg(r: { id: number; name: string; active: boolean; join_code: string }): Org {
+  return { id: r.id, name: r.name, active: r.active, joinCode: r.join_code };
 }
 
 function toProfile(r: Tables<"profiles">): Profile {
@@ -124,6 +133,8 @@ function toReceivable(row: unknown): Receivable {
     guarantorWallet: r.guarantor_wallet as Wallet | null,
     guarantySignedAt: r.guaranty_signed_at,
     status: r.status,
+    financeClearedAt: r.finance_cleared_at,
+    financeClearedBy: r.finance_cleared_by as Wallet | null,
     submittedAt: r.submitted_at,
     approvedAmount: r.approved_amount,
     approvedBy: r.approved_by as Wallet | null,
@@ -183,6 +194,8 @@ const RECEIVABLE_COLUMNS: Record<keyof ReceivablePatch, keyof TablesUpdate<"rece
   guarantorWallet: "guarantor_wallet",
   guarantySignedAt: "guaranty_signed_at",
   status: "status",
+  financeClearedAt: "finance_cleared_at",
+  financeClearedBy: "finance_cleared_by",
   submittedAt: "submitted_at",
   approvedAmount: "approved_amount",
   approvedBy: "approved_by",
@@ -314,13 +327,28 @@ export class SupabaseDb implements Db {
   }
 
   async insertOrg(name: string) {
-    return one(await this.db.from("orgs").insert({ name }).select("id, name, active").single());
+    let last: unknown;
+    for (let attempt = 0; attempt < 5; attempt++) {
+      try {
+        return toOrg(one(await this.db.from("orgs").insert({ name, join_code: makeJoinCode() }).select(ORG).single()));
+      } catch (error) {
+        last = error;
+        if (error instanceof UniqueViolation && error.constraint.includes("join_code")) continue;
+        throw error;
+      }
+    }
+    throw last;
   }
   async getOrg(id: number) {
-    return maybe(await this.db.from("orgs").select("id, name, active").eq("id", id).maybeSingle());
+    const row = maybe(await this.db.from("orgs").select(ORG).eq("id", id).maybeSingle());
+    return row ? toOrg(row) : null;
+  }
+  async getOrgByJoinCode(joinCode: string) {
+    const row = maybe(await this.db.from("orgs").select(ORG).eq("join_code", joinCode).maybeSingle());
+    return row ? toOrg(row) : null;
   }
   async listOrgs() {
-    return one(await this.db.from("orgs").select("id, name, active").order("id"));
+    return one(await this.db.from("orgs").select(ORG).order("id")).map(toOrg);
   }
   async setOrgActive(id: number, active: boolean) {
     done(await this.db.from("orgs").update({ active }).eq("id", id));
@@ -350,7 +378,7 @@ export class SupabaseDb implements Db {
     return rows.map((r) => ({ orgId: r.org_id, title: r.title, name: r.orgs?.name ?? "" }));
   }
   async listActiveOrgsWithOfficers() {
-    const orgs = one(await this.db.from("orgs").select("id, name, active").eq("active", true).order("id"));
+    const orgs = one(await this.db.from("orgs").select(ORG).eq("active", true).order("id")).map(toOrg);
     const officers = one(
       await this.db.from("org_officers").select("org_id, wallet_address, title").eq("active", true).in("org_id", orgs.map((o) => o.id)),
     );
@@ -365,6 +393,26 @@ export class SupabaseDb implements Db {
         .filter((o) => o.org_id === org.id)
         .map((o) => ({ wallet: o.wallet_address as Wallet, title: o.title, displayName: nameOf.get(o.wallet_address) ?? null })),
     }));
+  }
+
+  async insertMember(m: OrgMember) {
+    done(
+      await this.db.from("org_members").insert({
+        org_id: m.orgId,
+        wallet_address: m.wallet,
+        finance_agent: m.financeAgent,
+        role_title: m.roleTitle,
+      }),
+    );
+  }
+  async getMember(wallet: Wallet) {
+    const row = maybe(await this.db.from("org_members").select("org_id, wallet_address, finance_agent, role_title").eq("wallet_address", wallet).maybeSingle());
+    if (!row) return null;
+    return { orgId: row.org_id, wallet, financeAgent: row.finance_agent, roleTitle: row.role_title };
+  }
+  async listFinanceAgents(orgId: number) {
+    const rows = one(await this.db.from("org_members").select("wallet_address").eq("org_id", orgId).eq("finance_agent", true));
+    return rows.map((r) => r.wallet_address as Wallet);
   }
 
   async insertReceivable(c: NewReceivable) {
@@ -402,7 +450,18 @@ export class SupabaseDb implements Db {
       if (orgIds.length > 0) clauses.push(`org_id.in.(${orgIds.join(",")})`);
       query = query.or(clauses.join(","));
     }
-    return one(await query).map(toReceivable);
+    const rows = one(await query).map(toReceivable);
+    if (scope.kind !== "wallet" || scope.financeOrgId === null) return rows;
+    const members = one(await this.db.from("org_members").select("wallet_address").eq("org_id", scope.financeOrgId));
+    const wallets = members.map((m) => m.wallet_address);
+    if (wallets.length === 0) return rows;
+    const queued = one(
+      await this.receivables().eq("status", "FinanceReview").in("recipient_wallet", wallets).order("created_at", { ascending: false }),
+    ).map(toReceivable);
+    const seen = new Set(rows.map((r) => r.id));
+    const extra = queued.filter((r) => !seen.has(r.id));
+    if (extra.length === 0) return rows;
+    return [...rows, ...extra].sort((a, b) => b.createdAt.localeCompare(a.createdAt) || b.number - a.number);
   }
   async listReceivablesByStatus(statuses: ReceivableStatus[]) {
     return one(await this.receivables().in("status", statuses)).map(toReceivable);

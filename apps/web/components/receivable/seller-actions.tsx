@@ -15,7 +15,7 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { Label } from "@/components/ui/label";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Textarea } from "@/components/ui/textarea";
-import { useCall } from "@/hooks/use-api";
+import { useCall, useMe } from "@/hooks/use-api";
 import { useNowSeconds } from "@/hooks/use-now";
 import { ASSET, ledgerReady } from "@/lib/config";
 import { friendlyError } from "@/lib/errors";
@@ -82,17 +82,35 @@ function useReceivableAction(receivable: OffchainReceivable) {
   const call = useCall();
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: (action: "submit" | "cancel") => call("receivable-actions", { method: "POST", body: { action, receivableId: receivable.id } }),
+    mutationFn: (action: "submit" | "cancel" | "send-to-admin") => call("receivable-actions", { method: "POST", body: { action, receivableId: receivable.id } }),
     onSuccess: () => queryClient.invalidateQueries(),
   });
 }
 
+/** A finance agent sends the request on. An admin approves it after that. */
+export function FinanceRelease({ receivable }: { receivable: OffchainReceivable }) {
+  const action = useReceivableAction(receivable);
+  const amount = usd(BigInt(receivable.requestedAmount));
+  return (
+    <StatePanel lead={`Send this ${amount} request to an admin.`} description="You review it as a finance agent. An admin approves it after you send it on.">
+      <div>
+        <Button size="lg" onClick={() => action.mutate("send-to-admin")} disabled={action.isPending} data-testid="send-to-admin">
+          {action.isPending ? "Sending..." : "Send to admin"}
+        </Button>
+      </div>
+      {action.isError ? <ErrorNotice>{friendlyError(action.error)}</ErrorNotice> : null}
+    </StatePanel>
+  );
+}
+
 function SubmitReceivable({ receivable }: { receivable: OffchainReceivable }) {
   const action = useReceivableAction(receivable);
+  const me = useMe();
+  const financeFirst = Boolean(me.data?.membership?.active && (me.data.membership.peerFinanceAgents ?? 0) > 0);
   return (
     <div className="space-y-3">
       <Button size="lg" onClick={() => action.mutate("submit")} disabled={action.isPending} data-testid="submit-receivable">
-        {action.isPending ? "Sending..." : "Submit for review"}
+        {action.isPending ? "Sending..." : financeFirst ? "Send to your finance team" : "Submit for review"}
       </Button>
       {action.isError ? <ErrorNotice>{friendlyError(action.error)}</ErrorNotice> : null}
     </div>
@@ -228,6 +246,7 @@ function PaidCelebration({ receivable, onchain, onContinue }: { receivable: Offc
 
 /** The one action that fits the receivable's state, for the person who sold it (SYSTEM_DESIGN 6.2). */
 export function SellerActions({ receivable, onchain }: { receivable: OffchainReceivable; onchain: ReceivableView | null }) {
+  const me = useMe();
   const action = useReceivableAction(receivable);
   const call = useCall();
   const queryClient = useQueryClient();
@@ -249,6 +268,10 @@ export function SellerActions({ receivable, onchain }: { receivable: OffchainRec
   const loansClosed = vault.data?.phase === "subscription" || vault.data?.phase === "closed";
 
   const requested = usd(BigInt(receivable.requestedAmount));
+  const financeFirst = Boolean(me.data?.membership?.active && (me.data.membership.peerFinanceAgents ?? 0) > 0);
+  const reviewLine = financeFirst
+    ? "A finance agent at your organization sees it first. After they send it on, an admin approves it."
+    : `Reviewers check your documents before you get ${requested}.`;
   if (state === "Draft") {
     if (!receivable.packetHash) {
       return (
@@ -263,7 +286,7 @@ export function SellerActions({ receivable, onchain }: { receivable: OffchainRec
     }
     if (!receivable.guarantorWallet) {
       return (
-        <StatePanel lead="Ready to send for review." description={`Reviewers check your documents before you get ${requested}.`}>
+        <StatePanel lead="Ready to send for review." description={reviewLine}>
           <SubmitReceivable receivable={receivable} />
         </StatePanel>
       );
@@ -276,12 +299,25 @@ export function SellerActions({ receivable, onchain }: { receivable: OffchainRec
       );
     }
     return (
-      <StatePanel lead="Your approver signed off. Send it for review." description={`Reviewers check your documents before you get ${requested}.`}>
+      <StatePanel lead="Your approver signed off. Send it for review." description={reviewLine}>
         <SubmitReceivable receivable={receivable} />
       </StatePanel>
     );
   }
   if (!onchain) return <p className="text-muted-foreground text-sm">Loading the latest status...</p>;
+
+  if (state === "FinanceReview") {
+    return (
+      <StatePanel lead="A finance agent at your organization is reviewing this." description="After they send it on, an admin approves it.">
+        <div>
+          <Button variant="outline" size="sm" disabled={action.isPending} onClick={() => action.mutate("cancel")} data-testid="cancel-receivable">
+            Cancel this request
+          </Button>
+        </div>
+        {action.isError ? <ErrorNotice>{friendlyError(action.error)}</ErrorNotice> : null}
+      </StatePanel>
+    );
+  }
 
   if (state === "Submitted") {
     return (

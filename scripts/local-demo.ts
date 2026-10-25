@@ -85,9 +85,23 @@ for (const p of people) {
 }
 
 // 3. the business and its approver
-const { orgs } = await api<{ orgs: Array<{ id: number; name: string }> }>(staff, "orgs", "GET");
-const org = orgs.find((o) => o.name === ORG_NAME) ?? (await api<{ org: { id: number } }>(staff, "orgs", "POST", { action: "create", name: ORG_NAME })).org;
+const { orgs } = await api<{ orgs: Array<{ id: number; name: string; joinCode: string }> }>(staff, "orgs", "GET");
+const org = orgs.find((o) => o.name === ORG_NAME) ?? (await api<{ org: { id: number; joinCode: string } }>(staff, "orgs", "POST", { action: "create", name: ORG_NAME })).org;
 await api(staff, "orgs", "POST", { action: "set-officer", orgId: org.id, wallet: guarantor.wallet, title: "Finance lead", active: true });
+
+// everyone belongs to the demo business, so the app doesn't stop them on organization setup.
+// the approver is the finance agent who sees expedite requests before the admin does
+async function joinOrg(who: Persona, financeAgent: boolean, roleTitle: string | null) {
+  try {
+    await api(who, "membership", "POST", { action: "join", joinCode: org.joinCode, financeAgent, roleTitle });
+  } catch (error) {
+    if (!String(error).includes("already_member")) throw error;
+  }
+}
+await joinOrg(guarantor, true, null);
+await joinOrg(seller, false, "Buyer");
+await joinOrg(staff, false, "Operator");
+await joinOrg(lender, false, "Lender");
 
 // 4. receivables of each kind, in different states, made once
 type Receivable = { id: string; reference: string; status: string };
@@ -194,7 +208,10 @@ for (const d of DRAFTS) {
   const { packetHash } = await api<{ packetHash: string }>(seller, "packet", "POST", { receivableId: id });
   if (d.org) await api(guarantor, "guaranty", "POST", { receivableId: id, packetHash });
   if (d.to === "signed") continue;
-  await api(seller, "receivable-actions", "POST", { action: "submit", receivableId: id });
+  const submitted = await api<{ receivable: { status: string } }>(seller, "receivable-actions", "POST", { action: "submit", receivableId: id });
+  if (submitted.receivable.status === "FinanceReview") {
+    await api(guarantor, "receivable-actions", "POST", { action: "send-to-admin", receivableId: id });
+  }
   if (d.to === "approved") await api(staff, "receivable-actions", "POST", { action: "approve", receivableId: id, amount: (d.dollars * USD).toString() });
 }
 

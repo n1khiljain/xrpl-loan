@@ -1,6 +1,7 @@
 /** Lifecycle of a receivable. Postgres holds it; from funding on, the XRPL loan object backs the numbers. */
 export const RECEIVABLE_STATES = [
   "None",
+  "FinanceReview",
   "Submitted",
   "Approved",
   "Funded",

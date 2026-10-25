@@ -4,14 +4,16 @@ import { type Caller, type TokenVerifier, requireCaller, requireStaff } from "..
 import { receivableView, loadReceivable, requireSeller, unitsString, uuid } from "../_shared/receivables.ts";
 import type { Receivable, ReceivablePatch, ReceivableStatus, Db } from "../_shared/db/types.ts";
 import { renderEmail } from "../_shared/emails.ts";
-import { type Handler, badRequest, conflict, json, methodNotAllowed, readJson } from "../_shared/http.ts";
+import { type Handler, badRequest, conflict, forbidden, json, methodNotAllowed, readJson } from "../_shared/http.ts";
 import type { Mailer } from "../_shared/mail.ts";
 
 export type ReceivableActionsDeps = { auth: TokenVerifier; db: Db; config: NetworkConfig; mailer: Mailer; appBaseUrl: string; now?: () => Date };
 
 const Body = z.discriminatedUnion("action", [
-  /** seller: send a signed-off draft for review */
+  /** seller: send a signed-off draft for review. Finance agents at the seller's organization see it before an admin does. */
   z.strictObject({ action: z.literal("submit"), receivableId: uuid }),
+  /** finance agent: send a request on to the admin review queue */
+  z.strictObject({ action: z.literal("send-to-admin"), receivableId: uuid }),
   /** seller: withdraw a request that hasn't been paid */
   z.strictObject({ action: z.literal("cancel"), receivableId: uuid }),
   /** underwriter: approve up to what was asked for */
@@ -67,18 +69,41 @@ export function createReceivableActionsHandler(deps: ReceivableActionsDeps): Han
 
   async function run(caller: Caller, body: Action, receivable: Receivable): Promise<Receivable> {
     switch (body.action) {
-      case "submit":
+      case "submit": {
         requireSeller(caller, receivable);
         if (!receivable.packetHash) throw conflict("finish the request first", "not_frozen");
         if (receivable.guarantorWallet && !receivable.guarantySignedAt) throw conflict("your officer has to sign off first", "not_signed");
         if (receivable.guarantorWallet && receivable.orgId !== null && !(await db.isActiveOfficer(receivable.orgId, receivable.guarantorWallet))) {
           throw conflict("the officer who signed off isn't active in the org anymore; pick another", "not_officer");
         }
-        return move(receivable, ["Draft"], { status: "Submitted", submittedAt: iso(now()) });
+        // other finance agents in the seller's organization review it before it reaches an admin
+        const member = await db.getMember(caller.profile.wallet);
+        const org = member ? await db.getOrg(member.orgId) : null;
+        const peers = org?.active ? (await db.listFinanceAgents(org.id)).filter((wallet) => wallet !== caller.profile.wallet) : [];
+        const next = peers.length > 0 ? "FinanceReview" : "Submitted";
+        return move(receivable, ["Draft"], { status: next, submittedAt: iso(now()) });
+      }
+
+      case "send-to-admin": {
+        const member = await db.getMember(caller.profile.wallet);
+        if (!member?.financeAgent) throw forbidden("only a finance agent at the organization can send this on");
+        const seller = await db.getMember(receivable.recipientWallet);
+        if (!seller || seller.orgId !== member.orgId) throw forbidden("this request isn't for your organization");
+        if (receivable.recipientWallet === caller.profile.wallet) throw conflict("you can't send your own request on", "self_approval");
+        const org = await db.getOrg(member.orgId);
+        if (!org?.active) throw conflict("that organization isn't active", "org_inactive");
+        const moved = await move(receivable, ["FinanceReview"], {
+          status: "Submitted",
+          financeClearedAt: iso(now()),
+          financeClearedBy: caller.profile.wallet,
+        });
+        await log(caller, "send_to_admin", receivable, {});
+        return moved;
+      }
 
       case "cancel":
         requireSeller(caller, receivable);
-        return move(receivable, ["Submitted", "Approved"], { status: "Cancelled" });
+        return move(receivable, ["FinanceReview", "Submitted", "Approved"], { status: "Cancelled" });
 
       case "approve": {
         requireStaff(caller, ["underwriter", "admin"]);

@@ -36,7 +36,7 @@ Deno.test("GET returns nulls before the account is set up", async () => {
   const { handler } = setup();
   const res = await call(handler, "GET", ENDPOINT, { token: await privyToken("did:privy:new") });
   assertEquals(res.status, 200);
-  assertEquals(res.body, { profile: null, staffRole: null, officerOrgs: [], wallet: null });
+  assertEquals(res.body, { profile: null, staffRole: null, officerOrgs: [], membership: null, wallet: null });
 });
 
 Deno.test("first POST makes an encrypted custodial wallet, funds it, and makes the profile", async () => {

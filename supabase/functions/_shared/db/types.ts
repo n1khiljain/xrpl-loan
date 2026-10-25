@@ -11,6 +11,7 @@ export type PayerOutcome = "none" | "rejected" | "short_paid";
 export type CallReason = "none" | "payer_rejected" | "partial_shortfall" | "overdue";
 export type ReceivableStatus =
   | "Draft"
+  | "FinanceReview"
   | "Submitted"
   | "Approved"
   | "Funded"
@@ -40,8 +41,11 @@ export type Profile = {
 
 export type ProfilePatch = Partial<Omit<Profile, "wallet" | "privyUserId" | "createdAt">>;
 
-export type Org = { id: number; name: string; active: boolean };
+export type Org = { id: number; name: string; active: boolean; joinCode: string };
 export type Officer = { orgId: number; wallet: Wallet; title: string | null; active: boolean };
+
+/** One organization per person. A finance agent has no title; everyone else has one. */
+export type OrgMember = { orgId: number; wallet: Wallet; financeAgent: boolean; roleTitle: string | null };
 
 export type Receivable = {
   id: string;
@@ -64,6 +68,9 @@ export type Receivable = {
   guarantorWallet: Wallet | null;
   guarantySignedAt: string | null;
   status: ReceivableStatus;
+  /** Set when a finance agent sends the request on to an admin. */
+  financeClearedAt: string | null;
+  financeClearedBy: Wallet | null;
   submittedAt: string | null;
   approvedAmount: string;
   approvedBy: Wallet | null;
@@ -140,7 +147,7 @@ export type LedgerTx = {
 
 export type ReceivableScope =
   /** Receivables the wallet sells, guarantees, or can see as an officer of the org. */
-  | { kind: "wallet"; wallet: Wallet; officerOrgIds: number[] }
+  | { kind: "wallet"; wallet: Wallet; officerOrgIds: number[]; /** Set when the caller is a finance agent, so they see requests waiting on them. */ financeOrgId: number | null }
   /** Every receivable, for staff. */
   | { kind: "all" }
   /** Receivables with a payer outcome report, for the attester's exceptions list. */
@@ -176,6 +183,7 @@ export interface Db {
 
   insertOrg(name: string): Promise<Org>;
   getOrg(id: number): Promise<Org | null>;
+  getOrgByJoinCode(joinCode: string): Promise<Org | null>;
   listOrgs(): Promise<Org[]>;
   setOrgActive(id: number, active: boolean): Promise<void>;
   upsertOfficer(officer: Officer): Promise<void>;
@@ -183,6 +191,11 @@ export interface Db {
   listOfficerOrgs(wallet: Wallet): Promise<Array<{ orgId: number; name: string; title: string | null }>>;
   /** Active orgs with their active officers and the officers' display names (for picking a guarantor). */
   listActiveOrgsWithOfficers(): Promise<Array<Org & { officers: Array<{ wallet: Wallet; title: string | null; displayName: string | null }> }>>;
+
+  insertMember(member: OrgMember): Promise<void>;
+  getMember(wallet: Wallet): Promise<OrgMember | null>;
+  /** Wallets of the organization's finance agents. */
+  listFinanceAgents(orgId: number): Promise<Wallet[]>;
 
   insertReceivable(receivable: NewReceivable): Promise<Receivable>;
   getReceivable(id: string): Promise<Receivable | null>;

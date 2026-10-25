@@ -16,9 +16,10 @@ import { friendlyError } from "@/lib/errors";
 import { useSession } from "@/lib/session/context";
 import type { MeResponse } from "@/lib/types";
 import { cn } from "@/lib/utils";
-import { LocalDemoPicker } from "./local-demo-picker";
 import { Avatar } from "./avatar";
+import { LocalDemoPicker } from "./local-demo-picker";
 import { ErrorNotice } from "./notice";
+import { OrgSetup } from "./org-setup";
 
 function Loading() {
   return (
@@ -313,8 +314,8 @@ function SetUpAccount() {
 }
 
 /**
- * Renders children once the visitor is signed in and has a profile. Otherwise it shows the one step they need
- * next: sign in, or finish setting up.
+ * Renders children once the visitor is signed in, has a profile, and belongs to an organization. Otherwise it shows
+ * the one step they need next: sign in, finish setting up, or create or join an organization.
  */
 export function AccountGate({ children, reason }: { children: (me: MeResponse) => ReactNode; reason: string }) {
   const session = useSession();
@@ -325,5 +326,6 @@ export function AccountGate({ children, reason }: { children: (me: MeResponse) =
   if (me.isPending) return <Loading />;
   if (me.isError) return <ErrorNotice>{friendlyError(me.error)}</ErrorNotice>;
   if (!me.data.profile) return <SetUpAccount />;
+  if (!me.data.membership) return <OrgSetup />;
   return <>{children(me.data)}</>;
 }

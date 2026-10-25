@@ -52,7 +52,7 @@ function activeKey(pathname: string, view: string | null): string {
   return admin ?? "queue";
 }
 
-/** Guaranty requests waiting on this person, for the sidebar badge. Shares its cache with nothing else. */
+/** Guaranty requests waiting on this person, for the sidebar badge. The raw list is shared with the finance badge. */
 function useGuarantyRequests(wallet: string | undefined) {
   const call = useCall();
   const session = useSession();
@@ -65,7 +65,19 @@ function useGuarantyRequests(wallet: string | undefined) {
   });
 }
 
-function navFor(area: Area, guaranties: number): NavItem[] {
+function useFinanceRequests(wallet: string | undefined, enabled: boolean) {
+  const call = useCall();
+  const session = useSession();
+  return useQuery({
+    queryKey: ["receivables", "mine", "raw"],
+    enabled: session.status === "signed-in" && Boolean(wallet) && enabled,
+    queryFn: () => call<{ receivables: OffchainReceivable[] }>("receivables"),
+    select: (data) => data.receivables.filter((c) => c.status === "FinanceReview" && c.recipientWallet !== wallet).length,
+    staleTime: 30_000,
+  });
+}
+
+function navFor(area: Area, guaranties: number, finance = 0): NavItem[] {
   if (area === "lender") {
     return [
       { key: "pool", label: "Vault", href: "/lend/", icon: ChartColumn },
@@ -82,7 +94,7 @@ function navFor(area: Area, guaranties: number): NavItem[] {
     ];
   }
   return [
-    { key: "home", label: "Home", href: "/receivables/", icon: House },
+    { key: "home", label: "Home", href: "/receivables/", icon: House, badge: finance || undefined },
     { key: "new", label: "Expedite a payment", href: "/receivables/new/", icon: Plus, primary: true },
     { key: "receivables", label: "My loans", href: "/receivables/?view=receivables", icon: FileText },
     { key: "guaranties", label: "Sign-offs", href: "/receivables/?view=guaranties", icon: Handshake, badge: guaranties || undefined },
@@ -98,7 +110,8 @@ function Sidebar({ area, logos, active }: { area: Area; logos: LogoFiles; active
   const me = useMe();
   const wallet = me.data?.profile?.wallet;
   const guaranties = useGuarantyRequests(wallet);
-  const items = navFor(area, guaranties.data ?? 0);
+  const finance = useFinanceRequests(wallet, Boolean(me.data?.membership?.financeAgent));
+  const items = navFor(area, guaranties.data ?? 0, finance.data ?? 0);
   const name = me.data?.profile?.displayName ?? (session.status === "signed-in" ? "Signed in" : "Not signed in");
   const meta = me.data?.profile?.email ?? SECTION[area];
   const others: { href: string; label: string }[] = [
@@ -181,7 +194,8 @@ function Sidebar({ area, logos, active }: { area: Area; logos: LogoFiles; active
 function TabBar({ area, active }: { area: Area; active: string }) {
   const me = useMe();
   const guaranties = useGuarantyRequests(me.data?.profile?.wallet);
-  const all = navFor(area, guaranties.data ?? 0);
+  const finance = useFinanceRequests(me.data?.profile?.wallet, Boolean(me.data?.membership?.financeAgent));
+  const all = navFor(area, guaranties.data ?? 0, finance.data ?? 0);
   // the phone bar keeps five: Home, My receivables, Sell, Guaranties, and Me (verification and profile)
   const items =
     area === "member"

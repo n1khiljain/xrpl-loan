@@ -76,7 +76,7 @@ Deno.test("POST enforces amounts, the per-receivable cap, org state, and guarant
   const seller = await makeUser(db, { kyc: "approved" });
   const stranger = await makeUser(db);
   seedOrg(db, 1, "Blockchain at Berkeley", [seller.wallet]);
-  db.orgs.set(2, { id: 2, name: "Dormant Club", active: false });
+  db.orgs.set(2, { id: 2, name: "Dormant Club", active: false, joinCode: "DORMANT2" });
   const handler = handlerFor(db);
   const post = (body: Record<string, unknown>) => call(handler, "POST", ENDPOINT, { token: seller.token, body: draftBody(body) });
 
@@ -180,6 +180,20 @@ Deno.test("a reference is unique per seller, but another seller can use the same
   assertStatus(await call(handler, "POST", ENDPOINT, { token: one.token, body: invoiceBody() }), 201);
   assertStatus(await call(handler, "POST", ENDPOINT, { token: one.token, body: invoiceBody() }), 409, "duplicate_reference");
   assertStatus(await call(handler, "POST", ENDPOINT, { token: two.token, body: invoiceBody() }), 201);
+});
+
+Deno.test("a finance agent sees a teammate's request that is waiting on finance", async () => {
+  const w = await draftWorld();
+  const stranger = await makeUser(w.db);
+  await w.db.updateReceivable(w.receivable.id, { status: "FinanceReview", guarantorWallet: null, submittedAt: FIXED_NOW.toISOString() });
+  await w.db.insertMember({ orgId: 1, wallet: w.seller.wallet, financeAgent: false, roleTitle: "Buyer" });
+  await w.db.insertMember({ orgId: 1, wallet: w.outsider.wallet, financeAgent: true, roleTitle: null });
+  const handler = handlerFor(w.db);
+  const list = await call(handler, "GET", ENDPOINT, { token: w.outsider.token });
+  assertEquals((list.body.receivables as Array<{ id: string }>).some((c) => c.id === w.receivable.id), true);
+  assertEquals((await call(handler, "GET", ENDPOINT, { token: stranger.token })).body.receivables, []);
+  assertStatus(await call(handler, "GET", `${ENDPOINT}?id=${w.receivable.id}`, { token: w.outsider.token }), 200);
+  assertStatus(await call(handler, "GET", `${ENDPOINT}?id=${w.receivable.id}`, { token: stranger.token }), 404);
 });
 
 Deno.test("POST refuses the seller as their own payer", async () => {

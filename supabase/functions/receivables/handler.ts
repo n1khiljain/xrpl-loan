@@ -115,8 +115,13 @@ export function createReceivablesHandler(deps: ReceivablesDeps): Handler {
       return json({ receivables: (await db.listReceivables({ kind: scope })).map(receivableView) });
     }
     if (scope !== null && scope !== "mine") throw badRequest("scope must be mine, all, or reported");
-    const officerOrgIds = (await db.listOfficerOrgs(caller.profile.wallet)).map((o) => o.orgId);
-    const receivables = await db.listReceivables({ kind: "wallet", wallet: caller.profile.wallet, officerOrgIds });
+    const [officerOrgs, member] = await Promise.all([db.listOfficerOrgs(caller.profile.wallet), db.getMember(caller.profile.wallet)]);
+    const receivables = await db.listReceivables({
+      kind: "wallet",
+      wallet: caller.profile.wallet,
+      officerOrgIds: officerOrgs.map((o) => o.orgId),
+      financeOrgId: member?.financeAgent ? member.orgId : null,
+    });
     return json({ receivables: receivables.map(receivableView) });
   }
 

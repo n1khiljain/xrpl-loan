@@ -93,6 +93,32 @@ isOneToOne: false
                   Relationships: [
                     
                   ]
+                },"org_members": {
+                  Row: {
+                    "finance_agent": boolean,"org_id": number,"role_title": string | null,"wallet_address": string,"created_at": string
+                  }
+                  ComputedFields: never
+                  Insert: {
+                    "finance_agent"?: boolean,"org_id": number,"role_title"?: string | null,"wallet_address": string,"created_at"?: string
+                  }
+                  Update: {
+                    "finance_agent"?: boolean,"org_id"?: number,"role_title"?: string | null,"wallet_address"?: string,"created_at"?: string
+                  }
+                  Relationships: [
+                    {
+      foreignKeyName: "org_members_org_id_fkey"
+      columns: ["org_id"]
+isOneToOne: false
+      referencedRelation: "orgs"
+      referencedColumns: ["id"]
+    },{
+      foreignKeyName: "org_members_wallet_address_fkey"
+      columns: ["wallet_address"]
+isOneToOne: true
+      referencedRelation: "profiles"
+      referencedColumns: ["wallet_address"]
+    }
+                  ]
                 },"org_officers": {
                   Row: {
                     "active": boolean,"org_id": number,"title": string | null,"wallet_address": string
@@ -115,14 +141,14 @@ isOneToOne: false
                   ]
                 },"orgs": {
                   Row: {
-                    "active": boolean,"created_at": string,"id": number,"name": string
+                    "active": boolean,"created_at": string,"id": number,"join_code": string,"name": string
                   }
                   ComputedFields: never
                   Insert: {
-                    "active"?: boolean,"created_at"?: string,"id"?: never,"name": string
+                    "active"?: boolean,"created_at"?: string,"id"?: never,"join_code"?: string,"name": string
                   }
                   Update: {
-                    "active"?: boolean,"created_at"?: string,"id"?: never,"name"?: string
+                    "active"?: boolean,"created_at"?: string,"id"?: never,"join_code"?: string,"name"?: string
                   }
                   Relationships: [
                     
@@ -169,14 +195,14 @@ isOneToOne: false
                   ]
                 },"receivables": {
                   Row: {
-                    "amount_due": number,"amount_paid": number,"approval_expires_at": string | null,"approved_amount": number,"approved_by": string | null,"call_reason": Database["public"]['Enums']["call_reason"],"created_at": string,"description": string | null,"due_at": string | null,"due_date": string,"face_value": number,"fee_bps": number,"guarantor_called_at": string | null,"guarantor_wallet": string | null,"guaranty_signed_at": string | null,"id": string,"loan_id": string | null,"number": number,"org_id": number | null,"packet_hash": string | null,"packet_json": Json | null,"payer_email": string | null,"payer_name": string,"payer_outcome": Database["public"]['Enums']["payer_outcome"],"payer_outcome_at": string | null,"payer_outcome_note": string | null,"payer_wallet": string | null,"principal_written_off": boolean,"purchase_price": number,"purchased_at": string | null,"recipient_wallet": string,"reference": string,"reject_reason": string | null,"requested_amount": number,"status": Database["public"]['Enums']["receivable_status"],"submitted_at": string | null,"type": Database["public"]['Enums']["receivable_type"],"updated_at": string,"write_off_eligible_at": string | null,"written_off_principal": number
+                    "amount_due": number,"amount_paid": number,"approval_expires_at": string | null,"approved_amount": number,"approved_by": string | null,"call_reason": Database["public"]['Enums']["call_reason"],"created_at": string,"description": string | null,"due_at": string | null,"due_date": string,"face_value": number,"fee_bps": number,"finance_cleared_at": string | null,"finance_cleared_by": string | null,"guarantor_called_at": string | null,"guarantor_wallet": string | null,"guaranty_signed_at": string | null,"id": string,"loan_id": string | null,"number": number,"org_id": number | null,"packet_hash": string | null,"packet_json": Json | null,"payer_email": string | null,"payer_name": string,"payer_outcome": Database["public"]['Enums']["payer_outcome"],"payer_outcome_at": string | null,"payer_outcome_note": string | null,"payer_wallet": string | null,"principal_written_off": boolean,"purchase_price": number,"purchased_at": string | null,"recipient_wallet": string,"reference": string,"reject_reason": string | null,"requested_amount": number,"status": Database["public"]['Enums']["receivable_status"],"submitted_at": string | null,"type": Database["public"]['Enums']["receivable_type"],"updated_at": string,"write_off_eligible_at": string | null,"written_off_principal": number
                   }
                   ComputedFields: never
                   Insert: {
-                    "amount_due"?: number,"amount_paid"?: number,"approval_expires_at"?: string | null,"approved_amount"?: number,"approved_by"?: string | null,"call_reason"?: Database["public"]['Enums']["call_reason"],"created_at"?: string,"description"?: string | null,"due_at"?: string | null,"due_date": string,"face_value": number,"fee_bps"?: number,"guarantor_called_at"?: string | null,"guarantor_wallet"?: string | null,"guaranty_signed_at"?: string | null,"id"?: string,"loan_id"?: string | null,"number"?: never,"org_id"?: number | null,"packet_hash"?: string | null,"packet_json"?: Json | null,"payer_email"?: string | null,"payer_name": string,"payer_outcome"?: Database["public"]['Enums']["payer_outcome"],"payer_outcome_at"?: string | null,"payer_outcome_note"?: string | null,"payer_wallet"?: string | null,"principal_written_off"?: boolean,"purchase_price"?: number,"purchased_at"?: string | null,"recipient_wallet": string,"reference": string,"reject_reason"?: string | null,"requested_amount": number,"status"?: Database["public"]['Enums']["receivable_status"],"submitted_at"?: string | null,"type": Database["public"]['Enums']["receivable_type"],"updated_at"?: string,"write_off_eligible_at"?: string | null,"written_off_principal"?: number
+                    "amount_due"?: number,"amount_paid"?: number,"approval_expires_at"?: string | null,"approved_amount"?: number,"approved_by"?: string | null,"call_reason"?: Database["public"]['Enums']["call_reason"],"created_at"?: string,"description"?: string | null,"due_at"?: string | null,"due_date": string,"face_value": number,"fee_bps"?: number,"finance_cleared_at"?: string | null,"finance_cleared_by"?: string | null,"guarantor_called_at"?: string | null,"guarantor_wallet"?: string | null,"guaranty_signed_at"?: string | null,"id"?: string,"loan_id"?: string | null,"number"?: never,"org_id"?: number | null,"packet_hash"?: string | null,"packet_json"?: Json | null,"payer_email"?: string | null,"payer_name": string,"payer_outcome"?: Database["public"]['Enums']["payer_outcome"],"payer_outcome_at"?: string | null,"payer_outcome_note"?: string | null,"payer_wallet"?: string | null,"principal_written_off"?: boolean,"purchase_price"?: number,"purchased_at"?: string | null,"recipient_wallet": string,"reference": string,"reject_reason"?: string | null,"requested_amount": number,"status"?: Database["public"]['Enums']["receivable_status"],"submitted_at"?: string | null,"type": Database["public"]['Enums']["receivable_type"],"updated_at"?: string,"write_off_eligible_at"?: string | null,"written_off_principal"?: number
                   }
                   Update: {
-                    "amount_due"?: number,"amount_paid"?: number,"approval_expires_at"?: string | null,"approved_amount"?: number,"approved_by"?: string | null,"call_reason"?: Database["public"]['Enums']["call_reason"],"created_at"?: string,"description"?: string | null,"due_at"?: string | null,"due_date"?: string,"face_value"?: number,"fee_bps"?: number,"guarantor_called_at"?: string | null,"guarantor_wallet"?: string | null,"guaranty_signed_at"?: string | null,"id"?: string,"loan_id"?: string | null,"number"?: never,"org_id"?: number | null,"packet_hash"?: string | null,"packet_json"?: Json | null,"payer_email"?: string | null,"payer_name"?: string,"payer_outcome"?: Database["public"]['Enums']["payer_outcome"],"payer_outcome_at"?: string | null,"payer_outcome_note"?: string | null,"payer_wallet"?: string | null,"principal_written_off"?: boolean,"purchase_price"?: number,"purchased_at"?: string | null,"recipient_wallet"?: string,"reference"?: string,"reject_reason"?: string | null,"requested_amount"?: number,"status"?: Database["public"]['Enums']["receivable_status"],"submitted_at"?: string | null,"type"?: Database["public"]['Enums']["receivable_type"],"updated_at"?: string,"write_off_eligible_at"?: string | null,"written_off_principal"?: number
+                    "amount_due"?: number,"amount_paid"?: number,"approval_expires_at"?: string | null,"approved_amount"?: number,"approved_by"?: string | null,"call_reason"?: Database["public"]['Enums']["call_reason"],"created_at"?: string,"description"?: string | null,"due_at"?: string | null,"due_date"?: string,"face_value"?: number,"fee_bps"?: number,"finance_cleared_at"?: string | null,"finance_cleared_by"?: string | null,"guarantor_called_at"?: string | null,"guarantor_wallet"?: string | null,"guaranty_signed_at"?: string | null,"id"?: string,"loan_id"?: string | null,"number"?: never,"org_id"?: number | null,"packet_hash"?: string | null,"packet_json"?: Json | null,"payer_email"?: string | null,"payer_name"?: string,"payer_outcome"?: Database["public"]['Enums']["payer_outcome"],"payer_outcome_at"?: string | null,"payer_outcome_note"?: string | null,"payer_wallet"?: string | null,"principal_written_off"?: boolean,"purchase_price"?: number,"purchased_at"?: string | null,"recipient_wallet"?: string,"reference"?: string,"reject_reason"?: string | null,"requested_amount"?: number,"status"?: Database["public"]['Enums']["receivable_status"],"submitted_at"?: string | null,"type"?: Database["public"]['Enums']["receivable_type"],"updated_at"?: string,"write_off_eligible_at"?: string | null,"written_off_principal"?: number
                   }
                   Relationships: [
                     {
@@ -244,7 +270,7 @@ isOneToOne: false
             [_ in never]: never
           }
           Enums: {
-            "call_reason": "none"|"payer_rejected"|"partial_shortfall"|"overdue","kyc_source": "manual","kyc_status": "not_started"|"pending"|"approved"|"rejected","notification_kind": "guaranty_requested"|"receivable_approved"|"receivable_funded"|"due_soon"|"guarantor_called","payer_outcome": "none"|"rejected"|"short_paid","receivable_status": "Draft"|"Submitted"|"Approved"|"Funded"|"GuarantorCalled"|"Settled"|"Recovered"|"WrittenOff"|"Rejected"|"Cancelled","receivable_type": "card_settlement"|"reimbursement"|"invoice"|"other","staff_role": "underwriter"|"attester"|"admin"
+            "call_reason": "none"|"payer_rejected"|"partial_shortfall"|"overdue","kyc_source": "manual","kyc_status": "not_started"|"pending"|"approved"|"rejected","notification_kind": "guaranty_requested"|"receivable_approved"|"receivable_funded"|"due_soon"|"guarantor_called","payer_outcome": "none"|"rejected"|"short_paid","receivable_status": "Draft"|"FinanceReview"|"Submitted"|"Approved"|"Funded"|"GuarantorCalled"|"Settled"|"Recovered"|"WrittenOff"|"Rejected"|"Cancelled","receivable_type": "card_settlement"|"reimbursement"|"invoice"|"other","staff_role": "underwriter"|"attester"|"admin"
           }
           CompositeTypes: {
             [_ in never]: never
@@ -360,7 +386,7 @@ export type CompositeTypes<
 export const Constants = {
   "public": {
           Enums: {
-            "call_reason": ["none", "payer_rejected", "partial_shortfall", "overdue"],"kyc_source": ["manual"],"kyc_status": ["not_started", "pending", "approved", "rejected"],"notification_kind": ["guaranty_requested", "receivable_approved", "receivable_funded", "due_soon", "guarantor_called"],"payer_outcome": ["none", "rejected", "short_paid"],"receivable_status": ["Draft", "Submitted", "Approved", "Funded", "GuarantorCalled", "Settled", "Recovered", "WrittenOff", "Rejected", "Cancelled"],"receivable_type": ["card_settlement", "reimbursement", "invoice", "other"],"staff_role": ["underwriter", "attester", "admin"]
+            "call_reason": ["none", "payer_rejected", "partial_shortfall", "overdue"],"kyc_source": ["manual"],"kyc_status": ["not_started", "pending", "approved", "rejected"],"notification_kind": ["guaranty_requested", "receivable_approved", "receivable_funded", "due_soon", "guarantor_called"],"payer_outcome": ["none", "rejected", "short_paid"],"receivable_status": ["Draft", "FinanceReview", "Submitted", "Approved", "Funded", "GuarantorCalled", "Settled", "Recovered", "WrittenOff", "Rejected", "Cancelled"],"receivable_type": ["card_settlement", "reimbursement", "invoice", "other"],"staff_role": ["underwriter", "attester", "admin"]
           }
         }
 } as const

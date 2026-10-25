@@ -1,12 +1,12 @@
 -- The browser's anon key, and a signed-in Supabase user, can't read or write any table.
 begin;
-select plan(36);
+select plan(38);
 
 -- the table list is pinned, so a new table fails here until it's added to the checks below
 select is(
   (select array_agg(c.relname::text order by c.relname) from pg_class c
    join pg_namespace n on n.oid = c.relnamespace where n.nspname = 'public' and c.relkind in ('r', 'p', 'v', 'm')),
-  array['admin_actions', 'guarantor_invites', 'ledger_txs', 'notifications', 'once_keys', 'org_officers', 'orgs', 'profiles', 'receivable_documents', 'receivables', 'staff', 'sync_state', 'wallets'],
+  array['admin_actions', 'guarantor_invites', 'ledger_txs', 'notifications', 'once_keys', 'org_members', 'org_officers', 'orgs', 'profiles', 'receivable_documents', 'receivables', 'staff', 'sync_state', 'wallets'],
   'public has exactly the expected tables'
 );
 
@@ -32,6 +32,8 @@ insert into public.profiles (wallet_address, privy_user_id, email) values ('rPEP
 insert into public.staff (wallet_address, role) values ('rLHzPsX6oXkzU2qL12kHCH8G8cnZv1rBJh', 'underwriter');
 insert into public.orgs (name) values ('Blockchain at Berkeley');
 insert into public.org_officers (org_id, wallet_address) select id, 'rHb9CJAWyB4rj91VRWn96DkukG4bwdtyTh' from public.orgs where name = 'Blockchain at Berkeley';
+insert into public.org_members (org_id, wallet_address, finance_agent, role_title)
+select id, 'rPEPPER7kfTD9w2To4CQk6UCfuHM9c6GDY', true, null from public.orgs where name = 'Blockchain at Berkeley';
 insert into public.receivables (id, type, org_id, recipient_wallet, payer_name, due_date, face_value, requested_amount, reference)
 select '00000000-0000-0000-0000-000000000001', 'reimbursement', id, 'rPEPPER7kfTD9w2To4CQk6UCfuHM9c6GDY', 'ASUC', current_date + 30, 1, 1, 'PR-1'
 from public.orgs where name = 'Blockchain at Berkeley';
@@ -58,6 +60,7 @@ select throws_ok('select * from public.guarantor_invites', '42501', null, 'anon 
 select throws_ok('select * from public.ledger_txs', '42501', null, 'anon cannot select ledger_txs');
 select throws_ok('select * from public.notifications', '42501', null, 'anon cannot select notifications');
 select throws_ok('select * from public.once_keys', '42501', null, 'anon cannot select once_keys');
+select throws_ok('select * from public.org_members', '42501', null, 'anon cannot select org_members');
 select throws_ok('select * from public.org_officers', '42501', null, 'anon cannot select org_officers');
 select throws_ok('select * from public.orgs', '42501', null, 'anon cannot select orgs');
 select throws_ok('select * from public.profiles', '42501', null, 'anon cannot select profiles');
@@ -81,6 +84,7 @@ select throws_ok('select * from public.guarantor_invites', '42501', null, 'authe
 select throws_ok('select * from public.ledger_txs', '42501', null, 'authenticated cannot select ledger_txs');
 select throws_ok('select * from public.notifications', '42501', null, 'authenticated cannot select notifications');
 select throws_ok('select * from public.once_keys', '42501', null, 'authenticated cannot select once_keys');
+select throws_ok('select * from public.org_members', '42501', null, 'authenticated cannot select org_members');
 select throws_ok('select * from public.org_officers', '42501', null, 'authenticated cannot select org_officers');
 select throws_ok('select * from public.orgs', '42501', null, 'authenticated cannot select orgs');
 select throws_ok('select * from public.profiles', '42501', null, 'authenticated cannot select profiles');

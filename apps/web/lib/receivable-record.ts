@@ -16,6 +16,9 @@ export function timeline(receivable: OffchainReceivable, onchain: ReceivableView
   const afterPurchase: DisplayState[] = ["Funded", "GuarantorCalled", "Settled", "Recovered", "WrittenOff"];
   const afterApproval: DisplayState[] = ["Approved", ...afterPurchase];
   const afterSubmit: DisplayState[] = ["Submitted", "Rejected", "Cancelled", ...afterApproval];
+  const sent = reached(afterSubmit) || state === "FinanceReview";
+  // a finance agent reviewed it when one cleared it, or it's waiting on one now
+  const needsFinance = state === "FinanceReview" || Boolean(receivable.financeClearedAt);
 
   // only an org's receivable waits on an officer before it can go for review
   const needsSignOff = receivable.guarantorWallet !== null;
@@ -26,15 +29,23 @@ export function timeline(receivable: OffchainReceivable, onchain: ReceivableView
       ? [
           {
             label: "Approver signed off",
-            status: (receivable.guarantySigned || reached(afterSubmit) ? "done" : receivable.packetHash ? "current" : "upcoming") as TimelineStep["status"],
+            status: (receivable.guarantySigned || sent ? "done" : receivable.packetHash ? "current" : "upcoming") as TimelineStep["status"],
           },
         ]
       : []),
     {
       label: "Sent for review",
       detail: at(onchain?.submittedAt),
-      status: reached(afterSubmit) ? "done" : readyToSend ? "current" : "upcoming",
+      status: sent ? "done" : readyToSend ? "current" : "upcoming",
     },
+    ...(needsFinance
+      ? [
+          {
+            label: "Finance agent",
+            status: (state === "FinanceReview" ? "current" : reached(afterSubmit) ? "done" : "upcoming") as TimelineStep["status"],
+          },
+        ]
+      : []),
   ];
   if (state === "Rejected") return [...steps, { label: "Not approved", status: "failed" }];
   if (state === "Cancelled") return [...steps, { label: "Cancelled", status: "failed" }];
