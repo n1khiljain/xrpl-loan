@@ -1,11 +1,11 @@
 "use client";
 
 import { ExternalLink } from "lucide-react";
-import { GradientPanel } from "@/components/app/gradient-panel";
 import { InfoNotice } from "@/components/app/notice";
 import { Topbar } from "@/components/app/topbar";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
+import { GlyphField } from "@/components/landing/glyph-field";
 import { VaultActions } from "@/components/lend/vault-actions";
 import { ASSET, accountUrl, config, ledgerReady } from "@/lib/config";
 import { usd } from "@/lib/format";
@@ -26,11 +26,22 @@ export default function LendPage() {
   return (
     <div>
       <Topbar title="Lending vault" crumb={`XRPL ${config.network.replace("xrpl-", "")}`} action={null} />
-      <div className="flex max-w-4xl flex-col gap-5">
-        <GradientPanel tone="ledger" className="flex flex-col gap-4 p-6 sm:p-7">
-          <span className="text-on-ink/75 text-[13px]">Single asset vault · {ASSET}</span>
-          <h2 className="display-type text-[28px] sm:text-[36px]">Fund loans, earn the interest</h2>
-          <p className="text-on-ink/82 max-w-xl text-sm leading-relaxed sm:text-[15px]">
+      <div className="flex max-w-5xl flex-col gap-6">
+        {/* the landing's orange lenders card: a white title, Night for the small text (white is too faint on this
+            orange at that size), and the vault's bank rising out of the bottom right corner. Phones leave the bank
+            out, where it would run into the title */}
+        <section className="bg-grad-feature text-ink relative isolate flex min-h-[260px] flex-col gap-4 overflow-hidden rounded-3xl p-6 sm:min-h-[280px] sm:p-8 sm:pr-[42%]">
+          <GlyphField
+            shape="bank"
+            seed={8}
+            cell={11}
+            anchor={1}
+            fit={1}
+            className="absolute -z-10 hidden sm:top-[8%] sm:-right-[2%] sm:-bottom-[12%] sm:block sm:w-[40%]"
+          />
+          <span className="text-sm">Single asset vault · {ASSET}</span>
+          <h2 className="display-type text-on-ink max-w-[16ch] text-[32px] sm:text-[44px]">Fund loans, earn the interest</h2>
+          <p className="mt-auto max-w-lg text-base leading-snug sm:text-lg">
             Lenders deposit {ASSET} into a private vault on the XRP Ledger. Verified businesses get an upfront loan from it,
             and pay it back with interest based on the loan horizon. A first-loss cushion from the loan broker sits in front of lenders.
           </p>
@@ -43,60 +54,62 @@ export default function LendPage() {
               </Button>
             </div>
           ) : null}
-        </GradientPanel>
+        </section>
 
-        {ledgerReady ? (
-          <Card>
-            <CardHeader>
-              <CardTitle>Vault series</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <VaultActions />
-            </CardContent>
-          </Card>
-        ) : (
-          <InfoNotice title="The vault isn't set up yet">
-            Deposits, withdrawals, and live vault numbers switch on once the vault, loan broker, and credential domain are
-            created on the ledger.
-          </InfoNotice>
-        )}
+        {/* the same white card as the expedite form: generous padding, sections well apart, a display heading over a muted line */}
+        <Card className="lg:py-10">
+          <CardContent className="flex flex-col gap-10 sm:px-8 lg:px-10">
+            <section className="flex flex-col gap-6">
+              <div className="space-y-3">
+                <h2 className="display-type text-2xl">Vault series</h2>
+                <p className="text-muted-foreground text-sm">Deposit into the series taking deposits. It lends after that and pays out on its date.</p>
+              </div>
+              {ledgerReady ? (
+                <VaultActions />
+              ) : (
+                <InfoNotice title="The vault isn't set up yet">
+                  Deposits, withdrawals, and live vault numbers switch on once the vault, loan broker, and credential domain are
+                  created on the ledger.
+                </InfoNotice>
+              )}
+            </section>
 
-        <Card>
-          <CardHeader>
-            <CardTitle>How it works</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <ol className="grid gap-4 sm:grid-cols-2">
-              {STEPS.map((step, i) => (
-                <li key={step.title} className="flex gap-3">
-                  <span className="bg-surface-muted flex size-8 shrink-0 items-center justify-center rounded-full text-[13px] font-semibold">{i + 1}</span>
-                  <span className="flex flex-col gap-0.5">
-                    <span className="text-sm font-semibold">{step.title}</span>
-                    <span className="text-muted-foreground text-sm">{step.body}</span>
-                  </span>
-                </li>
-              ))}
-            </ol>
-          </CardContent>
-        </Card>
+            <section className="flex flex-col gap-6">
+              <div className="space-y-3">
+                <h2 className="display-type text-2xl">How it works</h2>
+                <p className="text-muted-foreground text-sm">Four steps, in the order a lender meets them.</p>
+              </div>
+              <ol className="grid gap-3 sm:grid-cols-2">
+                {STEPS.map((step, i) => (
+                  <li key={step.title} className="border-border bg-surface flex gap-4 rounded-lg border px-5 py-4">
+                    <span className="bg-surface-muted flex size-8 shrink-0 items-center justify-center rounded-full text-[13px] font-semibold">{i + 1}</span>
+                    <span className="flex flex-col gap-1">
+                      <span className="text-sm font-semibold">{step.title}</span>
+                      <span className="text-muted-foreground text-sm leading-relaxed">{step.body}</span>
+                    </span>
+                  </li>
+                ))}
+              </ol>
+            </section>
 
-        <Card>
-          <CardHeader>
-            <CardTitle>Terms</CardTitle>
-          </CardHeader>
-          <CardContent className="grid gap-3 text-sm sm:grid-cols-3">
-            <div className="flex flex-col gap-0.5">
-              <span className="text-muted-foreground">Vault deposit cap</span>
-              <span className="tabular font-semibold">{usd(config.params.poolDepositCap)}</span>
-            </div>
-            <div className="flex flex-col gap-0.5">
-              <span className="text-muted-foreground">Largest single loan</span>
-              <span className="tabular font-semibold">{usd(config.params.perReceivableCap)}</span>
-            </div>
-            <div className="flex flex-col gap-0.5">
-              <span className="text-muted-foreground">Interest</span>
-              <span className="tabular font-semibold">{config.params.feeBps / 100}% a year</span>
-            </div>
+            <section className="flex flex-col gap-6">
+              <div className="space-y-3">
+                <h2 className="display-type text-2xl">Terms</h2>
+                <p className="text-muted-foreground text-sm">Set by the vault on the ledger, the same for every lender.</p>
+              </div>
+              <dl className="grid gap-3 sm:grid-cols-3">
+                {[
+                  ["Vault deposit cap", usd(config.params.poolDepositCap)],
+                  ["Largest single loan", usd(config.params.perReceivableCap)],
+                  ["Interest", `${config.params.feeBps / 100}% a year`],
+                ].map(([label, value]) => (
+                  <div key={label} className="border-border bg-surface flex flex-col gap-1 rounded-lg border px-5 py-4">
+                    <dt className="text-muted-foreground text-sm">{label}</dt>
+                    <dd className="money-type text-2xl">{value}</dd>
+                  </div>
+                ))}
+              </dl>
+            </section>
           </CardContent>
         </Card>
       </div>

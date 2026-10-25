@@ -5,7 +5,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { ErrorNotice, InfoNotice } from "@/components/app/notice";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent } from "@/components/ui/card";
+import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { useCall } from "@/hooks/use-api";
 import { ASSET, config } from "@/lib/config";
@@ -50,43 +50,54 @@ function SeriesCard({ series }: { series: VaultSeriesView }) {
   const canDeposit = series.phase === "subscription" || series.phase === "open";
   const canWithdraw = (series.phase === "closed" || series.phase === "open") && BigInt(series.yourShares) > 0n;
   return (
-    <Card data-testid={`series-${series.vaultId.slice(0, 8)}`}>
-      <CardContent className="flex flex-col gap-4 pt-6">
-        <div className="flex flex-col gap-0.5">
-          <span className="text-sm font-semibold">{seriesName(series)}</span>
+    // a bordered tile like the expedite form's options, with each figure in its own tile and the amount labelled above its field
+    <div data-testid={`series-${series.vaultId.slice(0, 8)}`} className="border-border bg-surface flex flex-col gap-6 rounded-lg border px-5 py-5 sm:px-6">
+        <div className="flex flex-col gap-1">
+          <span className="text-base font-semibold">{seriesName(series)}</span>
           <span className="text-muted-foreground text-sm">{seriesStage(series)}</span>
         </div>
-        <div className="grid gap-3 text-sm sm:grid-cols-3">
-          <Stat label="In this series" value={usd(series.assetsTotal)} />
-          <Stat label="Available to lend" value={usd(series.assetsAvailable)} />
-          <Stat label="Your share" value={usd(series.yourValue)} />
-        </div>
+        <dl className="grid gap-3 sm:grid-cols-3">
+          {[
+            ["In this series", usd(series.assetsTotal)],
+            ["Available to lend", usd(series.assetsAvailable)],
+            ["Your share", usd(series.yourValue)],
+          ].map(([label, value]) => (
+            <div key={label} className="bg-surface-muted flex flex-col gap-1 rounded-lg px-4 py-3">
+              <dt className="text-muted-foreground text-sm">{label}</dt>
+              <dd className="money-type text-xl">{value}</dd>
+            </div>
+          ))}
+        </dl>
         {canDeposit || canWithdraw ? (
-          <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
-            <Input inputMode="decimal" placeholder="0.00" aria-label={`Amount of ${ASSET}`} value={amount} onChange={(event) => setAmount(event.target.value)} />
-            <div className="flex gap-2">
-              {canDeposit ? (
-                <Button disabled={send.isPending} onClick={() => send.mutate("deposit")} data-testid="vault-deposit">
-                  Deposit
-                </Button>
-              ) : null}
-              {canWithdraw ? (
-                <Button variant="outline" disabled={send.isPending} onClick={() => send.mutate("withdraw")} data-testid="vault-withdraw">
-                  Withdraw
-                </Button>
-              ) : null}
+          <div className="space-y-3">
+            <Label htmlFor={`amount-${series.vaultId}`} className="text-sm font-semibold">
+              Amount of {ASSET}
+            </Label>
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
+              <Input id={`amount-${series.vaultId}`} inputMode="decimal" placeholder="0.00" value={amount} onChange={(event) => setAmount(event.target.value)} />
+              <div className="flex gap-3">
+                {canDeposit ? (
+                  <Button size="lg" disabled={send.isPending} onClick={() => send.mutate("deposit")} data-testid="vault-deposit">
+                    Deposit
+                  </Button>
+                ) : null}
+                {canWithdraw ? (
+                  <Button size="lg" variant="secondary" disabled={send.isPending} onClick={() => send.mutate("withdraw")} data-testid="vault-withdraw">
+                    Withdraw
+                  </Button>
+                ) : null}
+              </div>
             </div>
           </div>
         ) : (
-          <p className="text-muted-foreground text-xs">
+          <p className="text-muted-foreground text-sm">
             {series.phase === "lending" && BigInt(series.yourShares) > 0n
               ? `Your share is lent out. You can withdraw it once the series pays out${series.redemptionAt ? ` on ${dateFromSeconds(series.redemptionAt)}` : ""}.`
               : "Deposits closed when this series started lending."}
           </p>
         )}
         {send.isError ? <ErrorNotice>{friendlyError(send.error)}</ErrorNotice> : null}
-      </CardContent>
-    </Card>
+    </div>
   );
 }
 
@@ -114,7 +125,7 @@ export function VaultActions() {
             Your wallet: <span className="tabular font-semibold">{usd(data.balance)}</span> {ASSET}
           </p>
           {config.asset.standIn ? (
-            <Button variant="outline" size="sm" disabled={draw.isPending} onClick={() => draw.mutate()} data-testid="vault-draw">
+            <Button variant="secondary" size="sm" disabled={draw.isPending} onClick={() => draw.mutate()} data-testid="vault-draw">
               {draw.isPending ? "Sending..." : `Get ${usd(TEST_DRAW_UNITS)} test ${ASSET}`}
             </Button>
           ) : null}
