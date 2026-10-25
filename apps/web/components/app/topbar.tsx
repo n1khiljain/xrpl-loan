@@ -50,8 +50,17 @@ export function Topbar({
 }) {
   return (
     <header className={cn("mb-5 flex flex-col gap-4 lg:mb-6", className)}>
-      <div className="flex items-center justify-between text-xl lg:hidden">
-        <ClientLockup />
+      <div className="flex items-center justify-between lg:hidden">
+        <span className="flex text-xl">
+          <ClientLockup />
+        </span>
+        <Link
+          href="/"
+          data-testid="main-site-phone"
+          className="text-muted-foreground hover:text-foreground flex items-center gap-1.5 text-sm font-medium transition-colors"
+        >
+          <ArrowLeft aria-hidden className="size-4" /> Main site
+        </Link>
       </div>
       {back ? (
         <Link

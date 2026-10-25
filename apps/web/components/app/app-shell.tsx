@@ -4,6 +4,7 @@ import { useQuery } from "@tanstack/react-query";
 import {
   AlertTriangle,
   ArrowDownToLine,
+  ArrowLeft,
   ChartColumn,
   FileText,
   Handshake,
@@ -118,6 +119,7 @@ function Sidebar({ area, logos, active }: { area: Area; logos: LogoFiles; active
   const name = me.data?.profile?.displayName ?? (session.status === "signed-in" ? "Signed in" : "Not signed in");
   const meta = me.data?.profile?.email ?? SECTION[area];
   const others: { href: string; label: string }[] = [
+    { href: "/", label: "Main site" },
     ...(area !== "member" ? [{ href: "/receivables/", label: "Member home" }] : []),
     ...(area !== "lender" ? [{ href: "/lend/", label: "Lend to the vault" }] : []),
     ...(area !== "admin" && me.data?.staffRole ? [{ href: "/admin/", label: "Admin" }] : []),
@@ -160,15 +162,19 @@ function Sidebar({ area, logos, active }: { area: Area; logos: LogoFiles; active
           })}
         </ul>
         <div className="relative mt-auto flex flex-col gap-2.5">
-          {others.length ? (
-            <div className="flex flex-col gap-0.5">
-              {others.map((o) => (
-                <Link key={o.href} href={o.href} className="text-on-ink/60 hover:text-on-ink rounded-sm px-3 py-1.5 text-[13px] font-medium">
-                  {o.label}
-                </Link>
-              ))}
-            </div>
-          ) : null}
+          <div className="flex flex-col gap-0.5">
+            {others.map((o) => (
+              <Link
+                key={o.href}
+                href={o.href}
+                data-testid={o.href === "/" ? "main-site" : undefined}
+                className="text-on-ink/60 hover:text-on-ink flex items-center gap-1.5 rounded-sm px-3 py-1.5 text-[13px] font-medium"
+              >
+                {o.href === "/" ? <ArrowLeft aria-hidden className="size-3.5" /> : null}
+                {o.label}
+              </Link>
+            ))}
+          </div>
           <div className="border-on-ink/10 bg-on-ink/7 flex items-center gap-2.5 rounded-lg border p-3 backdrop-blur">
             <Avatar name={me.data?.profile?.displayName} onInk />
             <span className="flex min-w-0 flex-1 flex-col gap-0.5">
