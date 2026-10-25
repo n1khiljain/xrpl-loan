@@ -50,7 +50,7 @@ function DeckCard({ stage, depth, reduced }: { stage: Stage; depth: number; redu
       animate={
         dealt && !reduced
           ? {
-              x: [0, -300, -300, place.x],
+              x: [0, -50, -50, place.x],
               y: [0, 16, 16, place.y],
               scale: [1, 0.96, 0.96, place.scale],
               zIndex: [PLACES.length + 1, PLACES.length + 1, 0, z],
@@ -104,12 +104,17 @@ export function CardJourney() {
         viewport={{ once: true, amount: 0.2 }}
         transition={{ scale: { type: "spring", stiffness: 80, damping: 18, mass: 1.5 }, opacity: { duration: 0.8, ease: EASE } }}
       >
-        {/* the four states as one deck; on phones the whole deck is drawn at 80% */}
-        <div className="absolute inset-0 origin-top scale-[0.8] sm:scale-100">
+        {/* the four states as one deck, and clicking it deals the next card; on phones the whole deck is drawn at 80% */}
+        <button
+          type="button"
+          aria-label={`Show the next state: ${(STAGES[(current + 1) % STAGES.length] ?? STAGES[0]!).label}`}
+          onClick={() => setCurrent((c) => (c + 1) % STAGES.length)}
+          className="absolute inset-0 block origin-top scale-[0.8] cursor-pointer rounded-3xl focus-visible:ring-[3px] focus-visible:ring-on-ink/40 focus-visible:outline-none sm:scale-100"
+        >
           {STAGES.map((s, i) => (
             <DeckCard key={s.state} stage={s} depth={(i - current + STAGES.length) % STAGES.length} reduced={Boolean(reduced)} />
           ))}
-        </div>
+        </button>
       </motion.div>
 
       {/* on desktop the column runs the deck's full height: the heading meets the card's top, the states and their line its bottom */}
