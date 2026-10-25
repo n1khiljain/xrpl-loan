@@ -95,14 +95,14 @@ isOneToOne: false
                   ]
                 },"org_members": {
                   Row: {
-                    "finance_agent": boolean,"org_id": number,"role_title": string | null,"wallet_address": string,"created_at": string
+                    "created_at": string,"finance_agent": boolean,"org_id": number,"role_title": string | null,"wallet_address": string
                   }
                   ComputedFields: never
                   Insert: {
-                    "finance_agent"?: boolean,"org_id": number,"role_title"?: string | null,"wallet_address": string,"created_at"?: string
+                    "created_at"?: string,"finance_agent"?: boolean,"org_id": number,"role_title"?: string | null,"wallet_address": string
                   }
                   Update: {
-                    "finance_agent"?: boolean,"org_id"?: number,"role_title"?: string | null,"wallet_address"?: string,"created_at"?: string
+                    "created_at"?: string,"finance_agent"?: boolean,"org_id"?: number,"role_title"?: string | null,"wallet_address"?: string
                   }
                   Relationships: [
                     {
@@ -267,7 +267,9 @@ isOneToOne: false
             [_ in never]: never
           }
           Functions: {
-            [_ in never]: never
+            "generate_join_code":
+{ Args: Record<PropertyKey, never>; Returns: string
+                           }
           }
           Enums: {
             "call_reason": "none"|"payer_rejected"|"partial_shortfall"|"overdue","kyc_source": "manual","kyc_status": "not_started"|"pending"|"approved"|"rejected","notification_kind": "guaranty_requested"|"receivable_approved"|"receivable_funded"|"due_soon"|"guarantor_called","payer_outcome": "none"|"rejected"|"short_paid","receivable_status": "Draft"|"FinanceReview"|"Submitted"|"Approved"|"Funded"|"GuarantorCalled"|"Settled"|"Recovered"|"WrittenOff"|"Rejected"|"Cancelled","receivable_type": "card_settlement"|"reimbursement"|"invoice"|"other","staff_role": "underwriter"|"attester"|"admin"
