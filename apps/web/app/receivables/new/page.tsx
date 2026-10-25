@@ -305,7 +305,10 @@ function WizardForm({ me, initial }: { me: MeResponse; initial: ReceivableWithDo
                           </Label>
                         ))}
                       </RadioGroup>
-                      <p className="text-muted-foreground pt-1 text-sm">Someone at the business signs off as approver and covers what&apos;s left if the payment never arrives.</p>
+                      <p className="text-muted-foreground pt-1 text-sm">
+                        An approver at the business signs off and covers what&apos;s left if the payment never arrives.
+                        {financeFirst ? " Your finance agents can look it over, and Install approves it." : ""}
+                      </p>
                     </div>
                   ) : null}
 
@@ -526,7 +529,7 @@ function WizardForm({ me, initial }: { me: MeResponse; initial: ReceivableWithDo
                   <p className="text-sm">
                     You&apos;ll get {usd(requestedUnits)} now. When {payerName.trim() || "the payer"} pays you, pay {usd(due)} back to the vault, with interest.
                     {withOfficer ? ` ${guarantorName} gets an email to sign off first.` : ""}
-                    {financeFirst ? ` A finance agent at ${me.membership?.name} reviews it before an admin approves it.` : ""}
+                    {financeFirst ? ` A finance agent at ${me.membership?.name} can look it over, and an admin approves it.` : ""}
                   </p>
                   <div className="flex flex-col-reverse gap-3 pt-2 sm:flex-row sm:items-center sm:justify-between">
                     <Button variant="secondary" size="lg" className="w-full sm:w-auto" onClick={() => setStep(step - 1)} disabled={busy}>

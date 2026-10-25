@@ -13,12 +13,12 @@ import { cn } from "@/lib/utils";
 const CARDS: { title: string; detail: string; shape: ShapeName }[] = [
   {
     title: "Liquidity up front",
-    detail: `The lending vault pays the loan in ${ASSET} once a reviewer approves it.`,
+    detail: `The lending vault pays the loan in ${ASSET} once an Install reviewer approves it.`,
     shape: "drop",
   },
   {
-    title: "Signed off at your business",
-    detail: "Someone at your business confirms the payment. If it never arrives, they cover the rest.",
+    title: "Reviewed by your own team",
+    detail: "An approver at your business signs off and backs the loan, and your finance agents can review it alongside Install.",
     shape: "pen",
   },
   {
@@ -33,7 +33,7 @@ export function FeatureGrid() {
     <section className="bg-surface w-full">
       <div className="mx-auto flex w-full max-w-[1440px] flex-col gap-10 px-4 py-16 sm:px-6 lg:gap-16 lg:px-10 lg:py-28">
         <div className="flex flex-col justify-between gap-6 lg:flex-row lg:gap-12">
-          <h2 className="display-type max-w-[16ch] text-[clamp(2rem,4vw,3.25rem)]">Liquidity for the payments you choose</h2>
+          <h2 className="display-type max-w-[16ch] text-[clamp(2rem,4vw,3.25rem)]">Built for the gap between invoice and payout</h2>
           <p className="text-muted-foreground max-w-md text-base leading-relaxed sm:text-lg">
             Install lets a business expedite a transaction, transfer, or payment. A lending vault on the XRP Ledger pays
             the loan up front, and you pay it back with interest based on the loan horizon.

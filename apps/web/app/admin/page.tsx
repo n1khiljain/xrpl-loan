@@ -39,7 +39,8 @@ function useQueue() {
     queryFn: async () => {
       const { receivables } = await call<{ receivables: OffchainReceivable[] }>("receivables", { query: { scope: "all" } });
       const items: QueueItem[] = receivables
-        .filter((c) => c.status === "Submitted" && c.ledger)
+        // requests still with an organization's finance agent too: an admin can approve without waiting
+        .filter((c) => (c.status === "Submitted" || c.status === "FinanceReview") && c.ledger)
         .map((receivable) => ({ receivable, ledger: receivableViewFromJson(receivable.ledger!) }))
         .sort((a, b) => a.ledger.submittedAt - b.ledger.submittedAt);
       const cap = BigInt(config.params.perOrgCap);
@@ -128,7 +129,7 @@ function ReviewCard({
             <Money units={ledger.requestedAmount} size="lg" />
             {receivable.description ? <p className="text-on-ink/80 max-w-md text-sm leading-snug">{receivable.description}</p> : null}
           </div>
-          <StateChip state="Submitted" className="text-on-ink shrink-0" />
+          <StateChip state={receivable.status === "FinanceReview" ? "FinanceReview" : "Submitted"} className="text-on-ink shrink-0" />
         </div>
       </GradientPanel>
       <CardContent className="flex flex-col gap-5 pt-5">
@@ -239,7 +240,7 @@ function Queue() {
   return (
     <div className="flex flex-col gap-5 lg:flex-row lg:items-start">
       <nav aria-label="Waiting for review" className="bg-card shadow-card flex shrink-0 flex-col gap-1 rounded-3xl p-3 lg:sticky lg:top-6 lg:w-80">
-        <span className="eyebrow text-muted-foreground px-2.5 pt-1.5 pb-2">Submitted {items.length}</span>
+        <span className="eyebrow text-muted-foreground px-2.5 pt-1.5 pb-2">Waiting for review {items.length}</span>
         {items.map(({ ledger, receivable }) => {
           const id = ledger.id.toString();
           const on = id === activeId;

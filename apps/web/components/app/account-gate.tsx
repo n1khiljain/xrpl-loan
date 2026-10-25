@@ -273,7 +273,7 @@ function SetUpAccount() {
         <span className="text-muted-foreground text-xs font-medium">One last thing</span>
         <h2 className="display-type text-3xl">What should we call you?</h2>
         <p className="text-muted-foreground text-sm leading-relaxed">
-          Your name shows on your loans and sign-offs.
+          Your name shows on your loans and approvals.
           {session.email ? (
             <>
               {" "}

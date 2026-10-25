@@ -25,7 +25,7 @@ const STEPS = [
 export default function LendPage() {
   return (
     <div>
-      <Topbar title="Lending vault" crumb={`XRPL ${config.network.replace("xrpl-", "")}`} action={null} />
+      <Topbar title="Lending vault" crumb={`XRPL ${config.network.replace("xrpl-", "").replace(/^./, (c) => c.toUpperCase())}`} action={null} />
       <div className="flex max-w-5xl flex-col gap-6">
         {/* the landing's orange lenders card: a white title, Night for the small text (white is too faint on this
             orange at that size), and the vault's bank rising out of the bottom right corner. Phones leave the bank

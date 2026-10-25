@@ -101,7 +101,7 @@ function navFor(area: Area, guaranties: number, finance = 0): NavItem[] {
     { key: "home", label: "Home", href: "/receivables/", icon: House, badge: finance || undefined },
     { key: "new", label: "Expedite a payment", href: "/receivables/new/", icon: Plus, primary: true },
     { key: "receivables", label: "My loans", href: "/receivables/?view=receivables", icon: FileText },
-    { key: "guaranties", label: "Sign-offs", href: "/receivables/?view=guaranties", icon: Handshake, badge: guaranties || undefined },
+    { key: "guaranties", label: "Approvals", href: "/receivables/?view=guaranties", icon: Handshake, badge: guaranties || undefined },
     { key: "verify", label: "Verification", href: "/onboard/", icon: ShieldCheck },
   ];
 }

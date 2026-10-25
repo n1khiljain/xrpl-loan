@@ -13,7 +13,7 @@ import { cn } from "@/lib/utils";
 
 const TILES = [
   {
-    href: "/claims/new/",
+    href: "/receivables/new/",
     label: "For businesses",
     title: "Get paid now for the payment you're waiting on",
     tone: "orange",

@@ -1,6 +1,6 @@
 "use client";
 
-import { formatJoinCode, type ReceivableView } from "@app/adapters";
+import type { ReceivableView } from "@app/adapters";
 import { useQuery } from "@tanstack/react-query";
 import { ArrowRight } from "lucide-react";
 import { motion } from "motion/react";
@@ -64,7 +64,7 @@ function resolveOrgName(rows: Row[], orgs: DirectoryOrg[] | undefined): string |
 }
 
 function crumbFor(me: MeResponse, orgName: string | null): string {
-  if (me.membership) return `${me.membership.name} · ${formatJoinCode(me.membership.joinCode)}`;
+  if (me.membership) return me.membership.name;
   if (me.officerOrgs.length > 0) return me.officerOrgs.map((o) => o.name).join(", ");
   return orgName ?? "Borrower";
 }
@@ -222,7 +222,7 @@ function EmptyReceivables({ title, detail }: { title: string; detail: string }) 
 }
 
 const EMPTY_LOANS = { title: "No loans yet", detail: "Name a payment you're waiting on, and the vault pays you up front once a reviewer approves it." };
-const EMPTY_SIGNOFFS = { title: "No sign-offs yet", detail: "When a teammate asks you to approve a loan for your business, it shows up here." };
+const EMPTY_SIGNOFFS = { title: "No approvals yet", detail: "When a teammate asks you to approve a loan for your business, it shows up here." };
 
 const TABS = [
   { value: "open", label: "Open" },
@@ -320,7 +320,8 @@ function FinanceCard({ row }: { row: Row }) {
 }
 
 function HomeView({ rows }: { rows: Row[] }) {
-  const [figure, setFigure] = useState<Figure>("due");
+  // until the person picks a figure, show the one that needs them: what's owed, else what's ready to collect
+  const [picked, setFigure] = useState<Figure | null>(null);
   if (rows.length === 0) return <EmptyReceivables {...EMPTY_LOANS} />;
   const mine = rows.filter((r) => r.role === "seller");
   const dueRows = mine.filter((r) => r.state === "Funded" || r.state === "GuarantorCalled");
@@ -330,10 +331,14 @@ function HomeView({ rows }: { rows: Row[] }) {
   const year = new Date().getFullYear();
   const settledRows = mine.filter((r) => (r.state === "Settled" || r.state === "Recovered") && new Date(r.receivable.updatedAt).getFullYear() === year);
   const settledThisYear = settledRows.reduce((sum, r) => sum + amountFor(r), 0n);
+  const figure: Figure = picked ?? (due === 0n && ready > 0n ? "ready" : "due");
   const shown = {
-    due: { value: due, caption: `From ${receivableCount(dueRows.length)}. Pay it back, with interest, when the payment arrives.` },
-    ready: { value: ready, caption: `From ${receivableCount(readyRows.length)}, approved and ready to collect.` },
-    settled: { value: settledThisYear, caption: `From ${receivableCount(settledRows.length)} closed out in ${year}.` },
+    due: {
+      value: due,
+      caption: dueRows.length ? `From ${receivableCount(dueRows.length)}. Pay it back, with interest, when the payment arrives.` : "Nothing to pay back right now.",
+    },
+    ready: { value: ready, caption: readyRows.length ? `From ${receivableCount(readyRows.length)}, approved and ready to collect.` : "Nothing approved and waiting yet." },
+    settled: { value: settledThisYear, caption: settledRows.length ? `From ${receivableCount(settledRows.length)} closed out in ${year}.` : `Nothing closed out yet in ${year}.` },
   }[figure];
   const funded = mine.find((r) => r.state === "Funded");
   const settleHref = funded ? `/receivable/?id=${funded.receivable.id}` : null;
@@ -403,7 +408,7 @@ function ReceivablesView({ me }: { me: MeResponse }) {
   const orgs = useOrgs();
   const firstName = (me.profile?.displayName ?? "").trim().split(/\s+/)[0] || "there";
   const orgName = resolveOrgName(rows.data ?? [], orgs.data);
-  const title = view === "receivables" ? "My loans" : view === "guaranties" ? "Sign-offs" : `Hi, ${firstName}`;
+  const title = view === "receivables" ? "My loans" : view === "guaranties" ? "Approvals" : `Hi, ${firstName}`;
   const crumb = view ? undefined : crumbFor(me, orgName);
 
   return (
@@ -427,7 +432,7 @@ function ReceivablesView({ me }: { me: MeResponse }) {
 
 export default function ReceivablesPage() {
   return (
-    <AccountGate reason="Sign in to see your loans and sign-offs.">
+    <AccountGate reason="Sign in to see your loans and approvals.">
       {(me) => (
         <Suspense fallback={<Skeleton className="h-96 w-full rounded-3xl" />}>
           <ReceivablesView me={me} />

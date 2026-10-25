@@ -132,13 +132,28 @@ Deno.test("a finance agent sends a request to an admin, who can then approve it"
   await w.db.insertMember({ orgId: 1, wallet: w.guarantor.wallet, financeAgent: true, roleTitle: null });
   const submitted = await w.act(w.seller.token, { action: "submit" });
   assertEquals((submitted.body.receivable as { status: string }).status, "FinanceReview");
-  assertStatus(await w.act(w.underwriter.token, { action: "approve", amount: "350000000" }), 409, "invalid_state");
   assertStatus(await w.act(w.seller.token, { action: "send-to-admin" }), 403);
   assertStatus(await w.act(w.outsider.token, { action: "send-to-admin" }), 403);
   const released = await w.act(w.guarantor.token, { action: "send-to-admin" });
   assertEquals((released.body.receivable as { status: string; financeClearedAt: string | null }).financeClearedAt !== null, true);
   assertEquals((released.body.receivable as { status: string }).status, "Submitted");
   assertStatus(await w.act(w.underwriter.token, { action: "approve", amount: "350000000" }), 200);
+});
+
+Deno.test("an admin can approve or reject a request without waiting for finance review", async () => {
+  const w = await world();
+  await w.db.insertMember({ orgId: 1, wallet: w.seller.wallet, financeAgent: false, roleTitle: "Buyer" });
+  await w.db.insertMember({ orgId: 1, wallet: w.guarantor.wallet, financeAgent: true, roleTitle: null });
+  await w.act(w.seller.token, { action: "submit" });
+  const approved = await w.act(w.underwriter.token, { action: "approve", amount: "350000000" });
+  assertStatus(approved, 200);
+  assertEquals((approved.body.receivable as { status: string }).status, "Approved");
+
+  const r = await world();
+  await r.db.insertMember({ orgId: 1, wallet: r.seller.wallet, financeAgent: false, roleTitle: "Buyer" });
+  await r.db.insertMember({ orgId: 1, wallet: r.guarantor.wallet, financeAgent: true, roleTitle: null });
+  await r.act(r.seller.token, { action: "submit" });
+  assertEquals(((await r.act(r.underwriter.token, { action: "reject", reason: "other" })).body.receivable as { status: string }).status, "Rejected");
 });
 
 Deno.test("the only finance agent, or a seller with no organization, goes straight to an admin", async () => {

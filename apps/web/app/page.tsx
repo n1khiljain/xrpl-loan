@@ -7,8 +7,8 @@ import { LandingNav } from "@/components/landing/landing-nav";
 
 /*
  * The landing page, laid out after smallest.ai: a plain top bar, the headline over a row of step cards, the feature
- * band, the product tour, who it's for, the FAQ, and a closing call to action over the footer
- * links. White throughout, with spot orange and Night carrying the colour. The copy is ours.
+ * band, the product tour, who it's for, and the FAQ last, over the footer links. White throughout, with spot orange
+ * and Night carrying the colour. The copy is ours.
  */
 
 export default function Landing() {

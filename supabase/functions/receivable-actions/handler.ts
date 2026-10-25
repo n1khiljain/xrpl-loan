@@ -113,7 +113,8 @@ export function createReceivableActionsHandler(deps: ReceivableActionsDeps): Han
         if (amount > perReceivableCap) throw badRequest("that's over the per-receivable cap", "over_cap");
         const recipient = await db.getProfile(receivable.recipientWallet);
         if (recipient?.kycStatus !== "approved") throw conflict("the seller isn't verified", "kyc_required");
-        const moved = await move(receivable, ["Submitted"], {
+        // an admin doesn't have to wait for the organization's finance agent
+        const moved = await move(receivable, ["FinanceReview", "Submitted"], {
           status: "Approved",
           approvedAmount: amount.toString(),
           approvedBy: caller.profile.wallet,
@@ -127,7 +128,7 @@ export function createReceivableActionsHandler(deps: ReceivableActionsDeps): Han
 
       case "reject": {
         requireStaff(caller, ["underwriter", "admin"]);
-        const moved = await move(receivable, ["Submitted"], { status: "Rejected", rejectReason: body.reason });
+        const moved = await move(receivable, ["FinanceReview", "Submitted"], { status: "Rejected", rejectReason: body.reason });
         await log(caller, "reject", receivable, { reason: body.reason });
         return moved;
       }

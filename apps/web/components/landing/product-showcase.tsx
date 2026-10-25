@@ -38,7 +38,7 @@ const NAV: { label: string; icon: LucideIcon }[] = [
   { label: "Home", icon: House },
   { label: "Expedite a payment", icon: Plus },
   { label: "My loans", icon: FileText },
-  { label: "Sign-offs", icon: Handshake },
+  { label: "Approvals", icon: Handshake },
   { label: "Verification", icon: ShieldCheck },
 ];
 
@@ -237,18 +237,18 @@ const STEPS: { key: StepKey; tab: string; title: string; detail: string; page: s
     key: "name",
     tab: "Name the payment",
     title: "Name the payment",
-    detail: "Add the payment reference and documents, and choose someone at your business to approve the loan.",
+    detail: "Add the payment reference and documents. An approver at your business signs off, and your finance team can look it over.",
     page: "Expedite a payment",
-    cta: { label: "Expedite a payment", href: "/claims/new/" },
+    cta: { label: "Expedite a payment", href: "/receivables/new/" },
     Screen: BorrowView,
   },
   {
     key: "loan",
     tab: "Get the loan",
     title: "Get the loan",
-    detail: `After a reviewer approves it, press one button and the vault sends ${ASSET} to your wallet.`,
+    detail: `After an Install reviewer approves it, press one button and the vault sends ${ASSET} to your wallet.`,
     page: "My loans",
-    cta: { label: "See my loans", href: "/claims/?view=claims" },
+    cta: { label: "See my loans", href: "/receivables/?view=receivables" },
     Screen: LoanView,
   },
   {
@@ -257,7 +257,7 @@ const STEPS: { key: StepKey; tab: string; title: string; detail: string; page: s
     title: "Pay it back with interest",
     detail: "Pay the loan back with interest by the end of its horizon. Then it's closed out.",
     page: "My loans",
-    cta: { label: "See my loans", href: "/claims/?view=claims" },
+    cta: { label: "See my loans", href: "/receivables/?view=receivables" },
     Screen: RepayView,
   },
 ];
@@ -321,7 +321,7 @@ export function ProductShowcase() {
   };
   return (
     <section id="how" aria-labelledby="how-title" className="bg-surface w-full scroll-mt-24">
-      <div id="product" className="mx-auto flex w-full max-w-[1440px] scroll-mt-24 flex-col gap-10 px-4 py-16 sm:px-6 lg:gap-16 lg:px-10 lg:py-28">
+      <div className="mx-auto flex w-full max-w-[1440px] flex-col gap-10 px-4 py-16 sm:px-6 lg:gap-16 lg:px-10 lg:py-28">
         <div className="flex flex-col justify-between gap-6 lg:flex-row lg:gap-12">
           <h2 id="how-title" className="display-type max-w-[16ch] text-[clamp(2rem,4vw,3.25rem)]">
             How it works
@@ -412,62 +412,3 @@ export function ProductShowcase() {
   );
 }
 
-// the closing still's loans: one paid out, one approved, one in review, so the list shows the states at a glance
-const RECENT: { ref: string; units: bigint; state: "Funded" | "Approved" | "Submitted" }[] = [
-  { ref: "INV-20418", units: SAMPLE, state: "Funded" },
-  { ref: "INV-20431", units: 1_150_000_000n, state: "Approved" },
-  { ref: "INV-20447", units: 860_000_000n, state: "Submitted" },
-];
-
-/** A calm home screen for the closing still: what's out on loan, and the latest loans in one tidy list. */
-function PreviewHome() {
-  return (
-    <div className="flex min-w-0 flex-1 flex-col">
-      <PageTop title="Home" meta={ORG} />
-      <div className="flex flex-col gap-8 px-5 pt-6 sm:px-8 sm:pt-8">
-        <div className="flex items-end justify-between gap-6">
-          <div className="flex flex-col gap-1.5">
-            <span className="text-muted-foreground text-sm">On loan to you</span>
-            <span className="money-type text-4xl">{usd(SAMPLE)}</span>
-          </div>
-          <span className={cn(buttonVariants({ size: "sm" }), "hidden shrink-0 xl:inline-flex")}>
-            <Plus className="size-4" strokeWidth={2.2} />
-            Expedite a payment
-          </span>
-        </div>
-        <div className="flex flex-col gap-3">
-          <span className="text-sm font-semibold">Recent loans</span>
-          <ul className="border-border divide-divider divide-y rounded-2xl border">
-            {RECENT.map((loan) => (
-              <li key={loan.ref} className="flex items-center justify-between gap-4 px-4 py-4 text-sm whitespace-nowrap sm:px-5">
-                <span className="flex min-w-0 items-center gap-3">
-                  <span className="bg-surface-muted flex size-8 shrink-0 items-center justify-center rounded-full">
-                    <FileText className="size-4" strokeWidth={1.7} />
-                  </span>
-                  <span className="truncate font-semibold">{loan.ref}</span>
-                </span>
-                <span className="flex items-center gap-4">
-                  <span className="tabular font-semibold">{usd(loan.units)}</span>
-                  <StateChip state={loan.state} className="hidden sm:inline-flex" />
-                </span>
-              </li>
-            ))}
-          </ul>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-/** One still of the app, framed in a light bezel, for the page's closing call to action. */
-export function AppPreview({ className }: { className?: string }) {
-  return (
-    // the bezel's corner is the screen's 20px radius plus its 8px of padding, as in the showcase above
-    <div aria-hidden className={cn("bg-divider rounded-t-[28px] p-2 pb-0", className)}>
-      <div className="bg-surface text-foreground flex h-full overflow-hidden rounded-t-2xl">
-        <Sidebar active="Home" />
-        <PreviewHome />
-      </div>
-    </div>
-  );
-}
