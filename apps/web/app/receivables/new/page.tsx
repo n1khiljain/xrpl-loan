@@ -305,7 +305,10 @@ function WizardForm({ me, initial }: { me: MeResponse; initial: ReceivableWithDo
                           </Label>
                         ))}
                       </RadioGroup>
-                      <p className="text-muted-foreground pt-1 text-sm">Someone at the business signs off as approver and covers what&apos;s left if the payment never arrives.</p>
+                      <p className="text-muted-foreground pt-1 text-sm">
+                        An approver at the business signs off and covers what&apos;s left if the payment never arrives.
+                        {financeFirst ? " Your finance agents review it next, then Install." : ""}
+                      </p>
                     </div>
                   ) : null}
 

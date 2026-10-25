@@ -2,7 +2,7 @@
 
 import { useQuery } from "@tanstack/react-query";
 import { ArrowRight } from "lucide-react";
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { PUBLIC_ENV } from "@/lib/env";
 import { DEV_SESSION_KEY, type DevSessionSeed } from "@/lib/session/types";
 
@@ -28,10 +28,10 @@ function signInAs(person: DemoPerson) {
   window.location.assign(HOME[person.role] ?? "/receivables/");
 }
 
-export function LocalDemoPicker() {
-  const people = useQuery({
+function useDemoPeople(enabled = true) {
+  return useQuery({
     queryKey: ["local-demo-sessions"],
-    enabled: PUBLIC_ENV.demoSessions,
+    enabled: PUBLIC_ENV.demoSessions && enabled,
     retry: false,
     queryFn: async () => {
       const res = await fetch("/local-demo-sessions.json", { cache: "no-store" });
@@ -39,14 +39,35 @@ export function LocalDemoPicker() {
       return (await res.json()) as DemoPerson[];
     },
   });
+}
 
-  // `?as=seller` (or guarantor, lender, staff) signs this tab in as that person, so a demo can open one tab per
-  // person already signed in; sessions are per tab
+/**
+ * `?as=seller` (or guarantor, lender, staff) signs this tab in as that person, so a demo can open one tab per person
+ * already signed in; sessions are per tab. Mounted on every page, so it also switches a tab that's signed in as
+ * someone else. It stays on the page asked for, minus `as`, and reloads because the session is read once on load.
+ */
+export function DemoAsSwitch() {
+  const [as] = useState(() => (typeof window === "undefined" ? null : new URLSearchParams(window.location.search).get("as")));
+  const people = useDemoPeople(Boolean(as));
   useEffect(() => {
-    const as = new URLSearchParams(window.location.search).get("as");
     const person = as ? people.data?.find((p) => p.role === as) : undefined;
-    if (person) signInAs(person);
-  }, [people.data]);
+    if (!person) return;
+    const url = new URL(window.location.href);
+    url.searchParams.delete("as");
+    // from the landing, go to the person's main screen
+    if (url.pathname === "/") url.pathname = HOME[person.role] ?? "/receivables/";
+    if (window.sessionStorage.getItem(DEV_SESSION_KEY) === JSON.stringify(person.seed)) {
+      window.history.replaceState(null, "", url);
+      return;
+    }
+    window.sessionStorage.setItem(DEV_SESSION_KEY, JSON.stringify(person.seed));
+    window.location.replace(url);
+  }, [as, people.data]);
+  return null;
+}
+
+export function LocalDemoPicker() {
+  const people = useDemoPeople();
 
   if (!PUBLIC_ENV.demoSessions) return null;
 

@@ -124,7 +124,7 @@ function ReceivableDetail({ me }: { me: MeResponse }) {
   const title = isFinance ? "Review this payment" : calledAsGuarantor ? "You're asked to cover this" : (TITLES[state] ?? "Loan");
   const fromSignOffs = isGuarantor && !isSeller;
   const crumb = `No. ${cardNumber(cardId)}`;
-  const back = fromSignOffs ? { href: "/receivables/?view=guaranties", label: "Sign-offs" } : { href: "/receivables/?view=receivables", label: "My loans" };
+  const back = fromSignOffs ? { href: "/receivables/?view=guaranties", label: "Approvals" } : { href: "/receivables/?view=receivables", label: "My loans" };
 
   return (
     <>

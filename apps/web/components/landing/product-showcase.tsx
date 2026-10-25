@@ -38,7 +38,7 @@ const NAV: { label: string; icon: LucideIcon }[] = [
   { label: "Home", icon: House },
   { label: "Expedite a payment", icon: Plus },
   { label: "My loans", icon: FileText },
-  { label: "Sign-offs", icon: Handshake },
+  { label: "Approvals", icon: Handshake },
   { label: "Verification", icon: ShieldCheck },
 ];
 
@@ -237,18 +237,18 @@ const STEPS: { key: StepKey; tab: string; title: string; detail: string; page: s
     key: "name",
     tab: "Name the payment",
     title: "Name the payment",
-    detail: "Add the payment reference and documents, and choose someone at your business to approve the loan.",
+    detail: "Add the payment reference and documents. An approver at your business signs off, then your finance team reviews it.",
     page: "Expedite a payment",
-    cta: { label: "Expedite a payment", href: "/claims/new/" },
+    cta: { label: "Expedite a payment", href: "/receivables/new/" },
     Screen: BorrowView,
   },
   {
     key: "loan",
     tab: "Get the loan",
     title: "Get the loan",
-    detail: `After a reviewer approves it, press one button and the vault sends ${ASSET} to your wallet.`,
+    detail: `After an Install reviewer approves it, press one button and the vault sends ${ASSET} to your wallet.`,
     page: "My loans",
-    cta: { label: "See my loans", href: "/claims/?view=claims" },
+    cta: { label: "See my loans", href: "/receivables/?view=receivables" },
     Screen: LoanView,
   },
   {
@@ -257,7 +257,7 @@ const STEPS: { key: StepKey; tab: string; title: string; detail: string; page: s
     title: "Pay it back with interest",
     detail: "Pay the loan back with interest by the end of its horizon. Then it's closed out.",
     page: "My loans",
-    cta: { label: "See my loans", href: "/claims/?view=claims" },
+    cta: { label: "See my loans", href: "/receivables/?view=receivables" },
     Screen: RepayView,
   },
 ];

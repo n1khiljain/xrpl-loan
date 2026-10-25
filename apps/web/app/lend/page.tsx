@@ -25,7 +25,7 @@ const STEPS = [
 export default function LendPage() {
   return (
     <div>
-      <Topbar title="Lending vault" crumb={`XRPL ${config.network.replace("xrpl-", "")}`} action={null} />
+      <Topbar title="Lending vault" crumb={`XRPL ${config.network.replace("xrpl-", "").replace(/^./, (c) => c.toUpperCase())}`} action={null} />
       <div className="flex max-w-4xl flex-col gap-5">
         <GradientPanel tone="ledger" className="flex flex-col gap-4 p-6 sm:p-7">
           <span className="text-on-ink/75 text-[13px]">Single asset vault · {ASSET}</span>

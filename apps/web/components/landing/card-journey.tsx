@@ -11,7 +11,7 @@ const STEP_MS = 2600;
 
 // the app's own loan card, walked through the states a borrower sees (labels and colors match state-chip.tsx)
 const STAGES: { state: string; label: string; tone: ReceivableCardTone; moment?: CardMoment; caption: string }[] = [
-  { state: "IN REVIEW", label: "In review", tone: "frost", caption: "Your approver signed off. A reviewer checks the payment." },
+  { state: "IN REVIEW", label: "In review", tone: "frost", caption: "Your approver signed off and your finance team checked it. Now Install reviews the payment." },
   { state: "APPROVED", label: "Approved", tone: "sky", moment: "approved", caption: "The vault is ready to pay you." },
   { state: "PAID", label: "Paid", tone: "deep", moment: "paid", caption: "The vault pays you within a day." },
   { state: "CLOSED OUT", label: "Closed out", tone: "gold", moment: "closed", caption: "The payment arrives, you pay the loan back with interest, and you're done." },

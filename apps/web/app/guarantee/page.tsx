@@ -24,7 +24,7 @@ import { dateTime, shortAddress, usd } from "@/lib/format";
 import type { InviteView } from "@/lib/types";
 import { RECEIVABLE_TYPES } from "@/lib/receivable-types";
 
-const BACK = { href: "/receivables/?view=guaranties", label: "Sign-offs" };
+const BACK = { href: "/receivables/?view=guaranties", label: "Approvals" };
 
 function Guarantee() {
   const invite = useSearchParams().get("invite");
@@ -74,7 +74,7 @@ function Guarantee() {
         : code === "expired"
           ? "This link expired. Ask the person who sent it to send a new one."
           : code === "used"
-            ? "You already signed off with this link. It's on your Sign-offs list."
+            ? "You already signed off with this link. It's on your Approvals list."
             : friendlyError(view.error);
     return (
       <div className="space-y-6">

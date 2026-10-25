@@ -5,7 +5,8 @@ import { useEffect, useRef, useState } from "react";
 import type { ShapeName } from "@/components/landing/glyph-field";
 import { PosterContent, posterSurface } from "@/components/landing/poster-card";
 import { Button } from "@/components/ui/button";
-import { ASSET } from "@/lib/config";
+import { ASSET, config } from "@/lib/config";
+import { usd } from "@/lib/format";
 import { cn } from "@/lib/utils";
 
 /*
@@ -25,12 +26,12 @@ const STEPS: { title: string; detail: string; glyph: ShapeName }[] = [
   },
   {
     title: "Name the payment",
-    detail: "Add its reference and documents, and pick an approver at your business.",
+    detail: "Add its reference and documents. An approver signs off, then your finance team reviews it.",
     glyph: "receipt",
   },
   {
     title: "Get the loan",
-    detail: `Once a reviewer approves it, one button sends ${ASSET} to your wallet.`,
+    detail: `Once an Install reviewer approves it, one button sends ${ASSET} to your wallet.`,
     glyph: "coins",
   },
   {
@@ -38,6 +39,13 @@ const STEPS: { title: string; detail: string; glyph: ShapeName }[] = [
     detail: "Repay by the end of the loan's horizon, and it's closed out.",
     glyph: "check",
   },
+];
+
+// the loan's terms under the calls to action, from the deployment's params so they match what the app enforces
+const TERMS = [
+  `${config.params.feeBps / 100}% a year`,
+  `Up to ${usd(BigInt(config.params.perReceivableCap)).replace(/\.00$/, "")} per loan`,
+  `Up to ${Math.floor(config.params.overdueWindowSeconds / 86_400)} days`,
 ];
 
 // lines the row up with the content column on wide screens, and with the page gutter on narrow ones
@@ -141,16 +149,25 @@ export function HowItWorks() {
           <h1 className="hero-type max-w-[18ch] text-[clamp(2.5rem,4.6vw,4.25rem)] text-balance lg:max-w-[21ch]">Expedite the payments you choose</h1>
           <div className="flex max-w-[34rem] flex-col gap-6 lg:max-w-[30rem] lg:shrink-0 lg:pb-2">
             <p className="text-muted-foreground text-lg leading-relaxed sm:text-xl">
-              Get the money for a payment up front, then pay it back with interest based on how long it runs.
+              Upfront {ASSET} loans for businesses waiting on invoices, card payouts, and reimbursements, funded by a
+              lending vault on the XRP Ledger. Pay it back with interest when the payment arrives.
             </p>
             <div className="flex flex-wrap gap-2.5">
               <Button asChild size="lg">
-                <Link href="/claims/new/">Expedite a payment</Link>
+                <Link href="/receivables/new/">Expedite a payment</Link>
               </Button>
               <Button asChild size="lg" variant="secondary">
                 <Link href="/lend/">Lend to the vault</Link>
               </Button>
             </div>
+            <ul aria-label="Loan terms" className="text-muted-foreground flex flex-wrap gap-x-5 gap-y-1.5 text-sm">
+              {TERMS.map((term) => (
+                <li key={term} className="flex items-center gap-2">
+                  <span aria-hidden className="size-1.5 rounded-full bg-[var(--spot)]" />
+                  {term}
+                </li>
+              ))}
+            </ul>
           </div>
         </div>
       </div>

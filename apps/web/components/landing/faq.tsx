@@ -4,13 +4,23 @@ import { Minus, Plus } from "lucide-react";
 import { AnimatePresence, motion } from "motion/react";
 import { useState } from "react";
 import { GlyphField, type ShapeName } from "@/components/landing/glyph-field";
+import { config, params } from "@/lib/config";
+import { amountDue, usd } from "@/lib/format";
+
+// the cost answer's worked example, from the deployment's rate: $1,000 for 30 days
+const EXAMPLE_LOAN = 1_000_000_000n;
+const EXAMPLE_INTEREST = amountDue(EXAMPLE_LOAN, params.feeBps, 30 * 86_400) - EXAMPLE_LOAN;
+const MAX_DAYS = Math.floor(params.overdueWindowSeconds / 86_400);
 
 const FAQ = [
   {
     q: "What is Install?",
     a: "Install lets a business expedite a transaction, transfer, or payment. You get an upfront loan from a lending vault on the XRP Ledger, and you pay it back with interest based on how long the loan runs.",
   },
-  { q: "What does it cost?", a: "Interest depends on the loan horizon. A shorter loan costs less. The app covers XRP Ledger network costs." },
+  {
+    q: "What does it cost?",
+    a: `Interest is ${config.params.feeBps / 100}% a year, charged only for the days the loan runs, so a $1,000 loan for 30 days costs about ${usd(EXAMPLE_INTEREST)}. Loans go up to ${usd(params.perReceivableCap).replace(/\.00$/, "")} and up to ${MAX_DAYS} days. The app covers XRP Ledger network costs.`,
+  },
   { q: "What if the payment never arrives?", a: "Report it in the app. The person who signed off covers what was not paid." },
   { q: "Who holds my documents?", a: "Only you, the people who sign off at your business, and Install's reviewers can see your documents. The documents themselves never go on the ledger." },
 ] as const;

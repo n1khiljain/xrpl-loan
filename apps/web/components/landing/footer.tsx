@@ -23,7 +23,7 @@ const COLUMNS: { title: string; links: FooterLink[] }[] = [
     links: [
       { label: "Expedite a payment", href: "/receivables/new/" },
       { label: "My loans", href: "/receivables/?view=receivables" },
-      { label: "Sign-offs", href: "/receivables/?view=guaranties" },
+      { label: "Approvals", href: "/receivables/?view=guaranties" },
       { label: "Verification", href: "/onboard/" },
     ],
   },
