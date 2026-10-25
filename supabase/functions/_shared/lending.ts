@@ -1,4 +1,5 @@
 import {
+  REDEMPTION_BUFFER_SECONDS,
   type VaultPhase,
   amountField,
   ceilToUnits,
@@ -156,33 +157,91 @@ export async function ensureAccess(deps: {
   );
 }
 
-export type VaultSnapshot = {
-  phase: VaultPhase | "unknown";
+/**
+ * One vault in the rolling series: a closed-ended vault the broker owns, with its own loan broker and first-loss
+ * cover. A new series opens for deposits while older ones lend, so lenders can always put money in and borrowers
+ * can always get a loan; each lender withdraws when their series pays out.
+ */
+export type VaultSeries = {
+  vaultId: string;
+  /** The LoanBroker that lends from this vault, or null until one is attached (it can't lend without it). */
+  loanBrokerId: string | null;
+  shareMptId: string | null;
+  phase: VaultPhase;
+  /** Unix seconds; null for an open-ended vault. */
   subscriptionAt: number | null;
   redemptionAt: number | null;
-  assetsTotal: string | null;
-  assetsAvailable: string | null;
-  entry: Record<string, unknown> | null;
+  /** Base units, as decimal strings. */
+  assetsTotal: string;
+  assetsAvailable: string;
+  lossUnrealized: string;
+  debtTotal: string;
+  coverAvailable: string;
 };
 
-/** Where the vault is in its closed-ended life, and the totals the lender page shows. */
-export async function vaultSnapshot(ledger: Ledger, config: NetworkConfig, nowUnix: number): Promise<VaultSnapshot> {
+/** Every series the broker has opened, oldest redemption first, read straight from the ledger. */
+export async function listSeries(ledger: Ledger, config: NetworkConfig, nowUnix: number): Promise<VaultSeries[]> {
   const setup = readySetup(config);
-  const entry = await ledger.readEntry(setup.vaultId);
-  const subscriptionAt = rippleToUnix(entry?.SubscriptionDate);
-  const redemptionAt = rippleToUnix(entry?.RedemptionDate);
-  const phase: VaultSnapshot["phase"] =
-    subscriptionAt === null || redemptionAt === null
-      ? "unknown"
-      : vaultPhase(nowUnix, subscriptionAt, redemptionAt, config.params.overdueWindowSeconds);
-  return {
-    phase,
-    subscriptionAt,
-    redemptionAt,
-    assetsTotal: unitsOf(entry?.AssetsTotal),
-    assetsAvailable: unitsOf(entry?.AssetsAvailable),
-    entry,
-  };
+  const [vaults, brokers] = await Promise.all([ledger.ownedObjects(setup.broker, "vault"), ledger.ownedObjects(setup.broker, "loan_broker")]);
+  const brokerOf = new Map(brokers.map((b) => [String(b.VaultID ?? "").toUpperCase(), b]));
+  // a vault without a loan broker can't lend, so it isn't a series lenders should see or deposit into
+  const series = vaults
+    .filter((v) => isOurAsset(v.Asset, config, setup.issuer) && brokerOf.has(String(v.index ?? v.LedgerIndex ?? "").toUpperCase()))
+    .map((v): VaultSeries => {
+      const vaultId = String(v.index ?? v.LedgerIndex ?? "").toUpperCase();
+      const broker = brokerOf.get(vaultId);
+      const subscriptionAt = rippleToUnix(v.SubscriptionDate);
+      const redemptionAt = rippleToUnix(v.RedemptionDate);
+      return {
+        vaultId,
+        loanBrokerId: broker ? String(broker.index ?? broker.LedgerIndex ?? "").toUpperCase() || null : null,
+        shareMptId: typeof v.ShareMPTID === "string" ? v.ShareMPTID : null,
+        phase:
+          subscriptionAt === null || redemptionAt === null
+            ? "open"
+            : // term 0: whether a particular loan still fits before redemption is canLend's question
+              vaultPhase(nowUnix, subscriptionAt, redemptionAt, 0),
+        subscriptionAt,
+        redemptionAt,
+        assetsTotal: unitsOf(v.AssetsTotal) ?? "0",
+        assetsAvailable: unitsOf(v.AssetsAvailable) ?? "0",
+        lossUnrealized: unitsOf(v.LossUnrealized) ?? "0",
+        debtTotal: unitsOf(broker?.DebtTotal) ?? "0",
+        coverAvailable: unitsOf(broker?.CoverAvailable) ?? "0",
+      };
+    });
+  return series.sort((a, b) => (a.redemptionAt ?? Infinity) - (b.redemptionAt ?? Infinity));
+}
+
+function isOurAsset(asset: unknown, config: NetworkConfig, issuer: string): boolean {
+  if (!asset || typeof asset !== "object") return false;
+  const a = asset as { currency?: string; issuer?: string };
+  return a.currency === config.asset.currency && a.issuer === issuer;
+}
+
+/**
+ * Whether a series can make a loan of `termSeconds` now: it's in its lending phase, has a loan broker, and the
+ * loan's payment lands at least {@link REDEMPTION_BUFFER_SECONDS} before the series pays out.
+ */
+export function canLend(series: VaultSeries, termSeconds: number, nowUnix: number): boolean {
+  if (!series.loanBrokerId) return false;
+  if (series.phase === "open") return true;
+  if (series.phase !== "lending" || series.redemptionAt === null) return false;
+  return nowUnix + termSeconds + REDEMPTION_BUFFER_SECONDS <= series.redemptionAt;
+}
+
+/**
+ * The series to fund a loan from: one that can lend for the whole term and has the principal on hand. Of those,
+ * the one that pays out soonest, so the longer-lived series stay free for longer loans. Null when none fits.
+ */
+export function pickLendingSeries(series: VaultSeries[], principal: bigint, termSeconds: number, nowUnix: number): VaultSeries | null {
+  const fits = series.filter((s) => canLend(s, termSeconds, nowUnix) && BigInt(s.assetsAvailable) >= principal);
+  return fits.sort((a, b) => (a.redemptionAt ?? Infinity) - (b.redemptionAt ?? Infinity))[0] ?? null;
+}
+
+/** The series taking deposits now, newest first; deposits default to the first. */
+export function depositSeries(series: VaultSeries[]): VaultSeries[] {
+  return series.filter((s) => s.phase === "subscription" || s.phase === "open").sort((a, b) => (b.subscriptionAt ?? 0) - (a.subscriptionAt ?? 0));
 }
 
 function rippleToUnix(field: unknown): number | null {

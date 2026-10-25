@@ -84,8 +84,6 @@ describe("requireSetup", () => {
         "credentialIssuer",
         "credentialType",
         "domainId",
-        "vaultId",
-        "loanBrokerId",
         "repaymentAccount",
       ]);
     }
@@ -99,12 +97,10 @@ describe("requireSetup", () => {
       credentialIssuer: ADDRESS,
       credentialType: "4B5943",
       domainId: ID,
-      vaultId: ID,
-      loanBrokerId: ID,
       repaymentAccount: ADDRESS,
     };
     const config = parseNetworkConfig(raw);
-    expect(requireSetup(config).vaultId).toBe(ID);
+    expect(requireSetup(config).domainId).toBe(ID);
     expect(requireSetup(config).issuer).toBe(ADDRESS);
   });
 });

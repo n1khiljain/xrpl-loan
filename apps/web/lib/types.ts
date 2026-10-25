@@ -76,6 +76,11 @@ export type OffchainReceivable = {
   financeClearedAt: string | null;
   rejectReason: string | null;
   loanId: string | null;
+  /** The vault series that funded the loan. */
+  vaultId: string | null;
+  /** When staff marked a missed payment (impaired) or defaulted the loan on the ledger. */
+  impairedAt: string | null;
+  defaultedAt: string | null;
   payerOutcome: "none" | "rejected" | "short_paid";
   payerOutcomeNote: string | null;
   createdAt: string;
@@ -136,4 +141,38 @@ export type WalletView = {
   assetUnits: string | null;
   assetCode: string;
   transactions: LedgerTxView[];
+};
+
+/** One vault in the rolling series, from the `vault` function. Amounts are base units. */
+export type VaultSeriesView = {
+  vaultId: string;
+  loanBrokerId: string | null;
+  phase: "open" | "subscription" | "lending" | "closed";
+  subscriptionAt: number | null;
+  redemptionAt: number | null;
+  assetsTotal: string;
+  assetsAvailable: string;
+  lossUnrealized: string;
+  debtTotal: string;
+  coverAvailable: string;
+  yourShares: string;
+  yourValue: string;
+};
+
+export type VaultView = {
+  broker: string;
+  series: VaultSeriesView[];
+  totals: {
+    assetsTotal: string;
+    assetsAvailable: string;
+    debtTotal: string;
+    coverAvailable: string;
+    lossUnrealized: string;
+    interestEarned: string;
+    interestExpected: string;
+    loansOutstanding: number;
+    loansImpaired: number;
+    loansDefaulted: number;
+  };
+  balance: string;
 };

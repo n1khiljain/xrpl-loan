@@ -9,6 +9,7 @@ import {
   Handshake,
   House,
   IdCard,
+  Landmark,
   Inbox,
   LogOut,
   type LucideIcon,
@@ -47,6 +48,7 @@ function activeKey(pathname: string, view: string | null): string {
   if (p === "/receivable") return "receivables";
   if (p === "/guarantee") return "guaranties";
   if (p === "/onboard") return "verify";
+  if (p === "/lend/stats") return "stats";
   if (p === "/lend") return view === "deposit" ? "deposit" : "pool";
   const admin = p.split("/")[2];
   return admin ?? "queue";
@@ -80,8 +82,9 @@ function useFinanceRequests(wallet: string | undefined, enabled: boolean) {
 function navFor(area: Area, guaranties: number, finance = 0): NavItem[] {
   if (area === "lender") {
     return [
-      { key: "pool", label: "Vault", href: "/lend/", icon: ChartColumn },
+      { key: "pool", label: "Vault", href: "/lend/", icon: Landmark },
       { key: "deposit", label: "Deposit and withdraw", href: "/lend/?view=deposit", icon: ArrowDownToLine, primary: true },
+      { key: "stats", label: "Vault stats", href: "/lend/stats/", icon: ChartColumn },
     ];
   }
   if (area === "admin") {

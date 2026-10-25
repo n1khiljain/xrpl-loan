@@ -147,3 +147,54 @@ export function seedOrg(db: MemoryDb, id: number, name: string, officers: Wallet
 export const FIXED_NOW = new Date("2026-10-11T17:00:00.000Z");
 
 export { FakeLedger, MemoryDb };
+
+/** A vault series on a FakeLedger: a closed-ended vault the broker owns and, unless `loanBroker: false`, its loan broker. */
+export type FakeSeries = {
+  vaultId: string;
+  loanBrokerId?: string;
+  /** unix seconds */
+  subscriptionAt: number;
+  redemptionAt: number;
+  /** issued-currency values, e.g. "25000" */
+  assetsTotal?: string;
+  assetsAvailable?: string;
+  debtTotal?: string;
+  coverAvailable?: string;
+  shareMptId?: string;
+  loanBroker?: boolean;
+  /** another currency, to check it's ignored */
+  currency?: string;
+};
+
+const RIPPLE_EPOCH = 946_684_800;
+
+export function seedSeries(ledger: FakeLedger, config: NetworkConfig, series: FakeSeries[]) {
+  const broker = config.ledger.broker as string;
+  const vaults = ledger.owned.get(`${broker}:vault`) ?? [];
+  const brokers = ledger.owned.get(`${broker}:loan_broker`) ?? [];
+  for (const s of series) {
+    vaults.push({
+      LedgerEntryType: "Vault",
+      index: s.vaultId,
+      Owner: broker,
+      Asset: { currency: s.currency ?? config.asset.currency, issuer: config.asset.issuer },
+      VaultKind: 1,
+      SubscriptionDate: s.subscriptionAt - RIPPLE_EPOCH,
+      RedemptionDate: s.redemptionAt - RIPPLE_EPOCH,
+      AssetsTotal: s.assetsTotal ?? "0",
+      AssetsAvailable: s.assetsAvailable ?? s.assetsTotal ?? "0",
+      ShareMPTID: s.shareMptId ?? `00${s.vaultId.slice(0, 46)}`,
+    });
+    if (s.loanBroker !== false) {
+      brokers.push({
+        LedgerEntryType: "LoanBroker",
+        index: s.loanBrokerId ?? `B${s.vaultId.slice(1)}`,
+        VaultID: s.vaultId,
+        DebtTotal: s.debtTotal ?? "0",
+        CoverAvailable: s.coverAvailable ?? "5000",
+      });
+    }
+  }
+  ledger.owned.set(`${broker}:vault`, vaults);
+  ledger.owned.set(`${broker}:loan_broker`, brokers);
+}

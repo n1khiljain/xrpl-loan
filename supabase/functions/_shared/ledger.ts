@@ -35,6 +35,10 @@ export interface Ledger {
   submitCoSigned(signer: XrplWallet, counterparty: XrplWallet, tx: SubmittableTransaction, why: TxPurpose): Promise<Submitted>;
   /** A ledger object by its index, or null when the network has no such entry. */
   readEntry(index: string): Promise<Record<string, unknown> | null>;
+  /** Every object of one type the account owns, e.g. the broker's vaults and loan brokers. */
+  ownedObjects(address: string, type: "vault" | "loan_broker"): Promise<Record<string, unknown>[]>;
+  /** How many of a vault's shares (an MPT) `holder` has, and how many exist in all; null where there are none. */
+  shareHolding(shareMptId: string, holder: string): Promise<{ held: string | null; outstanding: string | null }>;
 }
 
 export class LedgerError extends Error {
@@ -159,6 +163,40 @@ export function xrplLedger(config: NetworkConfig, db: Db): Ledger {
         }
       });
     },
+
+    ownedObjects(address, type) {
+      return withClient(config, async (client) => {
+        const out: Record<string, unknown>[] = [];
+        let marker: unknown = undefined;
+        // a broker that has opened many series pages its objects, so follow the marker to the end
+        for (let page = 0; page < 20; page++) {
+          const res = await client.request({ command: "account_objects", account: address, type, ledger_index: "validated", limit: 200, ...(marker ? { marker } : {}) });
+          out.push(...(res.result.account_objects as unknown as Record<string, unknown>[]));
+          marker = res.result.marker;
+          if (!marker) break;
+        }
+        return out;
+      });
+    },
+
+    shareHolding(shareMptId, holder) {
+      return withClient(config, async (client) => {
+        const read = async (request: Parameters<Client["request"]>[0]) => {
+          try {
+            return ((await client.request(request)) as { result: { node?: Record<string, unknown> } }).result.node ?? null;
+          } catch (error) {
+            const code = (error as { data?: { error?: string } }).data?.error;
+            if (code === "entryNotFound" || code === "actNotFound") return null;
+            throw error;
+          }
+        };
+        const token = await read({ command: "ledger_entry", mptoken: { mpt_issuance_id: shareMptId, account: holder }, ledger_index: "validated" });
+        const issuance = await read({ command: "ledger_entry", mpt_issuance: shareMptId, ledger_index: "validated" });
+        const held = token?.MPTAmount;
+        const outstanding = issuance?.OutstandingAmount;
+        return { held: typeof held === "string" ? held : null, outstanding: typeof outstanding === "string" ? outstanding : null };
+      });
+    },
   };
 }
 
@@ -196,5 +234,15 @@ export class FakeLedger implements Ledger {
   }
   async readEntry(index: string) {
     return this.entries.get(index) ?? null;
+  }
+  /** Objects by owner and type, for `ownedObjects`. */
+  readonly owned = new Map<string, Record<string, unknown>[]>();
+  /** `${shareMptId}:${holder}` to shares held, and shareMptId to shares outstanding. */
+  readonly shares = new Map<string, string>();
+  async ownedObjects(address: string, type: "vault" | "loan_broker") {
+    return this.owned.get(`${address}:${type}`) ?? [];
+  }
+  async shareHolding(shareMptId: string, holder: string) {
+    return { held: this.shares.get(`${shareMptId}:${holder}`) ?? null, outstanding: this.shares.get(shareMptId) ?? null };
   }
 }

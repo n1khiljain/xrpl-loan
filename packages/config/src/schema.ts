@@ -91,6 +91,10 @@ export const networkConfigShape = z.strictObject({
     /** Hex of the credential type the app issues after KYC. */
     credentialType: z.string().regex(/^[0-9A-F]{2,128}$/).optional(),
     domainId: ledgerId.optional(),
+    /**
+     * Unused: vaults are rolling series the broker account owns, which the functions read from the ledger.
+     * Kept so an older deployment file still parses.
+     */
     vaultId: ledgerId.optional(),
     loanBrokerId: ledgerId.optional(),
     repaymentAccount: xrplAddress.optional(),

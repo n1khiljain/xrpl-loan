@@ -260,12 +260,6 @@ export function SellerActions({ receivable, onchain }: { receivable: OffchainRec
       await queryClient.invalidateQueries();
     },
   });
-  const vault = useQuery({
-    queryKey: ["vault"],
-    enabled: ledgerReady && state === "Approved",
-    queryFn: () => call<{ phase: string; subscriptionAt: number | null; redemptionAt: number | null }>("vault"),
-  });
-  const loansClosed = vault.data?.phase === "subscription" || vault.data?.phase === "closed";
 
   const requested = usd(BigInt(receivable.requestedAmount));
   const financeFirst = Boolean(me.data?.membership?.active && (me.data.membership.peerFinanceAgents ?? 0) > 0);
@@ -352,7 +346,7 @@ export function SellerActions({ receivable, onchain }: { receivable: OffchainRec
           <Button
             size="lg"
             className="pr-2 self-start"
-            disabled={!ledgerReady || loansClosed || fund.isPending || fund.isSuccess}
+            disabled={!ledgerReady || fund.isPending || fund.isSuccess}
             onClick={() => fund.mutate()}
             data-testid="get-paid"
           >
@@ -362,16 +356,6 @@ export function SellerActions({ receivable, onchain }: { receivable: OffchainRec
           {!ledgerReady ? (
             <InfoNotice title="The lending vault isn't set up yet">
               Payouts come from the XRPL lending vault. They switch on once that vault is created.
-            </InfoNotice>
-          ) : null}
-          {vault.data?.phase === "subscription" ? (
-            <InfoNotice title="Deposits are still open">
-              Loans start once that window closes{vault.data.subscriptionAt ? ` on ${dateFromSeconds(vault.data.subscriptionAt)}` : ""}.
-            </InfoNotice>
-          ) : null}
-          {vault.data?.phase === "closed" ? (
-            <InfoNotice title="This vault isn't taking new loans">
-              A loan of this length would end after the vault&apos;s redemption date.
             </InfoNotice>
           ) : null}
         </div>
@@ -390,7 +374,18 @@ export function SellerActions({ receivable, onchain }: { receivable: OffchainRec
         {justFunded ? (
           <PaidCelebration receivable={receivable} onchain={onchain} onContinue={() => setJustFunded(false)} />
         ) : (
-          <StatePanel lead={`Pay ${usd(onchain.amountRemaining)} back to the vault when ${receivable.payerName} pays you.`} description={`By ${dateFromSeconds(onchain.dueAt)}.`}>
+          <StatePanel
+            lead={
+              receivable.impairedAt
+                ? `Your payment of ${usd(onchain.amountRemaining)} is late.`
+                : `Pay ${usd(onchain.amountRemaining)} back to the vault when ${receivable.payerName} pays you.`
+            }
+            description={
+              receivable.impairedAt
+                ? `It was due ${dateFromSeconds(onchain.dueAt)}, and the loan is marked impaired on the ledger. Pay it now to bring it back to good standing.`
+                : `By ${dateFromSeconds(onchain.dueAt)}.`
+            }
+          >
             <ProgressBar paid={onchain.amountPaid} due={onchain.amountDue} />
           </StatePanel>
         )}

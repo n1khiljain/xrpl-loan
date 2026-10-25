@@ -3,7 +3,7 @@ import { unitsToValue } from "./amounts.ts";
 /** Ripple epoch is 2000-01-01T00:00:00Z. Ledger times are seconds since then; unix times are seconds since 1970. */
 export const RIPPLE_EPOCH_OFFSET = 946_684_800;
 
-/** Deposits are open this long after the vault is created. Loans cannot start until it ends. */
+/** For a closed-ended vault (`pnpm xrpl:setup --closed`): deposits are open this long after it's created, and loans can't start until then. */
 export const SUBSCRIPTION_SECONDS = 90 * 24 * 60 * 60;
 
 /** The vault redeems this long after it is created. A loan's last payment has to land before then. */
@@ -76,7 +76,11 @@ export function vaultCapacityValue(poolUnits: bigint, feeBps: number): string {
   return unitsToValue(vaultCapacityUnits(poolUnits, feeBps));
 }
 
-export type VaultPhase = "subscription" | "lending" | "closed";
+/**
+ * "open": an open-ended vault (no subscription or redemption date), which takes deposits and makes loans at any
+ * time. The other three are the stages of a closed-ended vault.
+ */
+export type VaultPhase = "open" | "subscription" | "lending" | "closed";
 
 /**
  * Closed-ended vaults take deposits only before `subscriptionUnix`, and loans only after that, and only while
