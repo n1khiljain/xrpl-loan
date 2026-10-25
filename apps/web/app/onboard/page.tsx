@@ -109,18 +109,19 @@ function Hero({ me, onVerify, verifying }: { me: MeResponse; onVerify: () => voi
   return (
     // the landing's orange poster card: a white title, Night for the small text (white is too faint on this orange at
     // that size), and the shield of the "Get verified" step rising out of the bottom right corner
-    <section className="bg-grad-feature text-ink relative isolate flex min-h-[360px] flex-col gap-4 overflow-hidden rounded-3xl p-6 sm:min-h-[300px] sm:p-8 sm:pr-[42%]">
+    <section className="bg-grad-feature text-ink relative isolate flex min-h-[300px] flex-col gap-4 overflow-hidden rounded-3xl p-6 sm:min-h-[248px] sm:p-8 sm:pr-[42%]">
       <GlyphField
         shape="shield"
         seed={3}
         cell={11}
         anchor={1}
         fit={1}
-        className="absolute -right-[8%] -bottom-[14%] -z-10 h-[66%] w-[86%] sm:top-[8%] sm:-right-[2%] sm:-bottom-[12%] sm:h-auto sm:w-[38%]"
+        className="absolute -top-[6%] -right-[8%] -z-10 h-[46%] w-[42%] sm:top-[8%] sm:-right-[2%] sm:-bottom-[12%] sm:h-auto sm:w-[38%]"
       />
       <span className="text-sm">Identity</span>
       <h1 className="display-type text-on-ink max-w-[14ch] text-[32px] sm:text-[44px]">{title}</h1>
-      <p className="max-w-md text-base leading-snug sm:text-lg">{body}</p>
+      {/* the line sits along the bottom, like the poster cards' descriptions */}
+      <p className="mt-auto max-w-md text-base leading-snug sm:text-lg">{body}</p>
       {!emailVerified ? (
         <div className="pt-1">
           <Button variant="light" size="lg" onClick={onVerify} disabled={verifying} data-testid="verify-email">
