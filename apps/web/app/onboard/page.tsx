@@ -6,6 +6,7 @@ import { motion } from "motion/react";
 import Link from "next/link";
 import { AccountGate } from "@/components/app/account-gate";
 import { GradientPanel } from "@/components/app/gradient-panel";
+import { GlyphField } from "@/components/landing/glyph-field";
 import { ErrorNotice } from "@/components/app/notice";
 import { Topbar } from "@/components/app/topbar";
 import { WalletCopy } from "@/components/app/wallet-copy";
@@ -106,10 +107,20 @@ function Hero({ me, onVerify, verifying }: { me: MeResponse; onVerify: () => voi
         ? "Your email is verified. A reviewer checks who you are next and approves you, usually within a day."
         : "Sign-in already proved your email to Privy. Press below to share that proof with this app, so a reviewer can approve you.";
   return (
-    <GradientPanel tone="ledger" className="flex flex-col gap-4 p-6 sm:p-7">
-      <span className="text-on-ink/75 text-[13px]">Identity</span>
-      <h1 className="display-type text-[28px] sm:text-[36px]">{title}</h1>
-      <p className="text-on-ink/82 max-w-lg text-sm leading-relaxed sm:text-[15px]">{body}</p>
+    // the landing's orange poster card: a white title, Night for the small text (white is too faint on this orange at
+    // that size), and the shield of the "Get verified" step rising out of the bottom right corner
+    <section className="bg-grad-feature text-ink relative isolate flex min-h-[360px] flex-col gap-4 overflow-hidden rounded-3xl p-6 sm:min-h-[300px] sm:p-8 sm:pr-[42%]">
+      <GlyphField
+        shape="shield"
+        seed={3}
+        cell={11}
+        anchor={1}
+        fit={1}
+        className="absolute -right-[8%] -bottom-[14%] -z-10 h-[66%] w-[86%] sm:top-[8%] sm:-right-[2%] sm:-bottom-[12%] sm:h-auto sm:w-[38%]"
+      />
+      <span className="text-sm">Identity</span>
+      <h1 className="display-type text-on-ink max-w-[14ch] text-[32px] sm:text-[44px]">{title}</h1>
+      <p className="max-w-md text-base leading-snug sm:text-lg">{body}</p>
       {!emailVerified ? (
         <div className="pt-1">
           <Button variant="light" size="lg" onClick={onVerify} disabled={verifying} data-testid="verify-email">
@@ -117,7 +128,7 @@ function Hero({ me, onVerify, verifying }: { me: MeResponse; onVerify: () => voi
           </Button>
         </div>
       ) : null}
-    </GradientPanel>
+    </section>
   );
 }
 
