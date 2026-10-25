@@ -321,7 +321,7 @@ export function ProductShowcase() {
   };
   return (
     <section id="how" aria-labelledby="how-title" className="bg-surface w-full scroll-mt-24">
-      <div id="product" className="mx-auto flex w-full max-w-[1440px] scroll-mt-24 flex-col gap-10 px-4 py-16 sm:px-6 lg:gap-16 lg:px-10 lg:py-28">
+      <div className="mx-auto flex w-full max-w-[1440px] flex-col gap-10 px-4 py-16 sm:px-6 lg:gap-16 lg:px-10 lg:py-28">
         <div className="flex flex-col justify-between gap-6 lg:flex-row lg:gap-12">
           <h2 id="how-title" className="display-type max-w-[16ch] text-[clamp(2rem,4vw,3.25rem)]">
             How it works
