@@ -18,7 +18,7 @@ const CARDS: { title: string; detail: string; shape: ShapeName }[] = [
   },
   {
     title: "Reviewed by your own team",
-    detail: "An approver at your business signs off and backs the loan, and your finance agents review it before Install does.",
+    detail: "An approver at your business signs off and backs the loan, and your finance agents can review it alongside Install.",
     shape: "pen",
   },
   {

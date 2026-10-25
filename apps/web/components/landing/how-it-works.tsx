@@ -26,7 +26,7 @@ const STEPS: { title: string; detail: string; glyph: ShapeName }[] = [
   },
   {
     title: "Name the payment",
-    detail: "Add its reference and documents. An approver signs off, then your finance team reviews it.",
+    detail: "Add its reference and documents. An approver signs off, and your finance team can look it over.",
     glyph: "receipt",
   },
   {

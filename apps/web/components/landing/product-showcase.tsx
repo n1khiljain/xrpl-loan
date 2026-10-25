@@ -237,7 +237,7 @@ const STEPS: { key: StepKey; tab: string; title: string; detail: string; page: s
     key: "name",
     tab: "Name the payment",
     title: "Name the payment",
-    detail: "Add the payment reference and documents. An approver at your business signs off, then your finance team reviews it.",
+    detail: "Add the payment reference and documents. An approver at your business signs off, and your finance team can look it over.",
     page: "Expedite a payment",
     cta: { label: "Expedite a payment", href: "/receivables/new/" },
     Screen: BorrowView,
