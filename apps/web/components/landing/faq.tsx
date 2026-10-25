@@ -30,15 +30,23 @@ export function Faq() {
         {FAQ.map((item, i) => {
           const isOpen = open === i;
           return (
-            <div key={item.q} className="border-border bg-surface shadow-soft rounded-xl border p-4 transition-shadow hover:shadow-float sm:p-5 lg:rounded-2xl lg:p-6">
+            // the whole card toggles; the button's own click (mouse or keyboard) bubbles up to here.
+            // selecting answer text to copy it shouldn't close the card
+            <div
+              key={item.q}
+              onClick={() => {
+                if (window.getSelection()?.toString()) return;
+                setOpen(isOpen ? -1 : i);
+              }}
+              className="border-border bg-surface shadow-soft cursor-pointer rounded-xl border p-4 transition-shadow hover:shadow-float sm:p-5 lg:rounded-2xl lg:p-6"
+            >
               <h3>
                 <button
                   type="button"
                   id={`faq-q-${i}`}
                   aria-expanded={isOpen}
                   aria-controls={`faq-a-${i}`}
-                  onClick={() => setOpen(isOpen ? -1 : i)}
-                  className="flex w-full items-center justify-between gap-3 text-left"
+                  className="flex w-full cursor-pointer items-center justify-between gap-3 text-left"
                 >
                   <span className="flex min-w-0 items-center gap-3 lg:gap-5">
                     <span className="bg-surface-muted text-foreground flex size-9 shrink-0 items-center justify-center rounded-full text-sm font-semibold lg:size-10 lg:text-base">
