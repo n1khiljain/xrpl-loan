@@ -92,7 +92,7 @@ export function FinanceRelease({ receivable }: { receivable: OffchainReceivable 
   const action = useReceivableAction(receivable);
   const amount = usd(BigInt(receivable.requestedAmount));
   return (
-    <StatePanel lead={`Send this ${amount} request to an admin.`} description="You review it as a finance agent. An admin approves it after you send it on.">
+    <StatePanel lead={`Send this ${amount} request to an admin.`} description="You review it as a finance agent. An admin can also approve it without waiting.">
       <div>
         <Button size="lg" onClick={() => action.mutate("send-to-admin")} disabled={action.isPending} data-testid="send-to-admin">
           {action.isPending ? "Sending..." : "Send to admin"}
@@ -267,7 +267,7 @@ export function SellerActions({ receivable, onchain }: { receivable: OffchainRec
   const requested = usd(BigInt(receivable.requestedAmount));
   const financeFirst = Boolean(me.data?.membership?.active && (me.data.membership.peerFinanceAgents ?? 0) > 0);
   const reviewLine = financeFirst
-    ? "A finance agent at your organization sees it first. After they send it on, an admin approves it."
+    ? "A finance agent at your organization can look it over, and an admin approves it."
     : `Reviewers check your documents before you get ${requested}.`;
   if (state === "Draft") {
     if (!receivable.packetHash) {
@@ -305,7 +305,7 @@ export function SellerActions({ receivable, onchain }: { receivable: OffchainRec
 
   if (state === "FinanceReview") {
     return (
-      <StatePanel lead="A finance agent at your organization is reviewing this." description="After they send it on, an admin approves it.">
+      <StatePanel lead="A finance agent at your organization is reviewing this." description="An admin can approve it at any point.">
         <div>
           <Button variant="outline" size="sm" disabled={action.isPending} onClick={() => action.mutate("cancel")} data-testid="cancel-receivable">
             Cancel this request
