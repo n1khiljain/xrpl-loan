@@ -17,7 +17,7 @@ import { useCall } from "@/hooks/use-api";
 import { useNowSeconds } from "@/hooks/use-now";
 import { CALL_REASONS, type CallReasonValue } from "@/lib/admin";
 import { friendlyError } from "@/lib/errors";
-import { dateFromSeconds, shortAddress } from "@/lib/format";
+import { dateFromSeconds, dateTimeFromSeconds, shortAddress } from "@/lib/format";
 import type { OffchainReceivable } from "@/lib/types";
 
 type Exception = { onchain: ReceivableView; offchain: OffchainReceivable; why: string; suggested: CallReasonValue };
@@ -43,7 +43,7 @@ function useExceptions() {
             suggested: c.payerOutcome === "rejected" ? "payer_rejected" : "partial_shortfall",
           });
         } else if (onchain.dueAt > 0 && now >= onchain.dueAt) {
-          out.push({ onchain, offchain: c, why: `Overdue since ${dateFromSeconds(onchain.dueAt)}`, suggested: "overdue" });
+          out.push({ onchain, offchain: c, why: `Overdue since ${dateTimeFromSeconds(onchain.dueAt)}`, suggested: "overdue" });
         }
       }
       return out;
@@ -69,7 +69,7 @@ function MissedPayment({ item, now }: { item: Exception; now: number }) {
   return (
     <div className="border-divider flex flex-col gap-2 border-t pt-3" data-testid="missed-payment">
       <span className="text-muted-foreground text-xs font-medium">
-        Missed payment on the ledger{impaired ? " · marked impaired" : late ? " · payment is late" : ` · due ${dateFromSeconds(item.onchain.dueAt)}`}
+        Missed payment on the ledger{impaired ? " · marked impaired" : late ? " · payment is late" : ` · due ${dateTimeFromSeconds(item.onchain.dueAt)}`}
       </span>
       <div className="flex flex-wrap gap-2">
         {impaired ? (

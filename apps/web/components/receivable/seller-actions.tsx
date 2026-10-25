@@ -17,9 +17,9 @@ import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Textarea } from "@/components/ui/textarea";
 import { useCall, useMe } from "@/hooks/use-api";
 import { useNowSeconds } from "@/hooks/use-now";
-import { ASSET, ledgerReady } from "@/lib/config";
+import { ASSET, demoTools, ledgerReady } from "@/lib/config";
 import { friendlyError } from "@/lib/errors";
-import { dateFromSeconds, daysFrom, dollars, usd } from "@/lib/format";
+import { dateFromSeconds, dateTimeFromSeconds, daysFrom, dollars, usd } from "@/lib/format";
 import { cn } from "@/lib/utils";
 import type { InviteCreated, OffchainReceivable } from "@/lib/types";
 import { SettlePanel } from "./settle-panel";
@@ -244,6 +244,9 @@ function PaidCelebration({ receivable, onchain, onContinue }: { receivable: Offc
   );
 }
 
+/** How long a test-network demo loan runs. */
+const DEMO_LOAN_MINUTES = 5;
+
 /** The one action that fits the receivable's state, for the person who sold it (SYSTEM_DESIGN 6.2). */
 export function SellerActions({ receivable, onchain }: { receivable: OffchainReceivable; onchain: ReceivableView | null }) {
   const me = useMe();
@@ -254,7 +257,7 @@ export function SellerActions({ receivable, onchain }: { receivable: OffchainRec
   const state = receivable.status;
   const [justFunded, setJustFunded] = useState(false);
   const fund = useMutation({
-    mutationFn: () => call("loans", { method: "POST", body: { action: "fund", receivableId: receivable.id } }),
+    mutationFn: (demoMinutes?: number) => call("loans", { method: "POST", body: { action: "fund", receivableId: receivable.id, demoMinutes } }),
     onSuccess: async () => {
       setJustFunded(true);
       await queryClient.invalidateQueries();
@@ -347,11 +350,28 @@ export function SellerActions({ receivable, onchain }: { receivable: OffchainRec
             size="lg"
             className="pr-2 self-start"
             disabled={!ledgerReady || fund.isPending || fund.isSuccess}
-            onClick={() => fund.mutate()}
+            onClick={() => fund.mutate(undefined)}
             data-testid="get-paid"
           >
             <CtaLabel>{fund.isPending ? "Getting your loan..." : `Get ${usd(onchain.approvedAmount)} in ${ASSET}`}</CtaLabel>
           </Button>
+          {demoTools && ledgerReady ? (
+            <div className="flex flex-col gap-1.5">
+              <Button
+                variant="outline"
+                size="sm"
+                className="self-start"
+                disabled={fund.isPending || fund.isSuccess}
+                onClick={() => fund.mutate(DEMO_LOAN_MINUTES)}
+                data-testid="get-paid-demo"
+              >
+                Demo: take it as a {DEMO_LOAN_MINUTES}-minute loan
+              </Button>
+              <span className="text-muted-foreground text-xs">
+                Test network only. The loan is due in {DEMO_LOAN_MINUTES} minutes with a 1-minute grace period, so a missed payment and a default can be shown live.
+              </span>
+            </div>
+          ) : null}
           {fund.isError ? <ErrorNotice>{friendlyError(fund.error)}</ErrorNotice> : null}
           {!ledgerReady ? (
             <InfoNotice title="The lending vault isn't set up yet">
@@ -382,15 +402,15 @@ export function SellerActions({ receivable, onchain }: { receivable: OffchainRec
             }
             description={
               receivable.impairedAt
-                ? `It was due ${dateFromSeconds(onchain.dueAt)}, and the loan is marked impaired on the ledger. Pay it now to bring it back to good standing.`
-                : `By ${dateFromSeconds(onchain.dueAt)}.`
+                ? `It was due ${dateTimeFromSeconds(onchain.dueAt)}, and the loan is marked impaired on the ledger. Pay it now to bring it back to good standing.`
+                : `By ${dateTimeFromSeconds(onchain.dueAt)}.`
             }
           >
             <ProgressBar paid={onchain.amountPaid} due={onchain.amountDue} />
           </StatePanel>
         )}
         <PageSection title="Pay it back">
-          <SettlePanel receivableId={receivable.id} onchain={onchain} who="borrower" live={ledgerReady && Boolean(receivable.loanId)} />
+          <SettlePanel receivableId={receivable.id} onchain={onchain} who="borrower" live={ledgerReady && Boolean(receivable.loanId)} awaitingPayer />
         </PageSection>
         <div className="border-divider divide-divider flex flex-col divide-y border-t [&>*]:py-4">
           <ReportOutcome receivable={receivable} onchain={onchain} />

@@ -35,8 +35,8 @@ function readyConfig(base: NetworkConfig, broker: string, issuer: string): Netwo
   };
 }
 
-function envFor(brokerSeed: string): Env {
-  return { get: (name) => (name === "BROKER_SEED" ? brokerSeed : undefined) };
+function envFor(brokerSeed: string, issuerSeed?: string): Env {
+  return { get: (name) => (name === "BROKER_SEED" ? brokerSeed : name === "ISSUER_SEED" ? issuerSeed : undefined) };
 }
 
 async function approvedWorld() {
@@ -58,10 +58,10 @@ async function approvedWorld() {
     ledger,
     custody: testCustody(w.db),
     config,
-    env: envFor(ops.brokerSeed),
+    env: envFor(ops.brokerSeed, ops.issuerSeed),
     now: () => FIXED_NOW,
   });
-  return { ...w, config, ledger, handler, broker: ops.broker };
+  return { ...w, config, ledger, handler, broker: ops.broker, issuer: ops.issuer };
 }
 
 Deno.test("loans rejects requests without a valid Privy token", async () => {
@@ -237,4 +237,66 @@ Deno.test("missed payments: a loan that isn't on the ledger can't be managed", a
   const w = await approvedWorld();
   const attester = await makeUser(w.db, { staff: "attester", kyc: "approved" });
   assertStatus(await call(w.handler, "POST", ENDPOINT, { token: attester.token, body: { action: "impair", receivableId: w.receivable.id } }), 409, "no_loan");
+});
+
+Deno.test("a demo loan is due in minutes, with the ledger's shortest grace period", async () => {
+  const w = await approvedWorld();
+  const funded = await call(w.handler, "POST", ENDPOINT, { token: w.seller.token, body: { action: "fund", receivableId: w.receivable.id, demoMinutes: 5 } });
+  assertStatus(funded, 200);
+  const loan = w.ledger.submitted.find((entry) => entry.tx.TransactionType === "LoanSet")?.tx as LoanSet | undefined;
+  assertEquals([loan?.PaymentInterval, loan?.GracePeriod], [300, 60]);
+  const tooLong = await approvedWorld();
+  const res = await call(tooLong.handler, "POST", ENDPOINT, { token: tooLong.seller.token, body: { action: "fund", receivableId: tooLong.receivable.id, demoMinutes: 600 } });
+  assertStatus(res, 400);
+});
+
+Deno.test("demo tools are refused off a test network", async () => {
+  const w = await approvedWorld();
+  const handler = createLoansHandler({
+    auth: verifier,
+    db: w.db,
+    ledger: w.ledger,
+    custody: testCustody(w.db),
+    config: { ...w.config, features: { ...w.config.features, simulatePayment: false } },
+    env: envFor("x"),
+    now: () => FIXED_NOW,
+  });
+  assertStatus(await call(handler, "POST", ENDPOINT, { token: w.seller.token, body: { action: "fund", receivableId: w.receivable.id, demoMinutes: 5 } }), 403);
+  assertStatus(await call(handler, "POST", ENDPOINT, { token: w.seller.token, body: { action: "simulate-payment", receivableId: w.receivable.id } }), 403);
+});
+
+Deno.test("the simulated payer pays the borrower's wallet what they owe, and the wallet pays the loan off", async () => {
+  const w = await approvedWorld();
+  assertStatus(await call(w.handler, "POST", ENDPOINT, { token: w.seller.token, body: { action: "fund", receivableId: w.receivable.id } }), 200);
+  const due = (await w.db.getReceivable(w.receivable.id))?.amountDue ?? "";
+  assertStatus(await call(w.handler, "POST", ENDPOINT, { token: w.outsider.token, body: { action: "simulate-payment", receivableId: w.receivable.id } }), 403);
+  const paid = await call(w.handler, "POST", ENDPOINT, { token: w.seller.token, body: { action: "simulate-payment", receivableId: w.receivable.id } });
+  assertStatus(paid, 200);
+  assertEquals((paid.body.receivable as { status: string }).status, "Settled");
+  const sent = w.ledger.submitted.slice(-2).map((entry) => entry.tx);
+  const payment = sent[0] as unknown as { TransactionType: string; Account: string; Destination: string; DestinationTag: number; Amount: { value: string } };
+  assertEquals([payment.TransactionType, payment.Account, payment.Destination], ["Payment", w.issuer.address, w.seller.wallet]);
+  assertEquals(payment.DestinationTag, w.receivable.number);
+  // the payer pays the full invoice, which covers the loan; the borrower keeps the rest
+  assertEquals(payment.Amount.value, unitsToValue(BigInt(w.receivable.faceValue) > BigInt(due) ? BigInt(w.receivable.faceValue) : BigInt(due)));
+  assertEquals((sent[1] as LoanPay).TransactionType, "LoanPay");
+  assertEquals((sent[1] as LoanPay).Amount, { currency: w.config.asset.currency, issuer: w.config.asset.issuer ?? "", value: unitsToValue(BigInt(due)) });
+  assertStatus(await call(w.handler, "POST", ENDPOINT, { token: w.seller.token, body: { action: "simulate-payment", receivableId: w.receivable.id } }), 409, "invalid_state");
+});
+
+Deno.test("a payment after impairment uses the ledger's due date and is flagged late", async () => {
+  const w = await approvedWorld();
+  const loanId = "E".repeat(64);
+  await w.db.updateReceivable(w.receivable.id, {
+    status: "Funded",
+    purchasePrice: "350000000",
+    amountDue: "360000000",
+    amountPaid: "0",
+    loanId,
+    dueAt: new Date(FIXED_NOW.getTime() + 86_400_000).toISOString(),
+  });
+  w.ledger.entries.set(loanId, { LedgerEntryType: "Loan", NextPaymentDueDate: rippleTime(UNIX - 30) });
+  assertStatus(await call(w.handler, "POST", ENDPOINT, { token: w.seller.token, body: { action: "pay", receivableId: w.receivable.id } }), 200);
+  const payment = w.ledger.submitted.find((entry) => entry.tx.TransactionType === "LoanPay")?.tx as LoanPay | undefined;
+  assertEquals(payment?.Flags, 262_144);
 });

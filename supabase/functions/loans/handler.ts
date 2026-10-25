@@ -1,19 +1,20 @@
 import { amountDue, interestRateTenths, principalUnits, wholeNumber } from "@app/adapters";
 import type { NetworkConfig } from "@app/config";
-import { paramsAsBigInt } from "@app/config";
-import { type LoanManage, LoanManageFlags, LoanPayFlags, type LoanPay, type LoanSet } from "xrpl";
+import { isTestnet, paramsAsBigInt } from "@app/config";
+import { type LoanManage, LoanManageFlags, LoanPayFlags, type LoanPay, type LoanSet, type Payment } from "xrpl";
 import type { TokenVerifier } from "../_shared/auth.ts";
 import { type Caller, requireCaller, requireStaff } from "../_shared/auth.ts";
 import { amountRemaining, receivableView, loadReceivable, requireSeller } from "../_shared/receivables.ts";
 import type { Db, ReceivablePatch, ReceivableStatus } from "../_shared/db/types.ts";
 import type { Env } from "../_shared/env.ts";
-import { type Handler, conflict, json, methodNotAllowed, readJson } from "../_shared/http.ts";
+import { type Handler, conflict, forbidden, json, methodNotAllowed, readJson } from "../_shared/http.ts";
 import type { Ledger } from "../_shared/ledger.ts";
 import {
   brokerWallet,
   dueAtFromLoan,
   ensureAccess,
   issuedAmount,
+  issuerWallet,
   paymentDueUnits,
   readySetup,
   rethrowLedger,
@@ -34,11 +35,22 @@ export type LoansDeps = {
   now?: () => Date;
 };
 
+export const DEMO_MIN_MINUTES = 2;
+export const DEMO_MAX_MINUTES = 60;
+
 const Body = z.strictObject({
-  /** borrower: fund, pay. staff: impair (a missed payment), unimpair, default. */
-  action: z.enum(["fund", "pay", "impair", "unimpair", "default"]),
+  /**
+   * borrower: fund, pay. staff: impair (a missed payment), unimpair, default. borrower or staff, test networks only:
+   * simulate-payment, the payer paying the borrower's wallet, which then pays the loan off.
+   */
+  action: z.enum(["fund", "pay", "impair", "unimpair", "default", "simulate-payment"]),
   receivableId: z.uuid(),
+  /** fund, test networks only: a demo loan due this many minutes from now, so a missed payment can be shown live. */
+  demoMinutes: z.number().int().min(DEMO_MIN_MINUTES).max(DEMO_MAX_MINUTES).optional(),
 });
+
+/** A demo loan's grace period: the ledger's minimum, so it can be defaulted a minute after it's late. */
+export const DEMO_GRACE_SECONDS = 60;
 
 const PAYABLE: ReceivableStatus[] = ["Funded", "GuarantorCalled", "WrittenOff"];
 
@@ -57,13 +69,22 @@ export function createLoansHandler(deps: LoansDeps): Handler {
       requireStaff(caller, ["attester", "admin"]);
       return manage(deps, caller, receivable.id, body.action, now());
     }
+    if (body.action === "simulate-payment" || body.demoMinutes !== undefined) requireDemo(deps.config);
+    if (body.action === "simulate-payment") {
+      if (caller.profile.wallet !== receivable.recipientWallet) requireStaff(caller, ["attester", "admin"]);
+      return simulatePayment(deps, receivable.id, now());
+    }
     requireSeller(caller, receivable);
-    if (body.action === "fund") return fund(deps, receivable.id, now());
+    if (body.action === "fund") return fund(deps, receivable.id, now(), body.demoMinutes);
     return pay(deps, receivable.id, now());
   };
 }
 
-async function fund(deps: LoansDeps, receivableId: string, now: Date): Promise<Response> {
+function requireDemo(config: NetworkConfig): void {
+  if (!config.features.simulatePayment || !isTestnet(config)) throw forbidden("demo tools are only on a test network");
+}
+
+async function fund(deps: LoansDeps, receivableId: string, now: Date, demoMinutes?: number): Promise<Response> {
   const receivable = await loadReceivable(deps.db, receivableId);
   if (receivable.status !== "Approved") throw conflict("this isn't waiting to be funded", "invalid_state");
   if (!receivable.approvalExpiresAt || Date.parse(receivable.approvalExpiresAt) <= now.getTime()) {
@@ -73,10 +94,11 @@ async function fund(deps: LoansDeps, receivableId: string, now: Date): Promise<R
   if (profile?.kycStatus !== "approved") throw conflict("finish verification before you take this loan", "kyc_required");
   const setup = readySetup(deps.config);
   // the loan runs to the receivable's due date: the end of that day, UTC
-  const term = loanTermSeconds(receivable.dueDate, now);
-  if (term < MIN_TERM_SECONDS) throw conflict("the payer's due date is too close to start a loan now", "due_too_soon");
+  // a demo loan is due in minutes instead, with the shortest grace period the ledger allows
+  const term = demoMinutes !== undefined ? demoMinutes * 60 : loanTermSeconds(receivable.dueDate, now);
+  if (demoMinutes === undefined && term < MIN_TERM_SECONDS) throw conflict("the payer's due date is too close to start a loan now", "due_too_soon");
   // the ledger refuses a grace period longer than the payment interval, so a short loan gets a shorter grace
-  const grace = Math.min(deps.config.params.writeOffGraceSeconds, term);
+  const grace = demoMinutes !== undefined ? DEMO_GRACE_SECONDS : Math.min(deps.config.params.writeOffGraceSeconds, term);
 
   const params = paramsAsBigInt(deps.config);
   const principal = principalUnits(BigInt(receivable.approvedAmount), deps.config.params.advanceRateBps);
@@ -156,7 +178,10 @@ async function pay(deps: LoansDeps, receivableId: string, now: Date): Promise<Re
   let sent = false;
   try {
     const borrower = await deps.custody.signer(receivable.recipientWallet);
-    const late = receivable.dueAt !== null && Date.parse(receivable.dueAt) < now.getTime();
+    // the ledger's due date wins: impairing a loan moves it
+    const entry = await deps.ledger.readEntry(receivable.loanId);
+    const dueAt = entry ? dueAtFromLoan(entry, new Date(receivable.dueAt ?? now)) : receivable.dueAt;
+    const late = dueAt !== null && Date.parse(dueAt) < now.getTime();
     const tx: LoanPay = {
       TransactionType: "LoanPay",
       Account: borrower.classicAddress,
@@ -177,6 +202,38 @@ async function pay(deps: LoansDeps, receivableId: string, now: Date): Promise<Re
 }
 
 /** A loan shorter than a day isn't worth opening; the receivable form already asks for a date after today. */
+/**
+ * Test networks only: the payer pays what they owe into the borrower's wallet (the stand-in asset's issuer sends it,
+ * standing in for the payer), and the wallet pays the loan off from it. What's left after the loan stays with the
+ * borrower. On a real network this payment comes from the payer, and auto-repay sends the same LoanPay.
+ */
+async function simulatePayment(deps: LoansDeps, receivableId: string, now: Date): Promise<Response> {
+  const receivable = await loadReceivable(deps.db, receivableId);
+  if (!["Funded", "GuarantorCalled"].includes(receivable.status)) throw conflict("this loan isn't waiting on a payment", "invalid_state");
+  if (!receivable.loanId) throw conflict("this loan isn't on the ledger", "no_loan");
+  const remaining = amountRemaining(receivable);
+  const face = BigInt(receivable.faceValue);
+  const owed = face > remaining ? face : remaining;
+
+  const key = `payer:${receivable.id}`;
+  if (!(await deps.db.claimOnce(key))) throw conflict("the payer's payment was already sent", "in_progress");
+  try {
+    const issuer = issuerWallet(deps.config, signingSeed(deps.env, "ISSUER_SEED"));
+    const tx: Payment = {
+      TransactionType: "Payment",
+      Account: issuer.classicAddress,
+      Destination: receivable.recipientWallet,
+      DestinationTag: receivable.number,
+      Amount: issuedAmount(deps.config, owed),
+    };
+    await deps.ledger.submit(issuer, tx, { purpose: "payer_payment", receivableId: receivable.id });
+  } catch (error) {
+    await deps.db.releaseOnce(key);
+    rethrowLedger(error);
+  }
+  return pay(deps, receivable.id, now);
+}
+
 export const MIN_TERM_SECONDS = 86_400;
 
 /** Seconds from `now` to the end of the receivable's due date (YYYY-MM-DD, UTC). The receivables function caps how far out that is. */
@@ -210,7 +267,7 @@ async function manage(deps: LoansDeps, caller: Caller, receivableId: string, act
   // fixCleanup3_4_0: the due date has to have strictly passed, and for a default the grace period too
   if (action === "impair" && nowUnix <= dueUnix) throw conflict("the payment isn't late yet: the due date hasn't passed", "too_soon");
   if (action === "default" && nowUnix <= dueUnix + grace) {
-    throw conflict(`it can be defaulted after the grace period, on ${new Date((dueUnix + grace + 1) * 1000).toISOString().slice(0, 10)}`, "too_soon");
+    throw conflict(`it can be defaulted after the grace period, on ${new Date((dueUnix + grace + 1) * 1000).toISOString().slice(0, 16).replace("T", " ")} UTC`, "too_soon");
   }
 
   const broker = brokerWallet(deps.config, signingSeed(deps.env, "BROKER_SEED"));

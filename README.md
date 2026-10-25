@@ -56,6 +56,11 @@ pnpm xrpl:setup --fresh             # new accounts, e.g. after a Devnet reset
 
 The hosted functions need `BROKER_SEED` and `ISSUER_SEED` from `.env` as Supabase secrets.
 
+### Demoing repayment and missed payments (test networks only)
+
+- **Repayment:** on a funded loan, press **Simulate payer payment**. The payer's money lands in the borrower's wallet, which pays the loan off right away; the rest stays with the borrower.
+- **Missed payment:** on an approved request, press **Demo: take it as a 5-minute loan**. After 5 minutes, an admin opens **Exceptions** and presses **Mark payment missed**; a minute later, **Default the loan**, which writes it off and draws on the series's first-loss cover. **Vault stats** shows the default.
+
 Tests:
 
 ```bash

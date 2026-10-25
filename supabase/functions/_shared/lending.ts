@@ -103,6 +103,19 @@ async function submitAllowing(
 }
 
 /**
+ * A new wallet's faucet payment takes a ledger or two to validate, so someone approved seconds after signing up
+ * would otherwise be refused. Waits up to `tries` × `delayMs` for the account to exist.
+ */
+export async function waitForAccount(ledger: Ledger, address: Wallet, tries = 8, delayMs = 2_000) {
+  let balances = await ledger.balances(address);
+  for (let i = 1; i < tries && !balances.exists; i++) {
+    await new Promise((resolve) => setTimeout(resolve, delayMs));
+    balances = await ledger.balances(address);
+  }
+  return balances;
+}
+
+/**
  * A private IOU vault only accepts an account that holds the accepted credential and a trust line to the issuer.
  * Creating either one twice is the same as having it, so those results are ignored. One button still does it.
  */
@@ -115,7 +128,7 @@ export async function ensureAccess(deps: {
 }): Promise<void> {
   const setup = readySetup(deps.config);
   const broker = brokerWallet(deps.config, deps.brokerSeed);
-  const balances = await deps.ledger.balances(deps.holder);
+  const balances = await waitForAccount(deps.ledger, deps.holder);
   if (!balances.exists) throw conflict("this wallet isn't on the ledger yet", "unfunded");
   const holder = await deps.custody.signer(deps.holder);
   if (balances.asset === null) {

@@ -37,6 +37,11 @@ export function dateFromSeconds(seconds: number | bigint): string {
   return new Date(Number(seconds) * 1000).toLocaleDateString("en-US", { dateStyle: "medium" });
 }
 
+/** A date with the time, for loans due within the day (test-network demo loans). */
+export function dateTimeFromSeconds(seconds: number | bigint): string {
+  return new Date(Number(seconds) * 1000).toLocaleString("en-US", { dateStyle: "medium", timeStyle: "short" });
+}
+
 export function dateTime(iso: string): string {
   return new Date(iso).toLocaleString("en-US", { dateStyle: "medium", timeStyle: "short" });
 }

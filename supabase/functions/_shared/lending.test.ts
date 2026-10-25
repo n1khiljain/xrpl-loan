@@ -75,3 +75,15 @@ Deno.test("pickLendingSeries takes the soonest payout that fits the term and has
   assertEquals(pickLendingSeries(all, 1_000_000_000n, 300 * DAY, UNIX), null);
   assertEquals(pickLendingSeries(all, 50_000_000_000n, DAY, UNIX), null);
 });
+
+Deno.test("waitForAccount waits for a just-funded wallet, and gives up on one that never appears", async () => {
+  const { FakeLedger } = await import("./ledger.ts");
+  const { waitForAccount } = await import("./lending.ts");
+  const ledger = new FakeLedger();
+  const address = "rHb9CJAWyB4rj91VRWn96DkukG4bwdtyTh" as const;
+  setTimeout(() => ledger.balanceOf.set(address, { exists: true, xrpDrops: "100000000", asset: null }), 30);
+  const found = await waitForAccount(ledger, address, 10, 20);
+  if (!found.exists) throw new Error("should have waited for the account");
+  const never = await waitForAccount(ledger, "rPEPPER7kfTD9w2To4CQk6UCfuHM9c6GDY", 3, 5);
+  if (never.exists) throw new Error("should have given up");
+});
